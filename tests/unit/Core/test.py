@@ -1,0 +1,89 @@
+import unittest
+import asyncio
+from unittest.mock import MagicMock, patch
+
+from vectorq.main import VectorQ, VectorQBenchmark
+from vectorq.config import VectorQConfig
+
+class TestVectorQAsyncQueue(unittest.TestCase):
+    
+    def setUp(self):
+        self.config_with_cache = VectorQConfig(enable_cache=True)
+        self.config_without_cache = VectorQConfig(enable_cache=False)
+    
+    @patch('vectorq.main.VectorQCore')
+    @patch('vectorq.main.InferenceEngine')
+    def test_multiple_concurrent_requests(self, mock_inference_engine, mock_core):
+        mock_inference_engine_instance = mock_inference_engine.return_value
+        mock_inference_engine_instance.create.side_effect = [
+            "response 1", "response 2", "response 3", "response 4", "response 5"
+        ]
+        
+        async def test():
+            vectorq = VectorQ(self.config_without_cache)
+            tasks = [
+                vectorq.create(f"prompt {i}") 
+                for i in range(5)
+            ]
+            results = await asyncio.gather(*tasks)
+            await vectorq.shutdown()
+            return results
+        
+        results = asyncio.run(test())
+        
+        self.assertEqual(len(results), 5)
+        for i, (response, cache_hit) in enumerate(results):
+            self.assertEqual(response, f"response {i+1}")
+            self.assertFalse(cache_hit)
+        
+        self.assertEqual(mock_inference_engine_instance.create.call_count, 5)
+    
+    @patch('vectorq.main.VectorQCore')
+    @patch('vectorq.main.InferenceEngine')
+    def test_error_handling(self, mock_inference_engine, mock_core):
+        mock_inference_engine_instance = mock_inference_engine.return_value
+        mock_inference_engine_instance.create.side_effect = Exception("Test error")
+        
+        async def test():
+            vectorq = VectorQ(self.config_without_cache)
+            response, cache_hit = await vectorq.create("Is the sky blue?")
+            await vectorq.shutdown()
+            return response, cache_hit
+        
+        response, cache_hit = asyncio.run(test())
+        
+        self.assertTrue(response.startswith("[ERROR]"))
+        self.assertFalse(cache_hit)
+    
+    @patch('vectorq.main.VectorQCore')
+    @patch('vectorq.main.InferenceEngine')
+    def test_fifo_processing_order(self, mock_inference_engine, mock_core):
+        processing_times = []
+        
+        def create_side_effect(prompt, output_format=None):
+            processing_times.append(prompt)
+            return f"response for {prompt}"
+            
+        mock_inference_engine_instance = mock_inference_engine.return_value
+        mock_inference_engine_instance.create.side_effect = create_side_effect
+        
+        async def test():
+            vectorq = VectorQ(self.config_without_cache)
+            
+            tasks = [
+                vectorq.create("prompt 1"),
+                vectorq.create("prompt 2"),
+                vectorq.create("prompt 3")
+            ]
+            
+            results = await asyncio.gather(*tasks)
+            
+            await vectorq.shutdown()
+            return results
+        
+        _ = asyncio.run(test())
+        
+        self.assertEqual(processing_times, ["prompt 1", "prompt 2", "prompt 3"])
+
+if __name__ == "__main__":
+    unittest.main()

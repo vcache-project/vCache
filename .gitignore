@@ -1,0 +1,15 @@
+__pycache__/
+vectorq.egg-info/
+temp/
+nohup.out
+
+__old/*
+.cursorignore
+*.pdf
+*.json
+benchmarks/data/large_scale/*.json
+benchmarks/results/*
+temp/*
+*.log
+bin/*
+.venv/
