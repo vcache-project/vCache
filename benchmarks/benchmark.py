@@ -15,13 +15,8 @@ from typing import Dict, List
 from vectorq.main import VectorQ
 from vectorq.config import VectorQConfig
 from vectorq.main import VectorQBenchmark
-from vectorq.config import InferenceEngineType
-from vectorq.config import EmbeddingEngineType
-from vectorq.config import VectorDBType
-from vectorq.config import SimilarityMetricType
-from vectorq.config import EmbeddingMetadataStorageType
-from vectorq.config import SimilarityEvaluatorType
-from vectorq.vectorq_core.cache.vector_db.embedding_metadata_storage.embedding_metadata_obj import EmbeddingMetadataObj
+from vectorq.vectorq_core.cache.embedding_store.embedding_metadata_storage.embedding_metadata_obj import EmbeddingMetadataObj
+from vectorq import HNSWLibVectorDB, SimilarityMetricType, InMemoryEmbeddingMetadataStorage, StringComparisonSimilarityEvaluator
 
 repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 results_dir = os.path.join(repo_root, 'results')
@@ -35,10 +30,11 @@ logging.basicConfig(filename=os.path.join(results_dir, 'benchmark.log'), level=l
 
 # VectorQ Config
 MAX_CAPACITY = 800
-VECTOR_DB_TYPE = VectorDBType.HNSW
-VECTOR_DB_SIMILARITY_METRIC_TYPE = SimilarityMetricType.COSINE
-EMBEDDING_METADATA_STORAGE_TYPE = EmbeddingMetadataStorageType.IN_MEMORY
-SIMILARITY_EVALUATOR_TYPE = SimilarityEvaluatorType.STRING_COMPARISON
+VECTOR_DB = HNSWLibVectorDB(
+    similarity_metric_type=SimilarityMetricType.COSINE
+)
+EMBEDDING_METADATA_STORAGE = InMemoryEmbeddingMetadataStorage()
+SIMILARITY_EVALUATOR = StringComparisonSimilarityEvaluator()
 
 
 # Benchmark Config
@@ -434,10 +430,9 @@ if __name__ == '__main__':
                             is_static_threshold=True,
                             static_threshold=threshold,
                             max_capacity=MAX_CAPACITY,
-                            vector_db_type=VECTOR_DB_TYPE,
-                            vector_db_similarity_metric_type=VECTOR_DB_SIMILARITY_METRIC_TYPE,
-                            embedding_metadata_storage_type=EMBEDDING_METADATA_STORAGE_TYPE,
-                            similarity_evaluator_type=SIMILARITY_EVALUATOR_TYPE,
+                            vector_db=VECTOR_DB,
+                            embedding_metadata_storage=EMBEDDING_METADATA_STORAGE,
+                            similarity_evaluator=SIMILARITY_EVALUATOR,
                         )
                         vectorq:VectorQ = VectorQ(vectorq_config=config)
                         
@@ -467,10 +462,9 @@ if __name__ == '__main__':
                                 is_static_threshold=False,
                                 rnd_num_ub=rnd_num_ub,
                                 max_capacity=MAX_CAPACITY,
-                                vector_db_type=VECTOR_DB_TYPE,
-                                vector_db_similarity_metric_type=VECTOR_DB_SIMILARITY_METRIC_TYPE,
-                                embedding_metadata_storage_type=EMBEDDING_METADATA_STORAGE_TYPE,
-                                similarity_evaluator_type=SIMILARITY_EVALUATOR_TYPE,
+                                vector_db=VECTOR_DB,
+                                embedding_metadata_storage=EMBEDDING_METADATA_STORAGE,
+                                similarity_evaluator=SIMILARITY_EVALUATOR,
                             )
                             vectorq:VectorQ = VectorQ(vectorq_config=config)
                             

@@ -1,20 +1,13 @@
-import math
-from typing import List, TYPE_CHECKING
+from enum import Enum
+from typing import List
 from abc import ABC, abstractmethod
 
-if TYPE_CHECKING:
-    from vectorq.vectorq_core.cache.vector_db.embedding_metadata_storage.embedding_metadata_storage import EmbeddingMetadataStorageType
-    from vectorq.vectorq_core.cache.vector_db.embedding_metadata_storage.embedding_metadata_obj import EmbeddingMetadataObj
-    from vectorq.config import VectorQConfig
+class SimilarityMetricType(Enum):
+    COSINE = "cosine"
+    EUCLIDEAN = "euclidean"
 
-class VectorDBStrategy(ABC):
+class VectorDB(ABC):
     
-    def __init__(
-            self,
-            vectorq_config: "VectorQConfig"
-        ):
-        self.vectorq_config: "VectorQConfig" = vectorq_config
-        
     def transform_similarity_score(self, similarity_score: float, metric_type: str) -> float:
         '''
         similarity_score: float - The similarity score to transform

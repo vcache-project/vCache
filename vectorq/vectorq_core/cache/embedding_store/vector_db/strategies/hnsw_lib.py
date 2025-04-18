@@ -1,25 +1,22 @@
 import hnswlib
-from typing import List, TYPE_CHECKING
-from vectorq.vectorq_core.cache.vector_db.strategy import VectorDBStrategy
-
-if TYPE_CHECKING:
-    from vectorq.vectorq_core.cache.vector_db.embedding_metadata_storage.embedding_metadata_obj import EmbeddingMetadataObj
-    from vectorq.config import VectorQConfig
+from typing import List
+from vectorq.vectorq_core.cache.embedding_store.vector_db.vector_db import SimilarityMetricType, VectorDB
     
 '''
 Run 'sudo apt-get install build-essential' on Linux Debian/Ubuntu to install the build-essential package
 '''
     
-class HNSWLib(VectorDBStrategy):
+class HNSWLibVectorDB(VectorDB):
     
-    def __init__(self, vectorq_config: "VectorQConfig"):
-        super().__init__(vectorq_config)
+    def __init__(self, 
+                 similarity_metric_type: SimilarityMetricType = SimilarityMetricType.COSINE, 
+                 max_capacity: int = 1000):
         self.embedding_count = 0
         self.__next_embedding_id = 0
-        
+        self.similarity_metric_type = similarity_metric_type
         self.space = None
         self.dim = None
-        self.max_elements = None
+        self.max_elements = max_capacity
         self.ef_construction = None
         self.M = None
         self.ef = None
@@ -60,7 +57,7 @@ class HNSWLib(VectorDBStrategy):
         self.__next_embedding_id = 0
     
     def _init_vector_store(self, embedding_dim: int):
-        metric_type = self.vectorq_config._vector_db_similarity_metric_type.value
+        metric_type = self.similarity_metric_type.value
         match metric_type:
             case "cosine":
                 self.space = "cosine"
@@ -69,7 +66,6 @@ class HNSWLib(VectorDBStrategy):
             case _:
                 raise ValueError(f"Invalid similarity metric type: {metric_type}")
         self.dim = embedding_dim
-        self.max_elements = self.vectorq_config.max_capacity
         self.ef_construction = 350
         self.M = 52
         self.ef = 400

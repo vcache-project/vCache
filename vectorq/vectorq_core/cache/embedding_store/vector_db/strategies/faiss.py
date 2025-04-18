@@ -1,16 +1,13 @@
 import faiss
-from typing import List, TYPE_CHECKING
-from vectorq.vectorq_core.cache.vector_db.strategy import VectorDBStrategy
+from typing import List
+from vectorq.vectorq_core.cache.embedding_store.vector_db.vector_db import SimilarityMetricType, VectorDB
 import numpy as np
 
-if TYPE_CHECKING:
-    from vectorq.config import VectorQConfig
 
+class FAISSVectorDB(VectorDB):
 
-class FAISS(VectorDBStrategy):
-
-    def __init__(self, vectorq_config: "VectorQConfig"):
-        super().__init__(vectorq_config)
+    def __init__(self, similarity_metric_type: SimilarityMetricType = SimilarityMetricType.COSINE):
+        self.similarity_metric_type = similarity_metric_type
         self.__next_embedding_id = 0
         self.index = None
 
@@ -32,7 +29,7 @@ class FAISS(VectorDBStrategy):
         id = self.__next_embedding_id
         ids = np.array([id], dtype=np.int64)
         embedding_array = np.array([embedding], dtype=np.float32)
-        metric_type = self.vectorq_config._vector_db_similarity_metric_type.value
+        metric_type = self.similarity_metric_type.value
         # Normalize the embedding vector if the metric type is cosine
         if metric_type == "cosine":
             faiss.normalize_L2(embedding_array)
@@ -56,7 +53,7 @@ class FAISS(VectorDBStrategy):
             return []
         k_ = min(k, self.index.ntotal)
         query_vector = np.array([embedding], dtype=np.float32)
-        metric_type = self.vectorq_config._vector_db_similarity_metric_type.value
+        metric_type = self.similarity_metric_type.value
         # Normalize the query vector if the metric type is cosine
         if metric_type == "cosine":
             faiss.normalize_L2(query_vector)
@@ -79,7 +76,7 @@ class FAISS(VectorDBStrategy):
         self.__next_embedding_id = 0
 
     def _init_vector_store(self, embedding_dim: int):
-        metric_type = self.vectorq_config._vector_db_similarity_metric_type.value
+        metric_type = self.similarity_metric_type.value
         match metric_type:
             case "cosine":
                 faiss_metric = faiss.METRIC_INNER_PRODUCT
