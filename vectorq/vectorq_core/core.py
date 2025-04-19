@@ -22,8 +22,7 @@ class VectorQCore():
         
         self.cache = Cache(
             embedding_store=EmbeddingStore(
-                vector_db=self.vectorq_config.vector_db,
-                embedding_metadata_storage=self.vectorq_config.embedding_metadata_storage
+                vectorq_config=self.vectorq_config
             ),
             embedding_engine=self.vectorq_config.embedding_engine,
             eviction_policy=self.vectorq_config.eviction_policy
