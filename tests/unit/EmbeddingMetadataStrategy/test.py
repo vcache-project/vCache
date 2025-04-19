@@ -1,18 +1,18 @@
 import unittest
 
 from vectorq.config import VectorQConfig
-from vectorq.vectorq_core.cache.vector_db.embedding_metadata_storage import EmbeddingMetadataStorage, EmbeddingMetadataStorageType
-from vectorq.vectorq_core.cache.vector_db.embedding_metadata_storage import EmbeddingMetadataStorageType
-from vectorq.vectorq_core.cache.vector_db.embedding_metadata_storage.embedding_metadata_obj import EmbeddingMetadataObj
+from vectorq.vectorq_core.cache.embedding_store.embedding_metadata_storage import EmbeddingMetadataStorage, InMemoryEmbeddingMetadataStorage
+from vectorq.vectorq_core.cache.embedding_store.embedding_metadata_storage.embedding_metadata_obj import EmbeddingMetadataObj
 
-class TestVectorDBStrategy(unittest.TestCase):
+class TestEmbeddingMetadataStorageStrategy(unittest.TestCase):
     
-    def test_hnsw_lib_strategy_returns_embedding(self):
-        config = VectorQConfig(
-            embedding_metadata_storage_type=EmbeddingMetadataStorageType.IN_MEMORY
-        )
+    def test_in_memory_strategy(self):
+        # Create embedding metadata storage directly
+        embedding_metadata_storage = InMemoryEmbeddingMetadataStorage()
         
-        embedding_metadata_storage: EmbeddingMetadataStorage = EmbeddingMetadataStorage(vectorq_config=config)
+        # Create config with the embedding metadata storage
+        config = VectorQConfig(embedding_metadata_storage=embedding_metadata_storage)
+        
         initial_obj = EmbeddingMetadataObj(embedding_id=0, response="test")
         embedding_id = embedding_metadata_storage.add_metadata(embedding_id=0, metadata=initial_obj)
         assert embedding_id == 0
