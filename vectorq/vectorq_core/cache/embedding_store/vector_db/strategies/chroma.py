@@ -61,3 +61,6 @@ class ChromaVectorDB(VectorDB):
             name=collection_name,
             metadata={"dimension": embedding_dim, "hnsw:space": space},
         )
+
+    def is_empty(self) -> bool:
+        return self.collection.count() == 0

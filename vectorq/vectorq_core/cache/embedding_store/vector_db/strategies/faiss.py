@@ -85,3 +85,6 @@ class FAISSVectorDB(VectorDB):
             case _:
                 raise ValueError(f"Invalid similarity metric type: {metric_type}")
         self.index = faiss.index_factory(embedding_dim, "IDMap,Flat", faiss_metric)
+
+    def is_empty(self) -> bool:
+        return self.index.ntotal == 0

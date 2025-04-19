@@ -60,3 +60,10 @@ class VectorDB(ABC):
         embedding_dim: int - The dimension of the embedding
         '''
         pass
+    
+    @abstractmethod
+    def is_empty(self) -> bool:
+        '''
+        Returns: bool - Whether the vector db is empty
+        '''
+        pass

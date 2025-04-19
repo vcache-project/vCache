@@ -44,7 +44,7 @@ class HNSWLibVectorDB(VectorDB):
         if k_ == 0:
             return []
         ids, similarities = self.index.knn_query(embedding, k=k_)
-        metric_type = self.vectorq_config._vector_db_similarity_metric_type.value
+        metric_type = self.similarity_metric_type.value
         similarity_scores = [self.transform_similarity_score(sim, metric_type) for sim in similarities[0]]
         id_list = [int(id) for id in ids[0]]
         return list(zip(similarity_scores, id_list))
@@ -72,3 +72,6 @@ class HNSWLibVectorDB(VectorDB):
         self.index = hnswlib.Index(space=self.space, dim=self.dim)
         self.index.init_index(max_elements=self.max_elements, ef_construction=self.ef_construction, M=self.M)
         self.index.set_ef(self.ef)
+        
+    def is_empty(self) -> bool:
+        return self.embedding_count == 0
