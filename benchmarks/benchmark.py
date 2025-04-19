@@ -4,6 +4,7 @@ import logging
 import os
 import time
 import torch
+import asyncio
 from common.comparison import *
 from datetime import datetime
 import numpy as np
@@ -16,7 +17,9 @@ from vectorq.main import VectorQ
 from vectorq.config import VectorQConfig
 from vectorq.main import VectorQBenchmark
 from vectorq.vectorq_core.cache.embedding_store.embedding_metadata_storage.embedding_metadata_obj import EmbeddingMetadataObj
-from vectorq import HNSWLibVectorDB, SimilarityMetricType, InMemoryEmbeddingMetadataStorage, StringComparisonSimilarityEvaluator
+from vectorq.vectorq_core.cache.embedding_store.vector_db import HNSWLibVectorDB, SimilarityMetricType
+from vectorq.vectorq_core.cache.embedding_store.embedding_metadata_storage import InMemoryEmbeddingMetadataStorage
+from vectorq.vectorq_core.similarity_evaluator.strategies.string_comparison import StringComparisonSimilarityEvaluator
 
 repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 results_dir = os.path.join(repo_root, 'results')
@@ -29,13 +32,7 @@ logging.basicConfig(filename=os.path.join(results_dir, 'benchmark.log'), level=l
 ########################################################################################################################
 
 # VectorQ Config
-MAX_CAPACITY = 800
-VECTOR_DB = HNSWLibVectorDB(
-    similarity_metric_type=SimilarityMetricType.COSINE
-)
-EMBEDDING_METADATA_STORAGE = InMemoryEmbeddingMetadataStorage()
-SIMILARITY_EVALUATOR = StringComparisonSimilarityEvaluator()
-
+MAX_CAPACITY = 200
 
 # Benchmark Config
 EMBEDDING_MODEL_1 = ('embedding_1', 'GteLargeENv1_5', "float32", 1024)           # 'Alibaba-NLP/gte-large-en-v1.5'
@@ -43,7 +40,7 @@ EMBEDDING_MODEL_2 = ('embedding_2', 'E5_Mistral_7B_Instruct', "float16", 4096)  
 LARGE_LANGUAGE_MODEL_1 = ('response_1', 'Llama_3_8B_Instruct', "float16", None)  # 'meta-llama/Meta-Llama-3-8B-Instruct'
 LARGE_LANGUAGE_MODEL_2 = ('response_2', 'Llama_3_70B_Instruct', "float16", None) # 'meta-llama/Meta-Llama-3-70B-Instruct'
 SIMILARITY_STRATEGY = ('string_comparison', 'embedding_comparison', 'llm_judge_comparison')
-MAX_SAMPLES = 2000
+MAX_SAMPLES = 200
 
 embedding_models = [EMBEDDING_MODEL_1]
 llm_models = [LARGE_LANGUAGE_MODEL_2]
@@ -125,7 +122,7 @@ class Benchmark(unittest.TestCase):
         if self.output_folder_path and not os.path.exists(self.output_folder_path):
             os.makedirs(self.output_folder_path)
 
-    def test_run_benchmark(self):
+    async def test_run_benchmark(self):
         if not self.filepath or not self.embedding_model or not self.llm_model:
             raise ValueError(f"Required parameters not set: filepath: {self.filepath}, embedding_model: {self.embedding_model}, or llm_model: {self.llm_model}")
             
@@ -158,16 +155,16 @@ class Benchmark(unittest.TestCase):
 
                     row_embedding = data_entry[self.embedding_model[0]]
                     start_time_vectorq = time.time()
-                    vectorQ_answer, answer_reused = self.get_vectorQ_answer(review_text, row_embedding)
+                    vectorQ_answer, cache_hit = await self.get_vectorQ_answer(review_text, row_embedding)
                     duration_vectorq = time.time() - start_time_vectorq + emb_generation_latency
-                    if not answer_reused:
+                    if not cache_hit:
                         duration_vectorq += llm_generation_latency
                     self.total_duration_vectorq += duration_vectorq
 
-                    if answer_reused:
+                    if cache_hit:
                         self.total_reused += 1
          
-                    if answer_reused:
+                    if cache_hit:
                         if answers_have_same_meaning_static(self.task, direct_answer, vectorQ_answer):
                             self.true_positive_counter += 1  # Correctly reused
                         else:
@@ -178,13 +175,13 @@ class Benchmark(unittest.TestCase):
                         else:
                             self.true_negative_counter += 1  # Correctly didn't reuse
 
-                    if not answer_reused or answers_have_same_meaning_static(self.task, direct_answer, vectorQ_answer):
+                    if not cache_hit or answers_have_same_meaning_static(self.task, direct_answer, vectorQ_answer):
                         self.correct_answers += 1
                     else:
                         self.incorrect_answers += 1
                         self.incorrect_answers_in_step_size += 1
 
-                    self.append_results(idx, duration_direct, duration_vectorq, answer_reused, direct_answer)
+                    self.append_results(idx, duration_direct, duration_vectorq, cache_hit, direct_answer)
                     self.incorrect_answers_in_step_size = 0
 
         except Exception as e:
@@ -261,7 +258,7 @@ class Benchmark(unittest.TestCase):
         if (idx+1) % 500 == 0:
             logging.info(f"Sample Size: {idx+1}, Total Reused: {self.total_reused}, Incorrect Answers: {self.incorrect_answers}, Absolute Error Rate: {error_rate_absolute:.2f}%, Relative Error Rate (Reused Answers): {error_rate_relative:.2f}%, Relative Error Rate (Step Size): {relative_error_rate_to_step_size:.2f}%, Total Reused Rate: {total_reused_rate:.2f}%, Relative Reused Rate (Step Size): {relative_reuse_rate:.2f}%, Cache Size: {self.cache_size_mb:.2f} MB")
 
-    def get_vectorQ_answer(self, review_text, row_embedding):
+    async def get_vectorQ_answer(self, review_text, row_embedding):
         try:
             row_embedding = self.current_data_entry[self.embedding_model[0]]
         except json.JSONDecodeError as e:
@@ -290,7 +287,7 @@ class Benchmark(unittest.TestCase):
 
         vectorQ_prompt = f"{self.task} {review_text}"
         try:
-            vectorQ_response, cache_hit = vectorq.create(prompt=vectorQ_prompt, output_format=self.output_format, benchmark=vectorQ_benchmark)
+            vectorQ_response, cache_hit = await vectorq.create(prompt=vectorQ_prompt, output_format=self.output_format, benchmark=vectorQ_benchmark)
         except Exception as e:
             logging.error(f"Error getting VectorQ answer. Check VectorQ logs for more details.")
             raise e
@@ -425,16 +422,18 @@ if __name__ == '__main__':
                     for threshold in static_thresholds:
                         print(f"\n\n  - Using static threshold: {threshold}")
                         
-                        config:VectorQConfig = VectorQConfig(
-                            enable_cache=True,
-                            is_static_threshold=True,
-                            static_threshold=threshold,
-                            max_capacity=MAX_CAPACITY,
-                            vector_db=VECTOR_DB,
-                            embedding_metadata_storage=EMBEDDING_METADATA_STORAGE,
-                            similarity_evaluator=SIMILARITY_EVALUATOR,
+                        config = VectorQConfig(
+                            enable_cache = True,
+                            is_static_threshold = True,
+                            static_threshold = threshold,
+                            max_capacity = MAX_CAPACITY,
+                            vector_db = HNSWLibVectorDB(
+                                similarity_metric_type=SimilarityMetricType.COSINE
+                            ),
+                            embedding_metadata_storage = InMemoryEmbeddingMetadataStorage(),
+                            similarity_evaluator = StringComparisonSimilarityEvaluator(),
                         )
-                        vectorq:VectorQ = VectorQ(vectorq_config=config)
+                        vectorq: VectorQ = VectorQ(config)
                         
                         benchmark = Benchmark(MAX_SAMPLES)
                         # Set required parameters
@@ -457,16 +456,18 @@ if __name__ == '__main__':
                         for i in range(0,3): # 3 runs per combination for confidence intervals
                             print(f"\n\n  - Using dynamic threshold with rnd_num_ub: {rnd_num_ub}. Run {i+1} of 3")
                             
-                            config:VectorQConfig = VectorQConfig(
-                                enable_cache=True,
-                                is_static_threshold=False,
-                                rnd_num_ub=rnd_num_ub,
-                                max_capacity=MAX_CAPACITY,
-                                vector_db=VECTOR_DB,
-                                embedding_metadata_storage=EMBEDDING_METADATA_STORAGE,
-                                similarity_evaluator=SIMILARITY_EVALUATOR,
+                            config = VectorQConfig(
+                                enable_cache = True,
+                                is_static_threshold = False,
+                                rnd_num_ub = rnd_num_ub,
+                                max_capacity = MAX_CAPACITY,
+                                vector_db = HNSWLibVectorDB(
+                                    similarity_metric_type=SimilarityMetricType.COSINE
+                                ),
+                                embedding_metadata_storage = InMemoryEmbeddingMetadataStorage(),
+                                similarity_evaluator = StringComparisonSimilarityEvaluator(),
                             )
-                            vectorq:VectorQ = VectorQ(vectorq_config=config)
+                            vectorq: VectorQ = VectorQ(config)
                             
                             benchmark = Benchmark(MAX_SAMPLES)
                             # Set required parameters
