@@ -3,37 +3,37 @@ import pytest
 import os
 
 from vectorq.config import VectorQConfig
-from vectorq.inference_engine import InferenceEngineType
+from vectorq.inference_engine import OpenAIInferenceEngine, LangChainInferenceEngine
 from vectorq.inference_engine.inference_engine import InferenceEngine
 
 INFERENCE_ENGINE_PARAMS = [
     pytest.param(
-        InferenceEngineType.OPENAI,
-        "gpt-4o-mini",
+        OpenAIInferenceEngine,
+        {"model_name": "gpt-4o-mini", "temperature": 0},
         marks=pytest.mark.skipif(
             not os.environ.get("OPENAI_API_KEY"),
             reason="OPENAI_API_KEY environment variable not set",
         ),
     ),
     pytest.param(
-        InferenceEngineType.LANGCHAIN,
-        "openai/gpt-4o-mini",
+        LangChainInferenceEngine,
+        {"provider": "openai", "model_name": "gpt-4o-mini", "temperature": 0},
         marks=pytest.mark.skipif(
             not os.environ.get("OPENAI_API_KEY"),
             reason="OPENAI_API_KEY environment variable not set",
         ),
     ),
     pytest.param(
-        InferenceEngineType.LANGCHAIN,
-        "anthropic/claude-3-5-sonnet",
+        LangChainInferenceEngine,
+        {"provider": "anthropic", "model_name": "claude-3-5-sonnet", "temperature": 0},
         marks=pytest.mark.skipif(
             not os.environ.get("ANTHROPIC_API_KEY"),
             reason="ANTHROPIC_API_KEY environment variable not set",
         ),
     ),
     pytest.param(
-        InferenceEngineType.LANGCHAIN,
-        "google/gemini-1.5-flash",
+        LangChainInferenceEngine,
+        {"provider": "google", "model_name": "gemini-1.5-flash", "temperature": 0},
         marks=pytest.mark.skipif(
             not os.environ.get("GOOGLE_API_KEY"),
             reason="GOOGLE_API_KEY environment variable not set",
@@ -46,17 +46,16 @@ class TestInferenceEngineStrategy:
     """Test all inference engine strategies using parameterization."""
 
     @pytest.mark.parametrize(
-        "inference_engine_type, inference_engine_model_name", INFERENCE_ENGINE_PARAMS
+        "inference_engine_class, engine_params", INFERENCE_ENGINE_PARAMS
     )
-    def test_create(self, inference_engine_type, inference_engine_model_name):
+    def test_create(self, inference_engine_class, engine_params):
         """Test creating responses from different inference engines."""
-        config = VectorQConfig(
-            inference_engine_type=inference_engine_type,
-            inference_engine_model_name=inference_engine_model_name,
-            inference_engine_temperature=0,
-        )
+        # Create inference engine directly
+        engine = inference_engine_class(**engine_params)
+        
+        # Create config with the engine
+        config = VectorQConfig(inference_engine=engine)
 
-        engine = InferenceEngine(vectorq_config=config)
         prompt = "What is the capital of France?"
         response = engine.create(prompt)
 
@@ -64,19 +63,16 @@ class TestInferenceEngineStrategy:
         assert "Paris" in response
 
     @pytest.mark.parametrize(
-        "inference_engine_type, inference_engine_model_name", INFERENCE_ENGINE_PARAMS
+        "inference_engine_class, engine_params", INFERENCE_ENGINE_PARAMS
     )
-    def test_create_with_output_format(
-        self, inference_engine_type, inference_engine_model_name
-    ):
+    def test_create_with_output_format(self, inference_engine_class, engine_params):
         """Test creating responses with specified output format."""
-        config = VectorQConfig(
-            inference_engine_type=inference_engine_type,
-            inference_engine_model_name=inference_engine_model_name,
-            inference_engine_temperature=0,
-        )
+        # Create inference engine directly
+        engine = inference_engine_class(**engine_params)
+        
+        # Create config with the engine
+        config = VectorQConfig(inference_engine=engine)
 
-        engine = InferenceEngine(vectorq_config=config)
         prompt = "List three European capitals."
         output_format = "Provide the answer as a comma-separated list."
         response = engine.create(prompt, output_format)
@@ -90,19 +86,16 @@ class TestInferenceEngineStrategy:
         assert "," in response
 
     @pytest.mark.parametrize(
-        "inference_engine_type, inference_engine_model_name", INFERENCE_ENGINE_PARAMS
+        "inference_engine_class, engine_params", INFERENCE_ENGINE_PARAMS
     )
-    def test_consistent_responses(
-        self, inference_engine_type, inference_engine_model_name
-    ):
+    def test_consistent_responses(self, inference_engine_class, engine_params):
         """Test that responses are consistent with temperature=0."""
-        config = VectorQConfig(
-            inference_engine_type=inference_engine_type,
-            inference_engine_model_name=inference_engine_model_name,
-            inference_engine_temperature=0,
-        )
+        # Create inference engine directly
+        engine = inference_engine_class(**engine_params)
+        
+        # Create config with the engine
+        config = VectorQConfig(inference_engine=engine)
 
-        engine = InferenceEngine(vectorq_config=config)
         prompt = "What is 2+2?"
         response1 = engine.create(prompt)
         response2 = engine.create(prompt)
