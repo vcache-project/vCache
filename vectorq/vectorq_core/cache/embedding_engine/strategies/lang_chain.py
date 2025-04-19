@@ -1,20 +1,35 @@
-from typing import List, TYPE_CHECKING
+from typing import List
 from langchain_community.embeddings import HuggingFaceEmbeddings
 
-if TYPE_CHECKING:
-    from vectorq.config import VectorQConfig
-    
-from vectorq.vectorq_core.cache.embedding_engine.strategy import EmbeddingEngineStrategy
+from vectorq.vectorq_core.cache.embedding_engine.embedding_engine import EmbeddingEngine
 
-class LangChain(EmbeddingEngineStrategy):
+class LangChainEmbeddingEngine(EmbeddingEngine):
+    """
+    LangChain implementation of embedding engine using HuggingFace models
+    """
     
-    def __init__(self, vectorq_config: "VectorQConfig"):
-        super().__init__(vectorq_config=vectorq_config)
+    def __init__(self, model_name: str = "sentence-transformers/all-mpnet-base-v2"):
+        """
+        Initialize a LangChain embedding engine
+        
+        Args:
+            model_name: Name of the HuggingFace model to use for embeddings
+        """
+        self.model_name = model_name
         self.embeddings = HuggingFaceEmbeddings(
-            model_name=self.vectorq_config._embedding_engine_model_name
+            model_name=model_name
         )
         
     def get_embedding(self, text: str) -> List[float]:
+        """
+        Get embedding for the provided text using LangChain/HuggingFace
+        
+        Args:
+            text: The text to embed
+            
+        Returns:
+            The embedding vector
+        """
         try:
             embedding = self.embeddings.embed_query(text)
             return embedding

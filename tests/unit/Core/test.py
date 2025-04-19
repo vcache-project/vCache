@@ -4,18 +4,28 @@ from unittest.mock import MagicMock, patch
 
 from vectorq.main import VectorQ, VectorQBenchmark
 from vectorq.config import VectorQConfig
+from vectorq.inference_engine.inference_engine import InferenceEngine
+from vectorq.vectorq_core.core import VectorQCore
 
 class TestVectorQAsyncQueue(unittest.TestCase):
     
     def setUp(self):
-        self.config_with_cache = VectorQConfig(enable_cache=True)
-        self.config_without_cache = VectorQConfig(enable_cache=False)
+        self.mock_inference_engine = MagicMock(spec=InferenceEngine)
+        
+        self.mock_core = MagicMock(spec=VectorQCore)
+        
+        self.config_with_cache = VectorQConfig(
+            enable_cache=True,
+            inference_engine=self.mock_inference_engine
+        )
+        self.config_without_cache = VectorQConfig(
+            enable_cache=False,
+            inference_engine=self.mock_inference_engine
+        )
     
-    @patch('vectorq.main.VectorQCore')
-    @patch('vectorq.main.InferenceEngine')
-    def test_multiple_concurrent_requests(self, mock_inference_engine, mock_core):
-        mock_inference_engine_instance = mock_inference_engine.return_value
-        mock_inference_engine_instance.create.side_effect = [
+    def test_multiple_concurrent_requests(self):
+        # Set up mock responses
+        self.mock_inference_engine.create.side_effect = [
             "response 1", "response 2", "response 3", "response 4", "response 5"
         ]
         
@@ -36,13 +46,11 @@ class TestVectorQAsyncQueue(unittest.TestCase):
             self.assertEqual(response, f"response {i+1}")
             self.assertFalse(cache_hit)
         
-        self.assertEqual(mock_inference_engine_instance.create.call_count, 5)
+        self.assertEqual(self.mock_inference_engine.create.call_count, 5)
     
-    @patch('vectorq.main.VectorQCore')
-    @patch('vectorq.main.InferenceEngine')
-    def test_error_handling(self, mock_inference_engine, mock_core):
-        mock_inference_engine_instance = mock_inference_engine.return_value
-        mock_inference_engine_instance.create.side_effect = Exception("Test error")
+    def test_error_handling(self):
+        # Set up mock to raise an exception
+        self.mock_inference_engine.create.side_effect = Exception("Test error")
         
         async def test():
             vectorq = VectorQ(self.config_without_cache)
@@ -55,17 +63,14 @@ class TestVectorQAsyncQueue(unittest.TestCase):
         self.assertTrue(response.startswith("[ERROR]"))
         self.assertFalse(cache_hit)
     
-    @patch('vectorq.main.VectorQCore')
-    @patch('vectorq.main.InferenceEngine')
-    def test_fifo_processing_order(self, mock_inference_engine, mock_core):
+    def test_fifo_processing_order(self):
         processing_times = []
         
         def create_side_effect(prompt, output_format=None):
             processing_times.append(prompt)
             return f"response for {prompt}"
             
-        mock_inference_engine_instance = mock_inference_engine.return_value
-        mock_inference_engine_instance.create.side_effect = create_side_effect
+        self.mock_inference_engine.create.side_effect = create_side_effect
         
         async def test():
             vectorq = VectorQ(self.config_without_cache)

@@ -1,17 +1,12 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional, TYPE_CHECKING, List
+from typing import List
 
-if TYPE_CHECKING:
-    from vectorq.vectorq_core.cache.vector_db.embedding_metadata_storage.embedding_metadata_obj import EmbeddingMetadataObj
-    from vectorq.config import VectorQConfig
+from vectorq.vectorq_core.cache.embedding_store.embedding_metadata_storage.embedding_metadata_obj import EmbeddingMetadataObj
+
+class EmbeddingMetadataStorage(ABC):
     
-class EmbeddingMetadataStorageStrategy(ABC):
-    
-    def __init__(self, vectorq_config: "VectorQConfig"):
-        self.vectorq_config: "VectorQConfig" = vectorq_config
-        
     @abstractmethod
-    def add_metadata(self, embedding_id: int, metadata: "EmbeddingMetadataObj") -> int:
+    def add_metadata(self, embedding_id: int, metadata: EmbeddingMetadataObj) -> int:
         '''
         embedding_id: int - The id of the embedding to add the metadata for
         metadata: EmbeddingMetadataObj - The metadata to add to the embedding
@@ -20,7 +15,7 @@ class EmbeddingMetadataStorageStrategy(ABC):
         pass
 
     @abstractmethod
-    def get_metadata(self, embedding_id: int) -> "EmbeddingMetadataObj":
+    def get_metadata(self, embedding_id: int) -> EmbeddingMetadataObj:
         '''
         embedding_id: int - The id of the embedding to get the metadata for
         returns: EmbeddingMetadataObj - The metadata of the embedding
@@ -28,7 +23,7 @@ class EmbeddingMetadataStorageStrategy(ABC):
         pass
     
     @abstractmethod
-    def update(self, embedding_id: int, metadata: "EmbeddingMetadataObj") -> "EmbeddingMetadataObj":
+    def update(self, embedding_id: int, metadata: EmbeddingMetadataObj) -> EmbeddingMetadataObj:
         '''
         embedding_id: int - The id of the embedding to update the metadata for
         metadata: EmbeddingMetadataObj - The metadata to update the embedding with
@@ -51,7 +46,7 @@ class EmbeddingMetadataStorageStrategy(ABC):
         pass
 
     @abstractmethod
-    def get_all_embedding_metadata_objects(self) -> List["EmbeddingMetadataObj"]:
+    def get_all_embedding_metadata_objects(self) -> List[EmbeddingMetadataObj]:
         '''
         returns: List["EmbeddingMetadataObj"] - A list of all the embedding metadata objects in the storage
         '''

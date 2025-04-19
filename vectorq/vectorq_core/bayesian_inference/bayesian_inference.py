@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import TYPE_CHECKING, Dict, Any
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from vectorq.config import VectorQConfig
@@ -7,7 +7,7 @@ if TYPE_CHECKING:
 from vectorq.vectorq_core.bayesian_inference.strategy import LikelihoodFunctionStrategy
 from vectorq.vectorq_core.bayesian_inference.strategies.exponential import Exponential
 from vectorq.vectorq_core.bayesian_inference.strategies.sigmoid import Sigmoid
-from vectorq.vectorq_core.cache.vector_db.embedding_metadata_storage.embedding_metadata_obj import EmbeddingMetadataObj
+from vectorq.vectorq_core.cache.embedding_store.embedding_metadata_storage.embedding_metadata_obj import EmbeddingMetadataObj
 
 class LikelihoodFunctionType(Enum):
     EXPONENTIAL = "exponential"
@@ -19,7 +19,7 @@ class BayesianInference:
         self.vectorq_config: "VectorQConfig" = vectorq_config
         self.strategy: LikelihoodFunctionStrategy = None
         
-        match self.vectorq_config._likelihood_function_type:
+        match self.vectorq_config.likelihood_function_type:
             case LikelihoodFunctionType.EXPONENTIAL:
                 self.strategy: LikelihoodFunctionStrategy = Exponential()
             case LikelihoodFunctionType.SIGMOID:

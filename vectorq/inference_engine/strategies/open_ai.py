@@ -1,16 +1,16 @@
 from openai import OpenAI as OpenAIClient
 from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from vectorq.config import VectorQConfig
 
-from vectorq.inference_engine.strategy import InferenceEngineStrategy
+from vectorq.inference_engine.inference_engine import InferenceEngine
 
 
-class OpenAI(InferenceEngineStrategy):
+class OpenAIInferenceEngine(InferenceEngine):
 
-    def __init__(self, vectorq_config: "VectorQConfig"):
-        super().__init__(vectorq_config=vectorq_config)
+    def __init__(self, model_name: str, temperature: float = 1):
+        super().__init__()
+        self.model_name = model_name
+        self.temperature = temperature
         self.client = OpenAIClient()
 
     def create(self, prompt: str, output_format: str = None) -> str:
@@ -20,9 +20,9 @@ class OpenAI(InferenceEngineStrategy):
                 messages.append({"role": "system", "content": output_format})
             messages.append({"role": "user", "content": prompt})
             completion = self.client.chat.completions.create(
-                model=self.vectorq_config._inference_engine_model_name,
+                model=self.model_name,
                 messages=messages,
-                temperature=self.vectorq_config._inference_engine_temperature,
+                temperature=self.temperature,
             )
             return completion.choices[0].message.content
         except Exception as e:

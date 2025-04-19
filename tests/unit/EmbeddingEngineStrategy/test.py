@@ -3,17 +3,18 @@ import pytest
 import os
 
 from vectorq.config import VectorQConfig
-from vectorq.vectorq_core.cache.embedding_engine.embedding_engine import (
+from vectorq.vectorq_core.cache.embedding_engine import (
     EmbeddingEngine,
-    EmbeddingEngineType,
+    OpenAIEmbeddingEngine,
+    LangChainEmbeddingEngine,
 )
 
 # Define test parameters once at the module level
 EMBEDDING_ENGINE_PARAMS = [
-    (EmbeddingEngineType.LANGCHAIN, "sentence-transformers/all-MiniLM-L6-v2"),
+    (LangChainEmbeddingEngine, {"model_name": "sentence-transformers/all-MiniLM-L6-v2"}),
     pytest.param(
-        EmbeddingEngineType.OPENAI,
-        "text-embedding-ada-002",
+        OpenAIEmbeddingEngine,
+        {"model_name": "text-embedding-ada-002"},
         marks=pytest.mark.skipif(
             not os.environ.get("OPENAI_API_KEY"),
             reason="OPENAI_API_KEY environment variable not set",
@@ -26,16 +27,16 @@ class TestEmbeddingEngineStrategy:
     """Test all embedding engine strategies using parameterization."""
 
     @pytest.mark.parametrize(
-        "embedding_engine_type, embedding_engine_model_name", EMBEDDING_ENGINE_PARAMS
+        "embedding_engine_class, engine_params", EMBEDDING_ENGINE_PARAMS
     )
-    def test_get_embedding(self, embedding_engine_type, embedding_engine_model_name):
+    def test_get_embedding(self, embedding_engine_class, engine_params):
         """Test getting embeddings from different embedding engines."""
-        config = VectorQConfig(
-            embedding_engine_type=embedding_engine_type,
-            embedding_engine_model_name=embedding_engine_model_name,
-        )
+        # Create embedding engine directly
+        engine = embedding_engine_class(**engine_params)
+        
+        # Create config with the engine
+        config = VectorQConfig(embedding_engine=engine)
 
-        engine = EmbeddingEngine(vectorq_config=config)
         text = "This is a test embedding."
         embedding = engine.get_embedding(text)
 
@@ -66,18 +67,18 @@ class TestEmbeddingEngineStrategy:
         ), "Different texts should produce different embeddings"
 
     @pytest.mark.parametrize(
-        "embedding_engine_type, embedding_engine_model_name", EMBEDDING_ENGINE_PARAMS
+        "embedding_engine_class, engine_params", EMBEDDING_ENGINE_PARAMS
     )
     def test_embedding_dimensions_consistent(
-        self, embedding_engine_type, embedding_engine_model_name
+        self, embedding_engine_class, engine_params
     ):
         """Test that embeddings from the same engine have consistent dimensions."""
-        config = VectorQConfig(
-            embedding_engine_type=embedding_engine_type,
-            embedding_engine_model_name=embedding_engine_model_name,
-        )
+        # Create embedding engine directly
+        engine = embedding_engine_class(**engine_params)
+        
+        # Create config with the engine
+        config = VectorQConfig(embedding_engine=engine)
 
-        engine = EmbeddingEngine(vectorq_config=config)
         text1 = "First text for embedding."
         text2 = "Second text for embedding."
 
@@ -90,18 +91,17 @@ class TestEmbeddingEngineStrategy:
         ), "Embeddings should have consistent dimensions"
 
     @pytest.mark.parametrize(
-        "embedding_engine_type, embedding_engine_model_name", EMBEDDING_ENGINE_PARAMS
+        "embedding_engine_class, engine_params", EMBEDDING_ENGINE_PARAMS
     )
     def test_similar_texts_have_similar_embeddings(
-        self, embedding_engine_type, embedding_engine_model_name
+        self, embedding_engine_class, engine_params
     ):
         """Test that similar texts have more similar embeddings than dissimilar texts."""
-        config = VectorQConfig(
-            embedding_engine_type=embedding_engine_type,
-            embedding_engine_model_name=embedding_engine_model_name,
-        )
-
-        engine = EmbeddingEngine(vectorq_config=config)
+        # Create embedding engine directly
+        engine = embedding_engine_class(**engine_params)
+        
+        # Create config with the engine
+        config = VectorQConfig(embedding_engine=engine)
 
         text1 = "The cat sat on the mat."
         similar_text = "A cat was sitting on a mat."

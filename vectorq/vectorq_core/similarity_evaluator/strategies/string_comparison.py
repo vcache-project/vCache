@@ -1,6 +1,6 @@
-from vectorq.vectorq_core.similarity_evaluator.strategy import SimilarityEvaluatorStrategy
+from vectorq.vectorq_core.similarity_evaluator.similarity_evaluator import SimilarityEvaluator
 
-class StringComparison(SimilarityEvaluatorStrategy):
+class StringComparisonSimilarityEvaluator(SimilarityEvaluator):
     
     def __init__(self):
         super().__init__()

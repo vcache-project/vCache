@@ -21,7 +21,7 @@ def plot_error_rate_relative(benchmark: Benchmark, FONT_SIZE=20):
     plt.title(f'Relative Error Rate vs. Number of Samples (Relative To Reused Answers)')
     add_description(benchmark, plt)
 
-    filename = benchmark.output_folder_path + f'error_rate_relative_{benchmark.timestamp}.pdf'
+    filename = benchmark.output_folder_path + f'/error_rate_relative_{benchmark.timestamp}.pdf'
     plt.savefig(filename, format='pdf')
     plt.close()
 
@@ -40,7 +40,7 @@ def plot_error_rate_absolute(benchmark: Benchmark, FONT_SIZE=20):
     plt.title(f'Absolute Error Rate vs. Number of Samples')
     add_description(benchmark, plt)
 
-    filename = filename = benchmark.output_folder_path + f'error_rate_absolute_{benchmark.timestamp}.pdf'
+    filename = filename = benchmark.output_folder_path + f'/error_rate_absolute_{benchmark.timestamp}.pdf'
     plt.savefig(filename, format='pdf')
     plt.close()
 
@@ -59,7 +59,7 @@ def plot_relative_error_rate_step_size_(benchmark: Benchmark, FONT_SIZE=20):
     plt.title(f'Relative Error Rate per Step Size vs. Number of Samples')
     add_description(benchmark, plt)
 
-    filename = filename = benchmark.output_folder_path + f'relative_error_rate_step_size_{benchmark.timestamp}.pdf'
+    filename = filename = benchmark.output_folder_path + f'/relative_error_rate_step_size_{benchmark.timestamp}.pdf'
     plt.savefig(filename, format='pdf')
     plt.close()
 
@@ -82,7 +82,7 @@ def plot_reuse_rate(benchmark: Benchmark, FONT_SIZE=20):
     plt.title(f'Cache Hit Rate vs. Number of Samples')
     add_description(benchmark, plt)
 
-    filename = filename = benchmark.output_folder_path + f'reuse_rate_{benchmark.timestamp}.pdf'
+    filename = filename = benchmark.output_folder_path + f'/reuse_rate_{benchmark.timestamp}.pdf'
     plt.savefig(filename, format='pdf')
     plt.close()
 
@@ -101,7 +101,7 @@ def plot_relative_reuse_rate(benchmark: Benchmark, FONT_SIZE=20):
     plt.title(f'Relative Cache Hit Rate vs. Number of Samples')
     add_description(benchmark, plt)
 
-    filename = filename = benchmark.output_folder_path + f'relative_reuse_rate_step_size_{benchmark.timestamp}.pdf'
+    filename = filename = benchmark.output_folder_path + f'/relative_reuse_rate_step_size_{benchmark.timestamp}.pdf'
     plt.savefig(filename, format='pdf')
     plt.close()
     
@@ -116,7 +116,7 @@ def plot_duration_step_size(benchmark: Benchmark, FONT_SIZE=20):
     plt.legend()
     plt.grid(True)
     add_description(benchmark, plt)
-    filename = filename = benchmark.output_folder_path + f'relative_duration_step_size_{benchmark.timestamp}.pdf'
+    filename = filename = benchmark.output_folder_path + f'/relative_duration_step_size_{benchmark.timestamp}.pdf'
     plt.savefig(filename, format='pdf')
     plt.close()
 
@@ -134,7 +134,7 @@ def plot_duration_trend(benchmark: Benchmark, FONT_SIZE=20):
     plt.title('Total Inference Time vs. Number of Samples')
     plt.legend()
     add_description(benchmark, plt)
-    filename = filename = benchmark.output_folder_path + f'duration_trend_{benchmark.timestamp}.pdf'
+    filename = filename = benchmark.output_folder_path + f'/duration_trend_{benchmark.timestamp}.pdf'
     plt.savefig(filename, bbox_inches='tight')
     plt.close()
 
@@ -147,7 +147,7 @@ def plot_precision(benchmark: Benchmark, FONT_SIZE=20):
     plt.title('Precision vs. Number of Samples')
     plt.ylim(0, 1)  # Set fixed y-axis range from 0 to 1
     add_description(benchmark, plt)
-    filename = filename = benchmark.output_folder_path + f'precision_{benchmark.timestamp}.pdf'
+    filename = filename = benchmark.output_folder_path + f'/precision_{benchmark.timestamp}.pdf'
     plt.savefig(filename, bbox_inches='tight')
     plt.close()
     
@@ -160,7 +160,7 @@ def plot_recall(benchmark: Benchmark, FONT_SIZE=20):
     plt.title('Recall vs. Number of Samples')
     plt.ylim(0, 1)  # Set fixed y-axis range from 0 to 1
     add_description(benchmark, plt)
-    filename = filename = benchmark.output_folder_path + f'recall_{benchmark.timestamp}.pdf'
+    filename = filename = benchmark.output_folder_path + f'/recall_{benchmark.timestamp}.pdf'
     plt.savefig(filename, bbox_inches='tight')
     plt.close()
     
@@ -173,7 +173,7 @@ def plot_accuracy(benchmark: Benchmark, FONT_SIZE=20):
     plt.title('Accuracy vs. Number of Samples')
     plt.ylim(0, 1)  # Set fixed y-axis range from 0 to 1
     add_description(benchmark, plt)   
-    filename = filename = benchmark.output_folder_path + f'accuracy_{benchmark.timestamp}.pdf'
+    filename = filename = benchmark.output_folder_path + f'/accuracy_{benchmark.timestamp}.pdf'
     plt.savefig(filename, bbox_inches='tight')
     plt.close()
 
@@ -186,7 +186,7 @@ def plot_cache_size(benchmark: Benchmark, FONT_SIZE=20):
     plt.ylabel('Cache Size (MB)')
     plt.title('Cache Size Growth vs. Number of Samples')
     add_description(benchmark, plt)
-    filename = benchmark.output_folder_path + f'cache_size_{benchmark.timestamp}.pdf'
+    filename = benchmark.output_folder_path + f'/cache_size_{benchmark.timestamp}.pdf'
     plt.savefig(filename, bbox_inches='tight')
     plt.close()
 
@@ -294,7 +294,7 @@ def plot_cache_hit_latency_vs_size(benchmark: Benchmark, FONT_SIZE=20):
     
     #add_description(benchmark, plt)
     
-    filename = benchmark.output_folder_path + f'cache_hit_latency_vs_size_{benchmark.timestamp}.pdf'
+    filename = benchmark.output_folder_path + f'/cache_hit_latency_vs_size_{benchmark.timestamp}.pdf'
     plt.savefig(filename, format='pdf', bbox_inches='tight')
     plt.close()
     
@@ -345,8 +345,8 @@ def plot_combined_thresholds_and_posteriors(benchmark: Benchmark):
         
         plt.tight_layout()
         
-        output_folder_path = benchmark.output_folder_path + f'thresholds_and_posteriors/'
-        filename = benchmark.output_folder_path + f'thresholds_and_posteriors/combined_embedding_{idx}_{benchmark.timestamp}.pdf'
+        output_folder_path = benchmark.output_folder_path + f'/thresholds_and_posteriors/'
+        filename = benchmark.output_folder_path + f'/thresholds_and_posteriors/combined_embedding_{idx}_{benchmark.timestamp}.pdf'
         if output_folder_path and not os.path.exists(output_folder_path):
             os.makedirs(output_folder_path)
         plt.savefig(filename, format='pdf', bbox_inches='tight')

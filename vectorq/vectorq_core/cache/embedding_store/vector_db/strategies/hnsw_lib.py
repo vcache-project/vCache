@@ -1,25 +1,22 @@
 import hnswlib
-from typing import List, TYPE_CHECKING
-from vectorq.vectorq_core.cache.vector_db.strategy import VectorDBStrategy
-
-if TYPE_CHECKING:
-    from vectorq.vectorq_core.cache.vector_db.embedding_metadata_storage.embedding_metadata_obj import EmbeddingMetadataObj
-    from vectorq.config import VectorQConfig
+from typing import List
+from vectorq.vectorq_core.cache.embedding_store.vector_db.vector_db import SimilarityMetricType, VectorDB
     
 '''
 Run 'sudo apt-get install build-essential' on Linux Debian/Ubuntu to install the build-essential package
 '''
     
-class HNSWLib(VectorDBStrategy):
+class HNSWLibVectorDB(VectorDB):
     
-    def __init__(self, vectorq_config: "VectorQConfig"):
-        super().__init__(vectorq_config)
+    def __init__(self, 
+                 similarity_metric_type: SimilarityMetricType = SimilarityMetricType.COSINE, 
+                 max_capacity: int = 1000):
         self.embedding_count = 0
         self.__next_embedding_id = 0
-        
+        self.similarity_metric_type = similarity_metric_type
         self.space = None
         self.dim = None
-        self.max_elements = None
+        self.max_elements = max_capacity
         self.ef_construction = None
         self.M = None
         self.ef = None
@@ -47,7 +44,7 @@ class HNSWLib(VectorDBStrategy):
         if k_ == 0:
             return []
         ids, similarities = self.index.knn_query(embedding, k=k_)
-        metric_type = self.vectorq_config._vector_db_similarity_metric_type.value
+        metric_type = self.similarity_metric_type.value
         similarity_scores = [self.transform_similarity_score(sim, metric_type) for sim in similarities[0]]
         id_list = [int(id) for id in ids[0]]
         return list(zip(similarity_scores, id_list))
@@ -60,7 +57,7 @@ class HNSWLib(VectorDBStrategy):
         self.__next_embedding_id = 0
     
     def _init_vector_store(self, embedding_dim: int):
-        metric_type = self.vectorq_config._vector_db_similarity_metric_type.value
+        metric_type = self.similarity_metric_type.value
         match metric_type:
             case "cosine":
                 self.space = "cosine"
@@ -69,10 +66,12 @@ class HNSWLib(VectorDBStrategy):
             case _:
                 raise ValueError(f"Invalid similarity metric type: {metric_type}")
         self.dim = embedding_dim
-        self.max_elements = self.vectorq_config.max_capacity
         self.ef_construction = 350
         self.M = 52
         self.ef = 400
         self.index = hnswlib.Index(space=self.space, dim=self.dim)
         self.index.init_index(max_elements=self.max_elements, ef_construction=self.ef_construction, M=self.M)
         self.index.set_ef(self.ef)
+        
+    def is_empty(self) -> bool:
+        return self.embedding_count == 0

@@ -1,10 +1,6 @@
 import asyncio
-from typing import List, Tuple, Dict, Any
-from typing import TYPE_CHECKING, List
+from typing import List, Tuple
 
-if TYPE_CHECKING:
-    pass
-    
 from vectorq.config import VectorQConfig
 from vectorq.vectorq_core.core import VectorQCore
 from vectorq.inference_engine.inference_engine import InferenceEngine
@@ -24,17 +20,18 @@ class VectorQ:
     '''
     VectorQ is a main class that contains the VectorQ semantic prompt caching system.
     '''
-    def __init__(self, vectorq_config: VectorQConfig = VectorQConfig()):
-        self.vectorq_config: VectorQConfig = vectorq_config
+    def __init__(self, vectorq_config = VectorQConfig()):
+        self.vectorq_config = vectorq_config
         self.request_queue = asyncio.Queue()
         self.queue_processor_task = None
         self.running = False
         
         try:
-            self.inference_engine = InferenceEngine(vectorq_config=vectorq_config)
-            self.core = VectorQCore(self, inference_engine=self.inference_engine, vectorq_config=vectorq_config)
+            self.inference_engine = self.vectorq_config.inference_engine
+            self.core = VectorQCore(vectorq_config=vectorq_config)
             self.start_queue_processor()
         except Exception as e:
+            print(f"Error initializing VectorQ: {e}")
             raise Exception(f"Error initializing VectorQ: {e}")
     
     def start_queue_processor(self):

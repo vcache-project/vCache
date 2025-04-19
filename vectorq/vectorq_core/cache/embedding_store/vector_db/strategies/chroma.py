@@ -1,18 +1,15 @@
 import chromadb
-from typing import List, TYPE_CHECKING
-from vectorq.vectorq_core.cache.vector_db.strategy import VectorDBStrategy
-
-if TYPE_CHECKING:
-    from vectorq.config import VectorQConfig
+from typing import List
+from vectorq.vectorq_core.cache.embedding_store.vector_db.vector_db import SimilarityMetricType, VectorDB
 
 
-class Chroma(VectorDBStrategy):
+class ChromaVectorDB(VectorDB):
 
-    def __init__(self, vectorq_config: "VectorQConfig"):
-        super().__init__(vectorq_config)
+    def __init__(self, similarity_metric_type: SimilarityMetricType = SimilarityMetricType.COSINE):
         self.__next_embedding_id = 0
         self.collection = None
         self.client = None
+        self.similarity_metric_type = similarity_metric_type
 
     def add(self, embedding: List[float]) -> int:
         if self.collection is None:
@@ -39,9 +36,8 @@ class Chroma(VectorDBStrategy):
         )
         distances = results.get("distances", [[]])[0]
         ids = results.get("ids", [[]])[0]
-        metric_type = self.vectorq_config._vector_db_similarity_metric_type.value
         return [
-            (self.transform_similarity_score(float(dist), metric_type), int(idx))
+            (self.transform_similarity_score(float(dist), self.similarity_metric_type.value), int(idx))
             for dist, idx in zip(distances, ids)
         ]
 
@@ -53,7 +49,7 @@ class Chroma(VectorDBStrategy):
     def _init_vector_store(self, embedding_dim: int):
         self.client = chromadb.Client()
         collection_name = f"vectorq_collection_{id(self)}"
-        metric_type = self.vectorq_config._vector_db_similarity_metric_type.value
+        metric_type = self.similarity_metric_type.value
         match metric_type:
             case "cosine":
                 space = "cosine"
@@ -65,3 +61,6 @@ class Chroma(VectorDBStrategy):
             name=collection_name,
             metadata={"dimension": embedding_dim, "hnsw:space": space},
         )
+
+    def is_empty(self) -> bool:
+        return self.collection.count() == 0
