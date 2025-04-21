@@ -39,6 +39,40 @@ response, cache_hit = vectorq.create("Is the sky blue?")
 print(f"Response: {response}")
 ```
 
+## Development Setup
+
+To set up VectorQ for development:
+
+### Using Poetry
+
+1. Install Poetry if you don't have it already:
+```bash
+curl -sSL https://install.python-poetry.org | python3 -
+```
+
+2. Install dependencies:
+```bash
+poetry install --with dev,benchmarks
+```
+
+### Setting Up Pre-commit Hooks
+
+Install pre-commit hooks to ensure code quality:
+```bash
+poetry run pre-commit install
+```
+
+The pre-commit hooks will automatically:
+- Format code with Ruff
+- Check imports
+- Validate Python syntax
+- Run type checking with mypy
+
+When you commit changes, these checks will run automatically. You can also run them manually:
+```bash
+poetry run pre-commit run --all-files
+```
+
 ## Semantic Prompt Caches
 Semantic Prompt Caches are layered between your application server and inference server to reduce latency and cost by reusing cached responses for semantically similar prompts.
 
