@@ -8,27 +8,29 @@ if TYPE_CHECKING:
     from vectorq.config import VectorQConfig
 
 from vectorq.vectorq_core.cache.cache import Cache
-from vectorq.vectorq_core.bayesian_inference.bayesian_inference import BayesianInference
-
+from vectorq.vectorq_core.vectorq_policy.vectorq_policy import VectorQPolicy
+from vectorq.vectorq_core.similarity_evaluator.similarity_evaluator import SimilarityEvaluator
+from vectorq.inference_engine.inference_engine import InferenceEngine
+from vectorq.vectorq_core.vectorq_policy.action import Action
 class VectorQCore():
     
     def __init__(
             self, 
             vectorq_config: "VectorQConfig"
         ):
-        self.vectorq_config = vectorq_config
-        self.inference_engine = self.vectorq_config.inference_engine
-        self.similarity_evaluator = self.vectorq_config.similarity_evaluator
+        self.vectorq_config: "VectorQConfig" = vectorq_config
+        self.inference_engine: "InferenceEngine" = self.vectorq_config.inference_engine
+        self.similarity_evaluator: "SimilarityEvaluator" = self.vectorq_config.similarity_evaluator
         
-        self.cache = Cache(
+        self.cache: Cache = Cache(
             embedding_store=EmbeddingStore(
                 vectorq_config=self.vectorq_config
             ),
             embedding_engine=self.vectorq_config.embedding_engine,
             eviction_policy=self.vectorq_config.eviction_policy
         )
-        self.bayesian_inference = BayesianInference(vectorq_config=self.vectorq_config)
-        
+        self.vectorq_policy: VectorQPolicy = self.vectorq_config.vectorq_policy
+
     def process_request(self, prompt: str, benchmark: "VectorQBenchmark" = None, output_format: str = None) -> tuple[bool, str]:
         '''
         prompt: str - The prompt to check for cache hit
@@ -42,7 +44,7 @@ class VectorQCore():
             return self.__vectorQ(prompt, benchmark, output_format)
         
     def __naive(self, prompt: str, benchmark: "VectorQBenchmark" = None, output_format: str = None) -> tuple[bool, str]:
-        # TODO: LGS - Validate
+        # TODO: LGS - Validate (Benchmark obj)
         if (self.cache.is_empty()):
             generated_response: str = benchmark.candidate_response
             self.cache.add_embedding(embedding=benchmark.candidate_embedding, response=generated_response)
@@ -58,20 +60,28 @@ class VectorQCore():
                 return False, benchmark.candidate_response
     
     def __vectorQ(self, prompt: str, benchmark: "VectorQBenchmark" = None, output_format: str = None) -> tuple[bool, str]:
-        # TODO: LGS - Implement  
         if (self.cache.is_empty()):
             response:str = self.inference_engine.create(prompt=prompt, output_format=output_format)
             self.cache.add(prompt=prompt, response=response)
             return False, response
         else:
             knn: List[tuple[float, int]] = self.cache.get_knn(prompt=prompt, k=1)
-            sim, embedding_id = knn[0]
-            metadata = self.cache.get_metadata(embedding_id=embedding_id)
+            similarity_score, embedding_id = knn[0]
+            metadata_obj: EmbeddingMetadataObj = self.cache.get_metadata(embedding_id=embedding_id)
             
-            # TODO: LGS
-            response:str = self.inference_engine.create(prompt=prompt, output_format=output_format)
-            self.cache.add(prompt=prompt, response=response)
-            return False, response
+            selected_action: Action = self.vectorq_policy.select_action(similarity_score=similarity_score, metadata=metadata_obj)
+            if (selected_action == Action.EXPLORE):
+                response:str = self.inference_engine.create(prompt=prompt, output_format=output_format)
+                should_have_exploited: bool = self.similarity_evaluator.answers_similar(a=response, b=benchmark.candidate_response)
+                if (should_have_exploited):
+                    self.vectorq_policy.update_policy(similarity_score=similarity_score, is_correct=True, metadata=metadata_obj)
+                else:
+                    self.vectorq_policy.update_policy(similarity_score=similarity_score, is_correct=False, metadata=metadata_obj)
+                    self.cache.add(prompt=prompt, response=response)
+                self.cache.update_metadata(embedding_id=embedding_id, metadata=metadata_obj)
+                return False, response
+            else:
+                return True, metadata_obj.response
             
     def get_statistics(self) -> str:
         # TODO

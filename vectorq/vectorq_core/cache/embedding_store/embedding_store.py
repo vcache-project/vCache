@@ -40,7 +40,7 @@ class EmbeddingStore():
     def get_metadata(self, embedding_id: int) -> "EmbeddingMetadataObj":
         return self.embedding_metadata_storage.get_metadata(embedding_id)
     
-    def update(self, embedding_id: int, metadata: "EmbeddingMetadataObj") -> "EmbeddingMetadataObj":
+    def update_metadata(self, embedding_id: int, metadata: "EmbeddingMetadataObj") -> "EmbeddingMetadataObj":
         return self.embedding_metadata_storage.update(embedding_id, metadata)
 
     def is_empty(self) -> bool:

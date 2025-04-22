@@ -36,14 +36,6 @@ class Cache:
         '''
         self.embedding_store.remove(embedding_id)
     
-    def update(self, embedding_id: int, embedding_metadata: "EmbeddingMetadataObj") -> "EmbeddingMetadataObj":
-        '''
-        embedding_id: int - The id of the embedding to update
-        embedding_metadata: EmbeddingMetadataObj - The metadata to update the embedding with
-        returns: EmbeddingMetadataObj - The updated metadata of the embedding
-        '''
-        self.embedding_store.update(embedding_id, embedding_metadata)
-    
     def get_knn(self, prompt: str, k: int, embedding: List[float] = []) -> List[tuple[float, int]]:
         '''
         prompt: str - The prompt to get the k-nearest neighbors for
@@ -66,6 +58,14 @@ class Cache:
         returns: EmbeddingMetadataObj - The metadata of the embedding
         '''
         return self.embedding_store.get_metadata(embedding_id)
+    
+    def update_metadata(self, embedding_id: int, embedding_metadata: "EmbeddingMetadataObj") -> "EmbeddingMetadataObj":
+        '''
+        embedding_id: int - The id of the embedding to update
+        embedding_metadata: EmbeddingMetadataObj - The metadata to update the embedding with
+        returns: EmbeddingMetadataObj - The updated metadata of the embedding
+        '''
+        self.embedding_store.update_metadata(embedding_id, embedding_metadata)
     
     def get_current_capacity(self) -> int:
         '''
