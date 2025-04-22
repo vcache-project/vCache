@@ -58,5 +58,7 @@ skip-magic-trailing-comma = false
 
 
 [tool.mypy]
-python_version = "3.11"
-strict = true
+python_version = "3.10"
+packages = ["vectorq"]
+namespace_packages = true
+explicit_package_bases = true

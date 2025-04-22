@@ -2,6 +2,6 @@ from vectorq.vectorq_core.cache.eviction_policy.eviction_policy import EvictionP
 from vectorq.vectorq_core.cache.eviction_policy.strategies.lru import LRUEvictionPolicy
 
 __all__ = [
-    'EvictionPolicy',
-    'LRUEvictionPolicy',
+    "EvictionPolicy",
+    "LRUEvictionPolicy",
 ]

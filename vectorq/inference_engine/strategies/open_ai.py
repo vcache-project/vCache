@@ -1,12 +1,9 @@
 from openai import OpenAI as OpenAIClient
-from typing import TYPE_CHECKING
-
 
 from vectorq.inference_engine.inference_engine import InferenceEngine
 
 
 class OpenAIInferenceEngine(InferenceEngine):
-
     def __init__(self, model_name: str, temperature: float = 1):
         super().__init__()
         self.model_name = model_name
