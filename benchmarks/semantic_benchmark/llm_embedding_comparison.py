@@ -2,7 +2,6 @@ import json
 import os
 import time
 import argparse
-import asyncio
 import logging
 import numpy as np
 from typing import Dict, List, Any, Tuple, Set
@@ -10,9 +9,9 @@ from datetime import datetime
 from tqdm import tqdm
 from openai import OpenAI
 import tiktoken
-import concurrent.futures
+import multiprocessing
+from multiprocessing import Manager, Pool, Lock
 from functools import partial
-import threading
 import tempfile
 
 # Set up logging
@@ -46,15 +45,10 @@ class LLMEmbeddingBenchmark:
         self.workers = workers
         self.resume = resume
         self.api_key = api_key or os.environ.get("OPENAI_API_KEY")
-        self.file_lock = threading.Lock()
-        self.processed_count = 0
-        self.total_count = 0
-        self.processed_ids = set()  # Track IDs of processed samples
         
         if not self.api_key:
             raise ValueError("OpenAI API key not provided. Set OPENAI_API_KEY environment variable or pass as parameter.")
         
-        self.client = OpenAI(api_key=self.api_key)
         self.tokenizer_cache = {}
         
     def get_tokenizer(self, model_name: str):
@@ -107,20 +101,24 @@ class LLMEmbeddingBenchmark:
         else:  # Embedding models
             return (pricing[pricing_model] * token_count) / 1000
             
-    async def get_embedding(self, text: str, model: str) -> Tuple[List[float], float, float]:
+    def get_embedding(self, text: str, model: str) -> Tuple[List[float], float, float]:
         """
         Get embeddings for the given text using the specified model.
         Returns: (embedding, latency, cost)
         """
         try:
+            # Create a new client for each process
+            client = OpenAI(api_key=self.api_key)
+            
             # Clean up model name if needed
             if model == "text-embedding-3-small" or model == "text-embedding-3-large":
                 model_name = model
             else:
                 model_name = "text-embedding-3-small"  # Default fallback
                 logger.warning(f"Unknown embedding model {model}, falling back to {model_name}")
+            
             start_time = time.time()
-            response = self.client.embeddings.create(
+            response = client.embeddings.create(
                 model=model_name,
                 input=text,
                 encoding_format="float"
@@ -135,14 +133,17 @@ class LLMEmbeddingBenchmark:
             # Return empty embedding with zero cost in case of error
             return [], 0.0, 0.0
     
-    async def get_llm_response(self, prompt: str, model_name: str) -> Tuple[str, float, float]:
+    def get_llm_response(self, prompt: str, model_name: str) -> Tuple[str, float, float]:
         """
         Get LLM response for the given prompt using the specified model.
         Returns: (response, latency, cost)
         """
         try:
+            # Create a new client for each process
+            client = OpenAI(api_key=self.api_key)
+            
             start_time = time.time()
-            response = self.client.chat.completions.create(
+            response = client.chat.completions.create(
                 model=model_name,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=self.temperature,
@@ -164,7 +165,7 @@ class LLMEmbeddingBenchmark:
             # Return empty response with zero cost in case of error
             return "", 0.0, 0.0
     
-    async def process_sample(self, sample: Dict[str, Any]) -> Dict[str, Any]:
+    def process_sample(self, sample: Dict[str, Any]) -> Dict[str, Any]:
         """Process a single sample to fill in missing fields."""
         # Make a copy of the original sample
         result = sample.copy()
@@ -177,26 +178,26 @@ class LLMEmbeddingBenchmark:
         
         # Get embeddings if needed
         if "Prompt_Embedding_A" not in sample or not sample["Prompt_Embedding_A"]:
-            embedding_a, latency_a, cost_a = await self.get_embedding(prompt, embedding_model_a)
+            embedding_a, latency_a, cost_a = self.get_embedding(prompt, embedding_model_a)
             result["Prompt_Embedding_A"] = embedding_a
             result["Latency_Embedding_Model_A"] = latency_a
             result["Prompt_Embedding_A_Cost"] = cost_a
         
         if "Prompt_Embedding_B" not in sample or not sample["Prompt_Embedding_B"]:
-            embedding_b, latency_b, cost_b = await self.get_embedding(prompt, embedding_model_b)
+            embedding_b, latency_b, cost_b = self.get_embedding(prompt, embedding_model_b)
             result["Prompt_Embedding_B"] = embedding_b
             result["Latency_Embedding_Model_B"] = latency_b
             result["Prompt_Embedding_B_Cost"] = cost_b
         
         # Get LLM responses if needed
         if "Answer_LLM_A" not in sample or not sample["Answer_LLM_A"]:
-            answer_a, latency_a, cost_a = await self.get_llm_response(prompt, llm_a)
+            answer_a, latency_a, cost_a = self.get_llm_response(prompt, llm_a)
             result["Answer_LLM_A"] = answer_a
             result["Latency_LLM_A"] = latency_a
             result["Answer_LLM_A_Cost"] = cost_a
         
         if "Answer_LLM_B" not in sample or not sample["Answer_LLM_B"]:
-            answer_b, latency_b, cost_b = await self.get_llm_response(prompt, llm_b)
+            answer_b, latency_b, cost_b = self.get_llm_response(prompt, llm_b)
             result["Answer_LLM_B"] = answer_b
             result["Latency_LLM_B"] = latency_b
             result["Answer_LLM_B_Cost"] = cost_b
@@ -228,27 +229,23 @@ class LLMEmbeddingBenchmark:
             
         return processed_ids
     
-    def save_result(self, result: Dict[str, Any]):
-        """
-        Save a single result to the output file.
-        Uses a file lock to ensure thread safety.
-        """
-        with self.file_lock:
-            self.processed_count += 1
-            
-            # Create a temp file to avoid corruption if the process is interrupted while writing
-            temp_dir = os.path.dirname(self.output_file)
-            with tempfile.NamedTemporaryFile(mode='w', dir=temp_dir, delete=False) as temp_file:
-                temp_path = temp_file.name
-                
-                try:
-                    if os.path.exists(self.output_file) and os.path.getsize(self.output_file) > 0:
+    @staticmethod
+    def _save_result_worker(output_file, lock, result):
+        """Worker function for saving results, to be used by each process."""
+        with lock:
+            try:
+                # Create a temp file to avoid corruption if the process is interrupted while writing
+                temp_dir = os.path.dirname(output_file)
+                with tempfile.NamedTemporaryFile(mode='w', dir=temp_dir, delete=False) as temp_file:
+                    temp_path = temp_file.name
+                    
+                    if os.path.exists(output_file) and os.path.getsize(output_file) > 0:
                         # File exists and has content, read existing results
-                        with open(self.output_file, 'r') as f:
+                        with open(output_file, 'r') as f:
                             try:
                                 results = json.load(f)
                             except json.JSONDecodeError:
-                                logger.warning(f"Could not decode JSON from {self.output_file}. Creating new results array.")
+                                logger.warning(f"Could not decode JSON from {output_file}. Creating new results array.")
                                 results = []
                     else:
                         # File doesn't exist or is empty
@@ -257,59 +254,60 @@ class LLMEmbeddingBenchmark:
                     # Append the new result
                     results.append(result)
                     
-                    # Add the ID to processed IDs set
-                    if "ID" in result:
-                        self.processed_ids.add(result["ID"])
-                    
                     # Write to temp file
                     json.dump(results, temp_file, indent=2)
                     
                     # Ensure data is written to disk
                     temp_file.flush()
                     os.fsync(temp_file.fileno())
-                except Exception as e:
-                    logger.error(f"Error saving result: {e}")
-                    return False
-            
-            # Atomically replace the output file with the temp file
-            try:
-                os.replace(temp_path, self.output_file)
-                logger.debug(f"Saved result {self.processed_count}/{self.total_count} to {self.output_file}")
+                
+                # Atomically replace the output file with the temp file
+                os.replace(temp_path, output_file)
                 return True
             except Exception as e:
-                logger.error(f"Error replacing output file: {e}")
+                logger.error(f"Error saving result: {e}")
                 # Try to clean up the temp file
                 try:
-                    os.remove(temp_path)
+                    if 'temp_path' in locals():
+                        os.remove(temp_path)
                 except:
                     pass
                 return False
     
-    async def process_sample_wrapper(self, sample: Dict[str, Any], pbar: tqdm = None) -> Dict[str, Any]:
-        """Wrapper for process_sample to update progress bar, save result, and handle errors."""
+    def process_sample_for_mp(self, sample, lock, processed_counter, processed_ids, total_count):
+        """Process a single sample and save the result, designed for multiprocessing."""
         try:
             # Skip if already processed and resuming
-            if self.resume and "ID" in sample and sample["ID"] in self.processed_ids:
-                if pbar:
-                    pbar.update(1)
+            if self.resume and "ID" in sample and sample["ID"] in processed_ids:
+                with lock:
+                    processed_counter.value += 1
                 return sample
             
-            result = await self.process_sample(sample)
+            # Process the sample
+            result = self.process_sample(sample)
             
-            # Save the result immediately
-            self.save_result(result)
+            # Save the result
+            success = self._save_result_worker(self.output_file, lock, result)
             
-            if pbar:
-                pbar.update(1)
+            # Update the processed counter
+            with lock:
+                processed_counter.value += 1
+                if "ID" in result:
+                    processed_ids.add(result["ID"])
+                
+                # Log progress periodically
+                if processed_counter.value % 10 == 0 or processed_counter.value == total_count:
+                    logger.info(f"Progress: {processed_counter.value}/{total_count} samples processed")
+            
             return result
         except Exception as e:
             logger.error(f"Error processing sample: {e}")
-            if pbar:
-                pbar.update(1)
+            with lock:
+                processed_counter.value += 1
             # Return the original sample if processing fails
             return sample
     
-    async def run_benchmark(self):
+    def run_benchmark(self):
         """Run the benchmark to fill in missing fields in the dataset."""
         try:
             # Load input data
@@ -326,7 +324,7 @@ class LLMEmbeddingBenchmark:
                 logger.info(f"Limiting to {self.max_samples} samples out of {len(data)}")
                 data = data[:self.max_samples]
             
-            self.total_count = len(data)
+            total_count = len(data)
             
             # Create output directory if it doesn't exist
             os.makedirs(os.path.dirname(os.path.abspath(self.output_file)), exist_ok=True)
@@ -336,59 +334,59 @@ class LLMEmbeddingBenchmark:
                 with open(self.output_file, 'w') as f:
                     json.dump([], f)
             
+            # Set up multiprocessing shared objects
+            manager = Manager()
+            processed_ids = manager.set()
+            lock = manager.Lock()
+            processed_counter = manager.Value('i', 0)
+            
             # Load already processed samples for resuming
             if self.resume:
-                self.processed_ids = self.load_processed_samples()
-                pending_count = len(data) - len(self.processed_ids)
+                for id in self.load_processed_samples():
+                    processed_ids.add(id)
+                pending_count = len(data) - len(processed_ids)
                 if pending_count <= 0:
                     logger.info("All samples have already been processed. Nothing to do.")
                     return
-                logger.info(f"Resuming processing. {len(self.processed_ids)} samples already processed, {pending_count} remaining.")
+                logger.info(f"Resuming processing. {len(processed_ids)} samples already processed, {pending_count} remaining.")
             
             # Process samples
             num_workers = min(self.workers, len(data))
             if num_workers > 1:
                 logger.info(f"Processing {len(data)} samples with {num_workers} parallel workers (temperature={self.temperature}, top_p={self.top_p})")
+                
+                # Use a process pool to process samples in parallel
+                with Pool(processes=num_workers) as pool:
+                    process_func = partial(
+                        self.process_sample_for_mp,
+                        lock=lock,
+                        processed_counter=processed_counter,
+                        processed_ids=processed_ids,
+                        total_count=total_count
+                    )
+                    results = pool.map(process_func, data)
             else:
                 logger.info(f"Processing {len(data)} samples sequentially (temperature={self.temperature}, top_p={self.top_p})")
-            
-            # Initialize progress bar
-            pbar = tqdm(total=len(data), desc="Processing samples")
-            
-            # Process samples in parallel
-            results = []
-            if num_workers > 1:
-                # Use a thread pool to process samples concurrently
-                loop = asyncio.get_event_loop()
-                with concurrent.futures.ThreadPoolExecutor(max_workers=num_workers) as executor:
-                    # Create tasks
-                    futures = [
-                        loop.run_in_executor(
-                            executor,
-                            partial(
-                                asyncio.run,
-                                self.process_sample_wrapper(sample, pbar)
-                            )
-                        )
-                        for sample in data
-                    ]
-                    
-                    # Wait for all tasks to complete
-                    completed_results = await asyncio.gather(*futures)
-                    results.extend(completed_results)
-            else:
+                
                 # Process samples sequentially
+                results = []
                 for sample in data:
-                    result = await self.process_sample_wrapper(sample, pbar)
+                    result = self.process_sample_for_mp(
+                        sample, 
+                        lock,
+                        processed_counter,
+                        processed_ids,
+                        total_count
+                    )
                     results.append(result)
-            
-            pbar.close()
             
             # Report completion stats
             if self.resume:
-                logger.info(f"Benchmark completed. Processed {self.processed_count} new samples. Results saved to {self.output_file}")
+                logger.info(f"Benchmark completed. Processed {processed_counter.value - len(processed_ids)} new samples. Results saved to {self.output_file}")
             else:
                 logger.info(f"Benchmark completed. Results saved to {self.output_file}")
+                
+            return results
         
         except Exception as e:
             logger.error(f"Error running benchmark: {e}")
@@ -416,7 +414,7 @@ def parse_arguments():
                         help="Resume processing from where it was stopped")
     return parser.parse_args()
 
-async def main():
+def main():
     args = parse_arguments()
     
     # Set default output file if not provided
@@ -439,7 +437,9 @@ async def main():
         resume=args.resume
     )
     
-    await benchmark.run_benchmark()
+    benchmark.run_benchmark()
 
 if __name__ == "__main__":
-    asyncio.run(main()) 
+    # Set start method for multiprocessing
+    multiprocessing.set_start_method('spawn', force=True)
+    main() 
