@@ -17,7 +17,6 @@ class VectorQConfig:
     def __init__(
         self,
         accuracy_target: float = 0.8, 
-        max_capacity: int = 1000, 
         enable_cache: bool = True, 
         rnd_num_ub: float = 1.0,
         is_static_threshold: bool = False,
@@ -32,7 +31,6 @@ class VectorQConfig:
         vectorq_policy: Optional[VectorQPolicy] = None,
     ):
         self.accuracy_target: float = accuracy_target
-        self.max_capacity: int = max_capacity
         self.enable_cache: bool = enable_cache
         self.rnd_num_ub: float = rnd_num_ub
         self.is_static_threshold: bool = is_static_threshold

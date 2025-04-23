@@ -32,16 +32,14 @@ logging.basicConfig(filename=os.path.join(results_dir, 'benchmark.log'), level=l
 ### Parameters #########################################################################################################
 ########################################################################################################################
 
-# VectorQ Config
-MAX_CAPACITY = 1000000
-
 # Benchmark Config
+MAX_SAMPLES = 100
+CONFIDENCE_INTERVALS_ITERATIONS = 1
 EMBEDDING_MODEL_1 = ('embedding_1', 'GteLargeENv1_5', "float32", 1024)           # 'Alibaba-NLP/gte-large-en-v1.5'
 EMBEDDING_MODEL_2 = ('embedding_2', 'E5_Mistral_7B_Instruct', "float16", 4096)   # 'intfloat/e5-mistral-7b-instruct'
 LARGE_LANGUAGE_MODEL_1 = ('response_1', 'Llama_3_8B_Instruct', "float16", None)  # 'meta-llama/Meta-Llama-3-8B-Instruct'
 LARGE_LANGUAGE_MODEL_2 = ('response_2', 'Llama_3_70B_Instruct', "float16", None) # 'meta-llama/Meta-Llama-3-70B-Instruct'
 SIMILARITY_STRATEGY = ('string_comparison', 'embedding_comparison', 'llm_judge_comparison')
-MAX_SAMPLES = 10000
 
 embedding_models = [EMBEDDING_MODEL_1]
 llm_models = [LARGE_LANGUAGE_MODEL_2]
@@ -49,6 +47,9 @@ candidate_strategy = SIMILARITY_STRATEGY[0]
 
 static_thresholds = np.array([0.74, 0.76, 0.78, 0.8, 0.825, 0.85, 0.875, 0.9, 0.92, 0.94, 0.96])
 deltas = np.array([0.025, 0.05, 0.075, 0.1, 0.125, 0.15, 0.175, 0.2])
+
+# VectorQ Config
+MAX_VECTOR_DB_CAPACITY = 1000000
 
 THRESHOLD_TYPES = ['static', 'dynamic', 'both']
 THRESHOLD_TYPE = THRESHOLD_TYPES[1]
@@ -122,7 +123,6 @@ class Benchmark(unittest.TestCase):
         self.incorrect_y: Dict[int, List[float]] = {}
         self.posteriors: Dict[int, List[float]] = {}
         
-        # Create output directory if it doesn't exist
         if self.output_folder_path and not os.path.exists(self.output_folder_path):
             os.makedirs(self.output_folder_path)
 
@@ -448,9 +448,9 @@ async def main():
                             enable_cache = True,
                             is_static_threshold = True,
                             static_threshold = threshold,
-                            max_capacity = MAX_CAPACITY,
                             vector_db = HNSWLibVectorDB(
-                                similarity_metric_type=SimilarityMetricType.COSINE
+                                similarity_metric_type=SimilarityMetricType.COSINE,
+                                max_capacity=MAX_VECTOR_DB_CAPACITY
                             ),
                             embedding_metadata_storage = InMemoryEmbeddingMetadataStorage(),
                             similarity_evaluator = StringComparisonSimilarityEvaluator()
@@ -476,15 +476,15 @@ async def main():
                 # Dynamic thresholds (VectorQ)
                 if THRESHOLD_TYPE in ['dynamic', 'both']:
                     for delta in deltas:
-                        for i in range(0,3): # 3 runs per combination for confidence intervals
-                            print(f"Using dynamic threshold with delta: {delta}. Run {i+1} of 3")
+                        for i in range(0,CONFIDENCE_INTERVALS_ITERATIONS):
+                            print(f"Using dynamic threshold with delta: {delta}. Run {i+1} of {CONFIDENCE_INTERVALS_ITERATIONS}")
                             
                             config = VectorQConfig(
                                 enable_cache = True,
                                 is_static_threshold = False,
-                                max_capacity = MAX_CAPACITY,
                                 vector_db = HNSWLibVectorDB(
-                                    similarity_metric_type=SimilarityMetricType.COSINE
+                                    similarity_metric_type=SimilarityMetricType.COSINE,
+                                    max_capacity=MAX_VECTOR_DB_CAPACITY
                                 ),
                                 embedding_metadata_storage = InMemoryEmbeddingMetadataStorage(),
                                 similarity_evaluator = StringComparisonSimilarityEvaluator(),

@@ -226,7 +226,6 @@ def plot_cache_hit_latency_vs_size(benchmark: Benchmark, FONT_SIZE=20):
         print("Not enough cache hits to plot cache hit latency vs cache size")
         return
     
-    # Remove outliers using IQR method
     latencies_array = np.array(hit_latencies)
     q1 = np.percentile(latencies_array, 25)
     q3 = np.percentile(latencies_array, 75)
@@ -234,17 +233,11 @@ def plot_cache_hit_latency_vs_size(benchmark: Benchmark, FONT_SIZE=20):
     lower_bound = q1 - 1.5 * iqr
     upper_bound = q3 + 1.5 * iqr
     
-    # Filter out outliers
     outlier_mask = (latencies_array >= lower_bound) & (latencies_array <= upper_bound)
     filtered_cache_sizes = np.array(cache_sizes)[outlier_mask]
     filtered_hit_latencies = latencies_array[outlier_mask]
     filtered_cache_hits_count = np.array(cache_hits_count)[outlier_mask]
     
-    # Print how many outliers were removed
-    num_outliers = len(hit_latencies) - len(filtered_hit_latencies)
-    if num_outliers > 0:
-        print(f"Removed {num_outliers} outliers from hit latencies (out of {len(hit_latencies)})")
-        
     plt.rcParams.update({'font.size': FONT_SIZE})
     plt.figure(figsize=(16, 7))
     

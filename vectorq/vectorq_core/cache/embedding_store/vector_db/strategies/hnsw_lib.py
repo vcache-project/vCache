@@ -10,7 +10,7 @@ class HNSWLibVectorDB(VectorDB):
     
     def __init__(self, 
                  similarity_metric_type: SimilarityMetricType = SimilarityMetricType.COSINE, 
-                 max_capacity: int = 1000):
+                 max_capacity: int = 100000):
         self.embedding_count = 0
         self.__next_embedding_id = 0
         self.similarity_metric_type = similarity_metric_type
