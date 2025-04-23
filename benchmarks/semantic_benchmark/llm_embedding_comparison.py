@@ -274,11 +274,12 @@ class LLMEmbeddingBenchmark:
                     pass
                 return False
     
-    def process_sample_for_mp(self, sample, lock, processed_counter, processed_ids, total_count):
+    def process_sample_for_mp(self, sample, lock, processed_counter, processed_ids_dict, total_count):
         """Process a single sample and save the result, designed for multiprocessing."""
         try:
             # Skip if already processed and resuming
-            if self.resume and "ID" in sample and sample["ID"] in processed_ids:
+            sample_id = sample.get("ID")
+            if self.resume and sample_id is not None and sample_id in processed_ids_dict:
                 with lock:
                     processed_counter.value += 1
                 return sample
@@ -293,7 +294,7 @@ class LLMEmbeddingBenchmark:
             with lock:
                 processed_counter.value += 1
                 if "ID" in result:
-                    processed_ids.add(result["ID"])
+                    processed_ids_dict[result["ID"]] = True
                 
                 # Log progress periodically
                 if processed_counter.value % 10 == 0 or processed_counter.value == total_count:
@@ -336,19 +337,20 @@ class LLMEmbeddingBenchmark:
             
             # Set up multiprocessing shared objects
             manager = Manager()
-            processed_ids = manager.set()
+            # Use a dict to simulate a set since Manager doesn't have a set() method
+            processed_ids_dict = manager.dict()
             lock = manager.Lock()
             processed_counter = manager.Value('i', 0)
             
             # Load already processed samples for resuming
             if self.resume:
                 for id in self.load_processed_samples():
-                    processed_ids.add(id)
-                pending_count = len(data) - len(processed_ids)
+                    processed_ids_dict[id] = True
+                pending_count = len(data) - len(processed_ids_dict)
                 if pending_count <= 0:
                     logger.info("All samples have already been processed. Nothing to do.")
                     return
-                logger.info(f"Resuming processing. {len(processed_ids)} samples already processed, {pending_count} remaining.")
+                logger.info(f"Resuming processing. {len(processed_ids_dict)} samples already processed, {pending_count} remaining.")
             
             # Process samples
             num_workers = min(self.workers, len(data))
@@ -361,7 +363,7 @@ class LLMEmbeddingBenchmark:
                         self.process_sample_for_mp,
                         lock=lock,
                         processed_counter=processed_counter,
-                        processed_ids=processed_ids,
+                        processed_ids_dict=processed_ids_dict,
                         total_count=total_count
                     )
                     results = pool.map(process_func, data)
@@ -375,14 +377,14 @@ class LLMEmbeddingBenchmark:
                         sample, 
                         lock,
                         processed_counter,
-                        processed_ids,
+                        processed_ids_dict,
                         total_count
                     )
                     results.append(result)
             
             # Report completion stats
             if self.resume:
-                logger.info(f"Benchmark completed. Processed {processed_counter.value - len(processed_ids)} new samples. Results saved to {self.output_file}")
+                logger.info(f"Benchmark completed. Processed {processed_counter.value - len(processed_ids_dict)} new samples. Results saved to {self.output_file}")
             else:
                 logger.info(f"Benchmark completed. Results saved to {self.output_file}")
                 
