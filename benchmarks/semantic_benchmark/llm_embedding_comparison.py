@@ -13,6 +13,7 @@ import multiprocessing
 from multiprocessing import Manager, Pool, Lock
 from functools import partial
 import tempfile
+import threading
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -295,10 +296,6 @@ class LLMEmbeddingBenchmark:
                 processed_counter.value += 1
                 if "ID" in result:
                     processed_ids_dict[result["ID"]] = True
-                
-                # Log progress periodically
-                if processed_counter.value % 10 == 0 or processed_counter.value == total_count:
-                    logger.info(f"Progress: {processed_counter.value}/{total_count} samples processed")
             
             return result
         except Exception as e:
@@ -307,6 +304,16 @@ class LLMEmbeddingBenchmark:
                 processed_counter.value += 1
             # Return the original sample if processing fails
             return sample
+    
+    def _update_progress_bar(self, pbar, processed_counter, stop_event):
+        """Thread function to update progress bar based on shared counter value."""
+        last_value = 0
+        while not stop_event.is_set():
+            current_value = processed_counter.value
+            if current_value > last_value:
+                pbar.update(current_value - last_value)
+                last_value = current_value
+            time.sleep(0.1)  # Small sleep to avoid CPU hogging
     
     def run_benchmark(self):
         """Run the benchmark to fill in missing fields in the dataset."""
@@ -352,35 +359,53 @@ class LLMEmbeddingBenchmark:
                     return
                 logger.info(f"Resuming processing. {len(processed_ids_dict)} samples already processed, {pending_count} remaining.")
             
-            # Process samples
-            num_workers = min(self.workers, len(data))
-            if num_workers > 1:
-                logger.info(f"Processing {len(data)} samples with {num_workers} parallel workers (temperature={self.temperature}, top_p={self.top_p})")
-                
-                # Use a process pool to process samples in parallel
-                with Pool(processes=num_workers) as pool:
-                    process_func = partial(
-                        self.process_sample_for_mp,
-                        lock=lock,
-                        processed_counter=processed_counter,
-                        processed_ids_dict=processed_ids_dict,
-                        total_count=total_count
-                    )
-                    results = pool.map(process_func, data)
-            else:
-                logger.info(f"Processing {len(data)} samples sequentially (temperature={self.temperature}, top_p={self.top_p})")
-                
-                # Process samples sequentially
-                results = []
-                for sample in data:
-                    result = self.process_sample_for_mp(
-                        sample, 
-                        lock,
-                        processed_counter,
-                        processed_ids_dict,
-                        total_count
-                    )
-                    results.append(result)
+            # Set up progress bar in the main thread
+            pbar = tqdm(total=total_count, desc="Processing samples")
+            stop_event = threading.Event()
+            
+            # Create a thread to update the progress bar
+            progress_thread = threading.Thread(
+                target=self._update_progress_bar, 
+                args=(pbar, processed_counter, stop_event)
+            )
+            progress_thread.daemon = True
+            progress_thread.start()
+            
+            try:
+                # Process samples
+                num_workers = min(self.workers, len(data))
+                if num_workers > 1:
+                    logger.info(f"Processing {len(data)} samples with {num_workers} parallel workers (temperature={self.temperature}, top_p={self.top_p})")
+                    
+                    # Use a process pool to process samples in parallel
+                    with Pool(processes=num_workers) as pool:
+                        process_func = partial(
+                            self.process_sample_for_mp,
+                            lock=lock,
+                            processed_counter=processed_counter,
+                            processed_ids_dict=processed_ids_dict,
+                            total_count=total_count
+                        )
+                        results = pool.map(process_func, data)
+                else:
+                    logger.info(f"Processing {len(data)} samples sequentially (temperature={self.temperature}, top_p={self.top_p})")
+                    
+                    # Process samples sequentially
+                    results = []
+                    for sample in data:
+                        result = self.process_sample_for_mp(
+                            sample, 
+                            lock,
+                            processed_counter,
+                            processed_ids_dict,
+                            total_count
+                        )
+                        results.append(result)
+            finally:
+                # Stop the progress bar thread
+                stop_event.set()
+                progress_thread.join(timeout=1.0)
+                pbar.close()
             
             # Report completion stats
             if self.resume:
