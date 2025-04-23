@@ -16,11 +16,23 @@ The benchmark script expects data in a specific JSON format. Example datasets ar
 
 ## Running Benchmarks
 
+### VectorQ Performance Benchmark
+
 The main benchmark script can be run from the repository root:
 
 ```bash
 python benchmarks/benchmark.py
 ```
+
+### LLM and Embedding Comparison Benchmark
+
+The semantic benchmark module provides tools for comparing different LLM and embedding models:
+
+```bash
+python -m benchmarks.semantic_benchmark.llm_embedding_comparison --input path/to/input.json --output path/to/output.json
+```
+
+For more details, see the [Semantic Benchmark README](semantic_benchmark/README.md).
 
 ## Configuration
 
@@ -67,3 +79,13 @@ Once benchmarks have been completed and results are saved to the `./benchmarks/r
 ```bash
 python benchmarks/plotter_offline.py
 ```
+
+## Available Benchmarks
+
+1. **VectorQ Performance Benchmark** (`benchmark.py`): Evaluates the performance of VectorQ's semantic caching system including cache hit rate, error rate, and latency improvements.
+
+2. **LLM and Embedding Comparison** (`semantic_benchmark/`): Compares different LLM and embedding models by:
+   - Generating embeddings with multiple embedding models
+   - Generating responses with multiple LLM models
+   - Measuring performance metrics (latency, cost, etc.)
+   - Processing datasets to fill in missing information

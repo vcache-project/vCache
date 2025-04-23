@@ -60,6 +60,11 @@ VectorQ improves semantic caching by learning embedding-specific similarity thre
 
 VectorQ includes a benchmarking framework to evaluate performance metrics such as cache hit rates, error rates, and latency improvements. For detailed instructions on running benchmarks, see the [Benchmarking Documentation](benchmarks/README.md).
 
+### Available Benchmarks
+
+1. **VectorQ Performance Benchmark**: Evaluates the performance of VectorQ's semantic caching system.
+2. **LLM and Embedding Comparison Benchmark**: Compares different LLM and embedding models by generating embeddings and responses, and measuring performance metrics.
+
 ## Citation
 
 If you use VectorQ for your research, please cite our [paper](https://arxiv.org/abs/2502.03771).
