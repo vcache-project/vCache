@@ -10,6 +10,7 @@ class InMemoryEmbeddingMetadataStorage(EmbeddingMetadataStorage):
     
     def add_metadata(self, embedding_id: int, metadata: Optional[Dict[str, Any]] = None) -> None:
         self.metadata_storage[embedding_id] = metadata
+        print(f"add_metadata: Added metadata for embedding id {embedding_id}")
         return embedding_id
     
     def get_metadata(self, embedding_id: int) -> Optional[Dict[str, Any]]:
@@ -35,4 +36,5 @@ class InMemoryEmbeddingMetadataStorage(EmbeddingMetadataStorage):
         self.metadata_storage = {}
 
     def get_all_embedding_metadata_objects(self) -> List[EmbeddingMetadataObj]:
+        print(f"get_all_embedding_metadata_objects: Number of metadata objects in storage: {len(self.metadata_storage)}")
         return list(self.metadata_storage.values())

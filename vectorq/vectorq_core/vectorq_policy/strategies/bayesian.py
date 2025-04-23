@@ -9,27 +9,29 @@ from scipy.optimize import minimize
 
 class VectorQBayesianPolicy(VectorQPolicy):
     
-    def __init__(self):
+    def __init__(self, delta: float):
+        self.delta: float = delta
+        self.P_c: float = 1.0 - self.delta
         self.epsilon_grid: Sequence[float] = [k / 100 for k in range(1, 50)]
         self.phi_inv: Optional[Callable[[float, np.ndarray, np.ndarray, float, Callable[[float, np.ndarray, np.ndarray, float], float]], float]] = self._normal_quantile
         
-    def select_action(self, similarity_score: float, metadata: EmbeddingMetadataObj, delta: float) -> Action:
+    def select_action(self, similarity_score: float, metadata: EmbeddingMetadataObj) -> Action:
         '''
         similarity_score: float - The similarity score between the query and the embedding
         metadata: EmbeddingMetadataObj - The metadata of the embedding
         delta: float - Target correctness probability
         returns: Action - Explore or Exploit
         '''
-        P_c: float = 1.0 - delta
         similarities: np.ndarray = np.array([obs[0] for obs in metadata.observations])
         labels: np.ndarray = np.array([obs[1] for obs in metadata.observations])
-
-        t_hat, gamma = self._estimate_parameters(similarities, labels, metadata)
-        metadata.gamma = gamma
         
-        tau: float = self._get_tau(similarities, labels, similarity_score, t_hat, P_c, metadata)
+        if len(similarities) == 0 or len(labels) == 0:
+            return Action.EXPLORE
 
+        t_hat = self._estimate_parameters(similarities, labels, metadata)
+        tau: float = self._get_tau(similarities, labels, similarity_score, t_hat, metadata)
         u: float = random.uniform(0, 1)
+        
         if u <= tau:
             return Action.EXPLORE, t_hat, tau, u
         else:
@@ -48,10 +50,10 @@ class VectorQBayesianPolicy(VectorQPolicy):
 
     def _normal_quantile(self, t_hat: float, similarities: np.ndarray, labels: np.ndarray, quantile: float, loss_function: Callable[[float, np.ndarray, np.ndarray], float]) -> float:
         alpha: float = 2 * (1.0 - quantile)
-        _, upper = self._asymptotic_ci(t_hat, similarities, labels, alpha, loss_function)
+        _, upper = self._asymptotic_confidence_interval(t_hat, similarities, labels, alpha, loss_function)
         return upper
 
-    def _asymptotic_ci(
+    def _asymptotic_confidence_interval(
         self,
         t_hat: float,
         sims: np.ndarray,
@@ -74,71 +76,30 @@ class VectorQBayesianPolicy(VectorQPolicy):
         delta = z * np.sqrt(var_t)
         return t_hat - delta, t_hat + delta
     
-    def _estimate_parameters(self, similarities: np.ndarray, labels: np.ndarray, metadata: EmbeddingMetadataObj) -> Tuple[float, float]:
-        """
-        Estimate optimal t_hat parameter using gradient-based optimization.
-        
-        Returns:
-            t_hat: Estimated threshold
-        """
-        # Initial guess for t
-        x0 = np.array([0.5])
-        
-        # Bounds for parameter: t ∈ [0,1]
-        bounds = [(0.0, 1.0)]
-        
+    def _estimate_parameters(self, similarities: np.ndarray, labels: np.ndarray, metadata: EmbeddingMetadataObj) -> float:
+        initial_t_guess = np.array([0.8])
+        t_bounds = [(0.0, 1.0)]
         result = minimize(
             fun=lambda x: self._binary_cross_entropy_loss(
                 t=x[0], 
                 sims=similarities, 
                 labels=labels, 
-                gamma=metadata.gamma, 
-                apply_regularization=True
+                gamma=metadata.gamma
             ),
-            x0=x0,
-            bounds=bounds,
+            x0=initial_t_guess,
+            bounds=t_bounds,
             method='L-BFGS-B'
         )
-        
         t_hat = float(result.x[0])
         
-        return t_hat, metadata.gamma
+        return t_hat
     
-    def _joint_loss_function(self, t: float, gamma: float, sims: np.ndarray, labels: np.ndarray) -> float:
-        """
-        Binary cross-entropy loss with gamma as a parameter.
-        """
-        z: float = gamma * (sims - t)
-        p: float = 1 / (1 + np.exp(-z))
-        p = np.clip(p, 1e-12, 1 - 1e-12)  # numeric safety
-        reg_term: float = 0.01 * (gamma - 20.0)**2      # TODO: LGS validate
-        return -np.mean(labels * np.log(p) + (1 - labels) * np.log(1 - p)) + reg_term
-    
-    def _binary_cross_entropy_loss(self, t: float, sims: np.ndarray, labels: np.ndarray, gamma: float, apply_regularization: bool = False) -> float:
-        """
-        Binary cross-entropy loss with optional gamma parameter and regularization.
-        
-        Args:
-            t: Threshold parameter
-            sims: Similarity values
-            labels: Binary labels
-            gamma: Logistic slope
-            apply_regularization: Whether to apply ridge regularization to gamma
-            
-        Returns:
-            Loss value (BCE loss + optional regularization)
-        """
+    def _binary_cross_entropy_loss(self, t: float, sims: np.ndarray, labels: np.ndarray, gamma: float) -> float:
         likelihood = self._likelihood(sims, t, gamma)
         bce_loss = -np.mean(labels * np.log(likelihood) + (1 - labels) * np.log(1 - likelihood))
-        
-        if apply_regularization and gamma is not None:
-            #reg_term: float = 0.01 * gamma**2
-            #return bce_loss + reg_term
-            return bce_loss
-        else:
-            return bce_loss
+        return bce_loss
     
-    def _get_tau(self, similarities: np.ndarray, labels: np.ndarray, s: float, t_hat: float, P_c: float, metadata: EmbeddingMetadataObj) -> float:
+    def _get_tau(self, similarities: np.ndarray, labels: np.ndarray, s: float, t_hat: float, metadata: EmbeddingMetadataObj) -> float:
         taus: List[float] = []
         for eps in self.epsilon_grid:
             quantile: float = 1.0 - eps
@@ -150,7 +111,7 @@ class VectorQBayesianPolicy(VectorQPolicy):
                 lambda t, sims, labs: self._binary_cross_entropy_loss(t, sims, labs, metadata.gamma)
             )
             alpha_lower_bound: float = (1 - eps) * self._likelihood(s, t_prime, metadata.gamma)
-            taus.append(self._approximate_tau(alpha_lower_bound, P_c))
+            taus.append(self._approximate_tau(alpha_lower_bound))
         upper_lower_bound: float = min(taus)
         return upper_lower_bound
 
@@ -158,5 +119,5 @@ class VectorQBayesianPolicy(VectorQPolicy):
         z = gamma * (s - t_prime)
         return 1 / (1 + np.exp(-z))
 
-    def _approximate_tau(self, alpha_lower_bound: float, P_c: float) -> float:
-        return 1 - (1 - P_c) / (1 - alpha_lower_bound)
+    def _approximate_tau(self, alpha_lower_bound: float) -> float:
+        return 1 - (1 - self.P_c) / (1 - alpha_lower_bound)

@@ -1,9 +1,13 @@
-from typing import List
+from typing import List, Optional, TYPE_CHECKING
 
 from vectorq.vectorq_core.cache.embedding_store.embedding_metadata_storage.embedding_metadata_obj import EmbeddingMetadataObj
 from vectorq.vectorq_core.cache.embedding_store.embedding_store import EmbeddingStore
 from vectorq.vectorq_core.cache.embedding_engine.embedding_engine import EmbeddingEngine
 from vectorq.vectorq_core.cache.eviction_policy.eviction_policy import EvictionPolicy
+
+
+if TYPE_CHECKING:
+    from vectorq.main import VectorQBenchmark
 
 class Cache:
     
@@ -36,13 +40,15 @@ class Cache:
         '''
         self.embedding_store.remove(embedding_id)
     
-    def get_knn(self, prompt: str, k: int, embedding: List[float] = []) -> List[tuple[float, int]]:
+    def get_knn(self, prompt: str, k: int, benchmark: Optional["VectorQBenchmark"]) -> List[tuple[float, int]]:
         '''
         prompt: str - The prompt to get the k-nearest neighbors for
         k: int - The number of nearest neighbors to get
         returns: List[tuple[float, int]] - A list of tuples, each containing a similarity score and an embedding id
         '''
-        if (embedding == []):
+        if benchmark is not None:
+            embedding: List[float] = benchmark.candidate_embedding
+        else:
             embedding: List[float] = self.embedding_engine.get_embedding(prompt)
         return self.embedding_store.get_knn(embedding, k)
     
@@ -80,7 +86,7 @@ class Cache:
         '''
         return self.embedding_store.is_empty()
     
-    def get_all_embedding_metadata_objects(self) -> List[EmbeddingMetadataObj]:
+    def get_all_embedding_metadata_objects(self) -> List["EmbeddingMetadataObj"]:
         '''
         returns: List["EmbeddingMetadataObj"] - A list of all the embedding metadata objects in the cache
         '''

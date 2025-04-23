@@ -1225,3 +1225,7 @@ def plot_roc_curve(dataset, embedding_model_name, llm_model_name, timestamp, res
     plt.savefig(output_file, format='pdf', bbox_inches='tight')
     plt.close()
     print(f"     ROC curve comparison saved to {output_file}")
+
+def plot_bayesian_stats(dataset, embedding_model_name, llm_model_name, timestamp, results_dir, FONT_SIZE=20):
+    # TODO: LGS
+    pass

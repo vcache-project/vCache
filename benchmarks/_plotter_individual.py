@@ -5,6 +5,8 @@ from matplotlib.patches import Patch
 import seaborn as sns
 from typing import List, Tuple
 from benchmark import Benchmark
+from vectorq.vectorq_core.vectorq_policy.strategies.bayesian import VectorQBayesianPolicy
+from vectorq.vectorq_core.cache.embedding_store.embedding_metadata_storage.embedding_metadata_obj import EmbeddingMetadataObj
 
 def plot_error_rate_relative(benchmark: Benchmark, FONT_SIZE=20):
     plt.rcParams.update({'font.size': FONT_SIZE})
@@ -352,3 +354,69 @@ def plot_combined_thresholds_and_posteriors(benchmark: Benchmark):
         plt.savefig(filename, format='pdf', bbox_inches='tight')
         plt.close()
         
+def plot_bayesian_decision_boundary(benchmark: Benchmark):
+    if benchmark.is_dynamic_threshold:
+        vectorQ = VectorQBayesianPolicy(delta=benchmark.delta)
+        
+        for idx, observations, gamma in zip(benchmark.observations.keys(), benchmark.observations.values(), benchmark.gammas):
+            if (len(observations) == 0):
+                continue
+            
+            metadata = EmbeddingMetadataObj(embedding_id=-1, response="None")
+            metadata.gamma = gamma
+            print(f"Observations: {observations}")
+            similarities = [obs[0] for obs in observations]
+            labels = [obs[1] for obs in observations]
+            correct_obs = [obs[0] for obs in observations if obs[1] == 1]
+            incorrect_obs = [obs[0] for obs in observations if obs[1] == 0]
+            
+            print(similarities)
+            print(labels)
+            print(correct_obs)
+            print(incorrect_obs)
+            
+            t_hat, _ = vectorQ._estimate_parameters(similarities, labels, metadata)
+            
+            s_values = np.linspace(0.0, 1.0, 100)
+        
+            # Calculate tau for each similarity value
+            tau_values = []
+            for s in s_values:
+                tau = vectorQ._get_tau(similarities, labels, s, t_hat)
+                tau_values.append(tau)
+            
+            # Calculate probability for each similarity value
+            probs = [vectorQ._likelihood(s, t_hat) for s in s_values]
+            
+
+            plt.figure(figsize=(12, 8))
+            plt.plot(s_values, tau_values, 'r-', linewidth=2, label='Tau (exploration probability)')
+            plt.plot(s_values, probs, 'b--', linewidth=2, label=f'Probability curve (γ={gamma})')
+            plt.axvline(x=t_hat, color='g', linestyle='--', 
+                    label=f'Decision boundary (t_hat={t_hat:.2f})')
+            
+            if correct_obs:
+                plt.scatter(correct_obs, [0.05] * len(correct_obs), 
+                        color='green', label='Correct observations', 
+                        s=80, alpha=0.7)
+            if incorrect_obs:
+                plt.scatter(incorrect_obs, [0.05] * len(incorrect_obs), 
+                        color='red', label='Incorrect observations', 
+                        s=80, alpha=0.7)
+            
+            plt.xlim([0.0, 1.0])
+            plt.ylim([0, 1.05])
+            plt.xlabel('Similarity (s)', fontsize=18)
+            plt.ylabel('Probability / Tau', fontsize=18)
+            plt.title(f'Exploration Probability (Tau) vs. Similarity (δ={vectorQ.delta})', fontsize=18)
+            plt.grid(True, alpha=0.3)
+            plt.legend(fontsize=18)
+            plt.tight_layout(rect=[0, 0.05, 1, 1])
+            
+            output_folder_path = benchmark.output_folder_path + f'/bayesian_decision_boundary/'
+            filename = benchmark.output_folder_path + f'/bayesian_decision_boundary/decision_boundary_embedding_{idx}_{benchmark.timestamp}.pdf'
+            if output_folder_path and not os.path.exists(output_folder_path):
+                os.makedirs(output_folder_path)
+            plt.savefig(filename, format='pdf', bbox_inches='tight')
+            plt.close()
+            

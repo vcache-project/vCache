@@ -49,9 +49,9 @@ class EmbeddingMetadataObj:
             embedding_id={self.embedding_id},
             response={self.response},
             last_accessed={self.last_accessed},
-            len(correct_similarities)={len(self.correct_similarities)},
-            len(incorrect_similarities)={len(self.incorrect_similarities)},
-            len(posteriors)={len(self.posteriors)}
+            len(observations)={len(self.observations)},
+            observations={self.observations},
+            gamma={self.gamma},
         )
         """
         
