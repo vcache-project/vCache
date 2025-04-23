@@ -112,7 +112,6 @@ class LLMEmbeddingBenchmark:
         Get embeddings for the given text using the specified model.
         Returns: (embedding, latency, cost)
         """
-        start_time = time.time()
         try:
             # Clean up model name if needed
             if model == "text-embedding-3-small" or model == "text-embedding-3-large":
@@ -120,14 +119,14 @@ class LLMEmbeddingBenchmark:
             else:
                 model_name = "text-embedding-3-small"  # Default fallback
                 logger.warning(f"Unknown embedding model {model}, falling back to {model_name}")
-            
+            start_time = time.time()
             response = self.client.embeddings.create(
                 model=model_name,
                 input=text,
                 encoding_format="float"
             )
-            embedding = response.data[0].embedding
             latency = time.time() - start_time
+            embedding = response.data[0].embedding
             cost = self.calculate_token_cost(text, model_name)
             
             return embedding, latency, cost
@@ -141,17 +140,16 @@ class LLMEmbeddingBenchmark:
         Get LLM response for the given prompt using the specified model.
         Returns: (response, latency, cost)
         """
-        start_time = time.time()
         try:
+            start_time = time.time()
             response = self.client.chat.completions.create(
                 model=model_name,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=self.temperature,
                 top_p=self.top_p
             )
-            
-            response_text = response.choices[0].message.content
             latency = time.time() - start_time
+            response_text = response.choices[0].message.content
             
             # Calculate costs (input and output)
             input_cost = self.calculate_token_cost(prompt, model_name)
