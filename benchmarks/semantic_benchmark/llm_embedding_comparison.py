@@ -5,11 +5,15 @@ import argparse
 import asyncio
 import logging
 import numpy as np
-from typing import Dict, List, Any, Tuple
+from typing import Dict, List, Any, Tuple, Set
 from datetime import datetime
 from tqdm import tqdm
 from openai import OpenAI
 import tiktoken
+import concurrent.futures
+from functools import partial
+import threading
+import tempfile
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -26,12 +30,26 @@ class LLMEmbeddingBenchmark:
         input_file: str, 
         output_file: str, 
         api_key: str = None,
-        max_samples: int = None
+        max_samples: int = None,
+        test_mode: bool = False,
+        temperature: float = 0.7,
+        top_p: float = 1.0,
+        workers: int = 1,
+        resume: bool = False
     ):
         self.input_file = input_file
         self.output_file = output_file
         self.max_samples = max_samples
+        self.test_mode = test_mode
+        self.temperature = temperature
+        self.top_p = top_p
+        self.workers = workers
+        self.resume = resume
         self.api_key = api_key or os.environ.get("OPENAI_API_KEY")
+        self.file_lock = threading.Lock()
+        self.processed_count = 0
+        self.total_count = 0
+        self.processed_ids = set()  # Track IDs of processed samples
         
         if not self.api_key:
             raise ValueError("OpenAI API key not provided. Set OPENAI_API_KEY environment variable or pass as parameter.")
@@ -57,16 +75,17 @@ class LLMEmbeddingBenchmark:
             "text-embedding-3-small": 0.00002,  # per 1K tokens
             "text-embedding-3-large": 0.00013,  # per 1K tokens
             # LLM models (GPT-4o models) - approximate pricing
-            "gpt-4o-mini": {"input": 0.00015, "output": 0.0006},  # per 1K tokens
-            "gpt-4o": {"input": 0.005, "output": 0.015},  # per 1K tokens
+            "gpt-4.1-nano-2025-04-14": {"input": 0.00001, "output": 0.00004},  # per 1K tokens
+            "o4-mini-2025-04-16": {"input": 0.00011, "output": 0.00044},  # per 1K tokens
+            "gpt-4o-mini-2024-07-18": {"input": 0.000015, "output": 0.00006},  # per 1K tokens
             # Add more models as needed
         }
         
         # Map model aliases to pricing models
         model_mapping = {
-            "4o-mini": "gpt-4o-mini",
-            "4o": "gpt-4o",
-            # Add more mappings as needed
+            "gpt-4.1-nano-2025-04-14": "gpt-4.1-nano-2025-04-14",
+            "o4-mini-2025-04-16": "o4-mini-2025-04-16",
+            "gpt-4o-mini-2024-07-18": "gpt-4o-mini-2024-07-18",
         }
         
         pricing_model = model_mapping.get(model_name, model_name)
@@ -117,26 +136,18 @@ class LLMEmbeddingBenchmark:
             # Return empty embedding with zero cost in case of error
             return [], 0.0, 0.0
     
-    async def get_llm_response(self, prompt: str, model: str) -> Tuple[str, float, float]:
+    async def get_llm_response(self, prompt: str, model_name: str) -> Tuple[str, float, float]:
         """
         Get LLM response for the given prompt using the specified model.
         Returns: (response, latency, cost)
         """
         start_time = time.time()
         try:
-            # Clean up model name if needed
-            if model == "4o-mini":
-                model_name = "gpt-4o-mini"
-            elif model == "4o":
-                model_name = "gpt-4o"
-            else:
-                model_name = "gpt-4o-mini"  # Default fallback
-                logger.warning(f"Unknown LLM model {model}, falling back to {model_name}")
-            
             response = self.client.chat.completions.create(
                 model=model_name,
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.7
+                temperature=self.temperature,
+                top_p=self.top_p
             )
             
             response_text = response.choices[0].message.content
@@ -151,7 +162,7 @@ class LLMEmbeddingBenchmark:
             
             return response_text, latency, total_cost
         except Exception as e:
-            logger.error(f"Error getting LLM response for model {model}: {e}")
+            logger.error(f"Error getting LLM response for model {model_name}: {e}")
             # Return empty response with zero cost in case of error
             return "", 0.0, 0.0
     
@@ -194,6 +205,112 @@ class LLMEmbeddingBenchmark:
         
         return result
     
+    def load_processed_samples(self) -> Set[int]:
+        """
+        Load already processed samples from the output file to support resuming.
+        Returns a set of processed sample IDs.
+        """
+        processed_ids = set()
+        
+        if not os.path.exists(self.output_file) or os.path.getsize(self.output_file) == 0:
+            return processed_ids
+            
+        try:
+            with open(self.output_file, 'r') as f:
+                try:
+                    processed_samples = json.load(f)
+                    for sample in processed_samples:
+                        if "ID" in sample:
+                            processed_ids.add(sample["ID"])
+                    logger.info(f"Found {len(processed_ids)} previously processed samples")
+                except json.JSONDecodeError:
+                    logger.warning(f"Could not decode JSON from {self.output_file}. Starting from scratch.")
+        except Exception as e:
+            logger.error(f"Error loading processed samples: {e}")
+            
+        return processed_ids
+    
+    def save_result(self, result: Dict[str, Any]):
+        """
+        Save a single result to the output file.
+        Uses a file lock to ensure thread safety.
+        """
+        with self.file_lock:
+            self.processed_count += 1
+            
+            # Create a temp file to avoid corruption if the process is interrupted while writing
+            temp_dir = os.path.dirname(self.output_file)
+            with tempfile.NamedTemporaryFile(mode='w', dir=temp_dir, delete=False) as temp_file:
+                temp_path = temp_file.name
+                
+                try:
+                    if os.path.exists(self.output_file) and os.path.getsize(self.output_file) > 0:
+                        # File exists and has content, read existing results
+                        with open(self.output_file, 'r') as f:
+                            try:
+                                results = json.load(f)
+                            except json.JSONDecodeError:
+                                logger.warning(f"Could not decode JSON from {self.output_file}. Creating new results array.")
+                                results = []
+                    else:
+                        # File doesn't exist or is empty
+                        results = []
+                    
+                    # Append the new result
+                    results.append(result)
+                    
+                    # Add the ID to processed IDs set
+                    if "ID" in result:
+                        self.processed_ids.add(result["ID"])
+                    
+                    # Write to temp file
+                    json.dump(results, temp_file, indent=2)
+                    
+                    # Ensure data is written to disk
+                    temp_file.flush()
+                    os.fsync(temp_file.fileno())
+                except Exception as e:
+                    logger.error(f"Error saving result: {e}")
+                    return False
+            
+            # Atomically replace the output file with the temp file
+            try:
+                os.replace(temp_path, self.output_file)
+                logger.debug(f"Saved result {self.processed_count}/{self.total_count} to {self.output_file}")
+                return True
+            except Exception as e:
+                logger.error(f"Error replacing output file: {e}")
+                # Try to clean up the temp file
+                try:
+                    os.remove(temp_path)
+                except:
+                    pass
+                return False
+    
+    async def process_sample_wrapper(self, sample: Dict[str, Any], pbar: tqdm = None) -> Dict[str, Any]:
+        """Wrapper for process_sample to update progress bar, save result, and handle errors."""
+        try:
+            # Skip if already processed and resuming
+            if self.resume and "ID" in sample and sample["ID"] in self.processed_ids:
+                if pbar:
+                    pbar.update(1)
+                return sample
+            
+            result = await self.process_sample(sample)
+            
+            # Save the result immediately
+            self.save_result(result)
+            
+            if pbar:
+                pbar.update(1)
+            return result
+        except Exception as e:
+            logger.error(f"Error processing sample: {e}")
+            if pbar:
+                pbar.update(1)
+            # Return the original sample if processing fails
+            return sample
+    
     async def run_benchmark(self):
         """Run the benchmark to fill in missing fields in the dataset."""
         try:
@@ -202,28 +319,78 @@ class LLMEmbeddingBenchmark:
             with open(self.input_file, 'r') as f:
                 data = json.load(f)
             
+            # Test mode - only process the first sample
+            if self.test_mode:
+                logger.info("Running in test mode - only processing the first sample")
+                data = data[:1]
             # Limit samples if specified
-            if self.max_samples and self.max_samples < len(data):
+            elif self.max_samples and self.max_samples < len(data):
                 logger.info(f"Limiting to {self.max_samples} samples out of {len(data)}")
                 data = data[:self.max_samples]
             
+            self.total_count = len(data)
+            
+            # Create output directory if it doesn't exist
+            os.makedirs(os.path.dirname(os.path.abspath(self.output_file)), exist_ok=True)
+            
+            # Initialize output file with an empty JSON array if it doesn't exist
+            if not os.path.exists(self.output_file):
+                with open(self.output_file, 'w') as f:
+                    json.dump([], f)
+            
+            # Load already processed samples for resuming
+            if self.resume:
+                self.processed_ids = self.load_processed_samples()
+                pending_count = len(data) - len(self.processed_ids)
+                if pending_count <= 0:
+                    logger.info("All samples have already been processed. Nothing to do.")
+                    return
+                logger.info(f"Resuming processing. {len(self.processed_ids)} samples already processed, {pending_count} remaining.")
+            
             # Process samples
-            logger.info(f"Processing {len(data)} samples")
+            num_workers = min(self.workers, len(data))
+            if num_workers > 1:
+                logger.info(f"Processing {len(data)} samples with {num_workers} parallel workers (temperature={self.temperature}, top_p={self.top_p})")
+            else:
+                logger.info(f"Processing {len(data)} samples sequentially (temperature={self.temperature}, top_p={self.top_p})")
+            
+            # Initialize progress bar
+            pbar = tqdm(total=len(data), desc="Processing samples")
+            
+            # Process samples in parallel
             results = []
+            if num_workers > 1:
+                # Use a thread pool to process samples concurrently
+                loop = asyncio.get_event_loop()
+                with concurrent.futures.ThreadPoolExecutor(max_workers=num_workers) as executor:
+                    # Create tasks
+                    futures = [
+                        loop.run_in_executor(
+                            executor,
+                            partial(
+                                asyncio.run,
+                                self.process_sample_wrapper(sample, pbar)
+                            )
+                        )
+                        for sample in data
+                    ]
+                    
+                    # Wait for all tasks to complete
+                    completed_results = await asyncio.gather(*futures)
+                    results.extend(completed_results)
+            else:
+                # Process samples sequentially
+                for sample in data:
+                    result = await self.process_sample_wrapper(sample, pbar)
+                    results.append(result)
             
-            for sample in tqdm(data, desc="Processing samples"):
-                filled_sample = await self.process_sample(sample)
-                results.append(filled_sample)
-                
-                # Optional: add delay to avoid API rate limits
-                await asyncio.sleep(0.1)
+            pbar.close()
             
-            # Save results
-            logger.info(f"Saving results to {self.output_file}")
-            with open(self.output_file, 'w') as f:
-                json.dump(results, f, indent=2)
-            
-            logger.info(f"Benchmark completed. Results saved to {self.output_file}")
+            # Report completion stats
+            if self.resume:
+                logger.info(f"Benchmark completed. Processed {self.processed_count} new samples. Results saved to {self.output_file}")
+            else:
+                logger.info(f"Benchmark completed. Results saved to {self.output_file}")
         
         except Exception as e:
             logger.error(f"Error running benchmark: {e}")
@@ -239,6 +406,16 @@ def parse_arguments():
                         help="OpenAI API key (if not set as environment variable)")
     parser.add_argument("--max-samples", type=int, 
                         help="Maximum number of samples to process")
+    parser.add_argument("--test", action="store_true",
+                        help="Test mode - only process the first sample")
+    parser.add_argument("--temperature", type=float, default=0.7,
+                        help="Temperature for LLM response generation (default: 0.7)")
+    parser.add_argument("--top-p", type=float, default=1.0,
+                        help="Top-p (nucleus sampling) value for LLM response generation (default: 1.0)")
+    parser.add_argument("--workers", type=int, default=1,
+                        help="Number of parallel workers for processing samples (default: 1)")
+    parser.add_argument("--resume", action="store_true",
+                        help="Resume processing from where it was stopped")
     return parser.parse_args()
 
 async def main():
@@ -256,7 +433,12 @@ async def main():
         input_file=args.input,
         output_file=args.output,
         api_key=args.api_key,
-        max_samples=args.max_samples
+        max_samples=args.max_samples,
+        test_mode=args.test,
+        temperature=args.temperature,
+        top_p=args.top_p,
+        workers=args.workers,
+        resume=args.resume
     )
     
     await benchmark.run_benchmark()
