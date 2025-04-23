@@ -1,5 +1,5 @@
 from typing import TYPE_CHECKING, List, Optional
-
+import time
 from vectorq.vectorq_core.cache.embedding_store.embedding_metadata_storage.embedding_metadata_obj import EmbeddingMetadataObj
 from vectorq.vectorq_core.cache.embedding_store.embedding_store import EmbeddingStore
 from vectorq.vectorq_core.cache.cache import Cache
@@ -67,8 +67,8 @@ class VectorQCore():
             knn: List[tuple[float, int]] = self.cache.get_knn(prompt=prompt, k=1, benchmark=benchmark)
             similarity_score, embedding_id = knn[0]
             metadata_obj: EmbeddingMetadataObj = self.cache.get_metadata(embedding_id=embedding_id)
-            print(f"Metadata obj: {metadata_obj}")
             selected_action: Action = self.vectorq_policy.select_action(similarity_score=similarity_score, metadata=metadata_obj)
+            
             if (selected_action == Action.EXPLORE):
                 response:str = self.__create(prompt=prompt, benchmark=benchmark, output_format=output_format)
                 should_have_exploited: bool = self.similarity_evaluator.answers_similar(a=response, b=metadata_obj.response)

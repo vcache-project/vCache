@@ -20,6 +20,7 @@ from vectorq.vectorq_core.cache.embedding_store.embedding_metadata_storage.embed
 from vectorq.vectorq_core.cache.embedding_store.vector_db import HNSWLibVectorDB, SimilarityMetricType
 from vectorq.vectorq_core.cache.embedding_store.embedding_metadata_storage import InMemoryEmbeddingMetadataStorage
 from vectorq.vectorq_core.similarity_evaluator.strategies.string_comparison import StringComparisonSimilarityEvaluator
+from tqdm import tqdm
 
 repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 results_dir = os.path.join(repo_root, 'benchmarks', 'results')
@@ -32,7 +33,7 @@ logging.basicConfig(filename=os.path.join(results_dir, 'benchmark.log'), level=l
 ########################################################################################################################
 
 # VectorQ Config
-MAX_CAPACITY = 200
+MAX_CAPACITY = 1000000
 
 # Benchmark Config
 EMBEDDING_MODEL_1 = ('embedding_1', 'GteLargeENv1_5', "float32", 1024)           # 'Alibaba-NLP/gte-large-en-v1.5'
@@ -40,7 +41,7 @@ EMBEDDING_MODEL_2 = ('embedding_2', 'E5_Mistral_7B_Instruct', "float16", 4096)  
 LARGE_LANGUAGE_MODEL_1 = ('response_1', 'Llama_3_8B_Instruct', "float16", None)  # 'meta-llama/Meta-Llama-3-8B-Instruct'
 LARGE_LANGUAGE_MODEL_2 = ('response_2', 'Llama_3_70B_Instruct', "float16", None) # 'meta-llama/Meta-Llama-3-70B-Instruct'
 SIMILARITY_STRATEGY = ('string_comparison', 'embedding_comparison', 'llm_judge_comparison')
-MAX_SAMPLES = 200
+MAX_SAMPLES = 10000
 
 embedding_models = [EMBEDDING_MODEL_1]
 llm_models = [LARGE_LANGUAGE_MODEL_2]
@@ -128,16 +129,12 @@ class Benchmark(unittest.TestCase):
     async def test_run_benchmark(self):
         if not self.filepath or not self.embedding_model or not self.llm_model:
             raise ValueError(f"Required parameters not set: filepath: {self.filepath}, embedding_model: {self.embedding_model}, or llm_model: {self.llm_model}")
-            
-        if self.is_dynamic_threshold:
-            print(f"Running benchmark for {self.filepath} with VectorQ, rnd_num_ub: {self.rnd_num_ub}, embedding model: {self.embedding_model[1]}, LLM model: {self.llm_model[1]}")
-        else:
-            print(f"Running benchmark for {self.filepath} with Static Threshold, threshold: {self.threshold}, embedding model: {self.embedding_model[1]}, LLM model: {self.llm_model[1]}")
 
         try:
-            with open(self.filepath, 'rb') as file:  # Open in binary mode for ijson
-                data_entries = ijson.items(file, 'item') # Streams JSON file one entry at a time
+            with open(self.filepath, 'rb') as file:
+                data_entries = ijson.items(file, 'item')
                 
+                pbar = tqdm(total=self.max_samples, desc="Processing entries")
                 for idx, data_entry in enumerate(data_entries):
                     if idx >= self.max_samples:
                         break
@@ -186,6 +183,10 @@ class Benchmark(unittest.TestCase):
 
                     self.append_results(idx, duration_direct, duration_vectorq, cache_hit, direct_answer)
                     self.incorrect_answers_in_step_size = 0
+                    
+                    pbar.update(1)
+                
+                pbar.close()
 
         except Exception as e:
             logging.error(f"Error processing benchmark: {e}")
@@ -313,7 +314,7 @@ class Benchmark(unittest.TestCase):
         posteriors = {}
         
         metadata_objects: List[EmbeddingMetadataObj] = self.vectorq.core.cache.get_all_embedding_metadata_objects()
-        print(f"Number of metadata objects: {len(metadata_objects)}")
+        
         for metadata_object in metadata_objects:
             observations[metadata_object.embedding_id] = metadata_object.observations
             gammas[metadata_object.embedding_id] = metadata_object.gamma
@@ -441,7 +442,7 @@ async def main():
                 #Static thresholds
                 if THRESHOLD_TYPE in ['static', 'both']:
                     for threshold in static_thresholds:
-                        print(f"\n\n  - Using static threshold: {threshold}")
+                        print(f"Using static threshold: {threshold}")
                         
                         config = VectorQConfig(
                             enable_cache = True,
@@ -476,7 +477,7 @@ async def main():
                 if THRESHOLD_TYPE in ['dynamic', 'both']:
                     for delta in deltas:
                         for i in range(0,3): # 3 runs per combination for confidence intervals
-                            print(f"\n\n  - Using dynamic threshold with delta: {delta}. Run {i+1} of 3")
+                            print(f"Using dynamic threshold with delta: {delta}. Run {i+1} of 3")
                             
                             config = VectorQConfig(
                                 enable_cache = True,

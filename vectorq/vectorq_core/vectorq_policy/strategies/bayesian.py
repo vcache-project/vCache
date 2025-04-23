@@ -6,6 +6,7 @@ import numpy as np
 from scipy.stats import norm
 import random
 from scipy.optimize import minimize
+from scipy.special import expit
 
 class VectorQBayesianPolicy(VectorQPolicy):
     
@@ -25,17 +26,16 @@ class VectorQBayesianPolicy(VectorQPolicy):
         similarities: np.ndarray = np.array([obs[0] for obs in metadata.observations])
         labels: np.ndarray = np.array([obs[1] for obs in metadata.observations])
         
-        if len(similarities) == 0 or len(labels) == 0:
+        if len(similarities) < 2 or len(labels) < 2:
             return Action.EXPLORE
 
         t_hat = self._estimate_parameters(similarities, labels, metadata)
         tau: float = self._get_tau(similarities, labels, similarity_score, t_hat, metadata)
         u: float = random.uniform(0, 1)
-        
         if u <= tau:
-            return Action.EXPLORE, t_hat, tau, u
+            return Action.EXPLORE
         else:
-            return Action.EXPLOIT, t_hat, tau, u
+            return Action.EXPLOIT
     
     def update_policy(self, similarity_score: float, is_correct: bool, metadata: EmbeddingMetadataObj) -> None:
         '''
@@ -72,6 +72,7 @@ class VectorQBayesianPolicy(VectorQPolicy):
         second_deriv = (f1 + f2 - 2 * f0) / (h * h)
         n = len(sims)
         var_t = 1.0 / (n * second_deriv + 1e-12)
+        var_t = max(var_t, 1e-6)
         z = norm.ppf(1 - alpha/2)
         delta = z * np.sqrt(var_t)
         return t_hat - delta, t_hat + delta
@@ -96,6 +97,8 @@ class VectorQBayesianPolicy(VectorQPolicy):
     
     def _binary_cross_entropy_loss(self, t: float, sims: np.ndarray, labels: np.ndarray, gamma: float) -> float:
         likelihood = self._likelihood(sims, t, gamma)
+        eps = np.finfo(float).eps      # ≈2.2e−16
+        likelihood = np.clip(likelihood, eps, 1.0 - eps)
         bce_loss = -np.mean(labels * np.log(likelihood) + (1 - labels) * np.log(1 - likelihood))
         return bce_loss
     
@@ -117,7 +120,7 @@ class VectorQBayesianPolicy(VectorQPolicy):
 
     def _likelihood(self, s: float, t_prime: float, gamma: float) -> float:
         z = gamma * (s - t_prime)
-        return 1 / (1 + np.exp(-z))
-
+        return expit(z)
+    
     def _approximate_tau(self, alpha_lower_bound: float) -> float:
         return 1 - (1 - self.P_c) / (1 - alpha_lower_bound)

@@ -364,29 +364,32 @@ def plot_bayesian_decision_boundary(benchmark: Benchmark):
             
             metadata = EmbeddingMetadataObj(embedding_id=-1, response="None")
             metadata.gamma = gamma
-            print(f"Observations: {observations}")
-            similarities = [obs[0] for obs in observations]
-            labels = [obs[1] for obs in observations]
-            correct_obs = [obs[0] for obs in observations if obs[1] == 1]
-            incorrect_obs = [obs[0] for obs in observations if obs[1] == 0]
             
-            print(similarities)
-            print(labels)
-            print(correct_obs)
-            print(incorrect_obs)
+            similarities = np.array([obs[0] for obs in observations])
+            labels = np.array([obs[1] for obs in observations])
+            correct_obs = np.array([obs[0] for obs in observations if obs[1] == 1])
+            incorrect_obs = np.array([obs[0] for obs in observations if obs[1] == 0])
             
-            t_hat, _ = vectorQ._estimate_parameters(similarities, labels, metadata)
+            if (
+                len(similarities) < 2 or 
+                len(labels) < 2 or 
+                len(correct_obs) == 0 or 
+                len(incorrect_obs) == 0
+            ):
+                continue
+
+            t_hat = vectorQ._estimate_parameters(similarities, labels, metadata)
             
             s_values = np.linspace(0.0, 1.0, 100)
         
             # Calculate tau for each similarity value
             tau_values = []
             for s in s_values:
-                tau = vectorQ._get_tau(similarities, labels, s, t_hat)
+                tau = vectorQ._get_tau(similarities, labels, s, t_hat, metadata)
                 tau_values.append(tau)
             
             # Calculate probability for each similarity value
-            probs = [vectorQ._likelihood(s, t_hat) for s in s_values]
+            probs = [vectorQ._likelihood(s, t_hat, gamma) for s in s_values]
             
 
             plt.figure(figsize=(12, 8))
@@ -395,14 +398,12 @@ def plot_bayesian_decision_boundary(benchmark: Benchmark):
             plt.axvline(x=t_hat, color='g', linestyle='--', 
                     label=f'Decision boundary (t_hat={t_hat:.2f})')
             
-            if correct_obs:
-                plt.scatter(correct_obs, [0.05] * len(correct_obs), 
-                        color='green', label='Correct observations', 
-                        s=80, alpha=0.7)
-            if incorrect_obs:
-                plt.scatter(incorrect_obs, [0.05] * len(incorrect_obs), 
-                        color='red', label='Incorrect observations', 
-                        s=80, alpha=0.7)
+            plt.scatter(correct_obs, [0.05] * len(correct_obs), 
+                    color='green', label='Correct observations', 
+                    s=80, alpha=0.7)
+            plt.scatter(incorrect_obs, [0.05] * len(incorrect_obs), 
+                    color='red', label='Incorrect observations', 
+                    s=80, alpha=0.7)
             
             plt.xlim([0.0, 1.0])
             plt.ylim([0, 1.05])
