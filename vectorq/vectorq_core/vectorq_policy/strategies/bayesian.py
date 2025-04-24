@@ -106,24 +106,25 @@ class VectorQBayesianPolicy(VectorQPolicy):
         return bce_loss
     
     def _get_tau(self, similarities: np.ndarray, labels: np.ndarray, s: float, t_hat: float, metadata: EmbeddingMetadataObj) -> float:
-        taus: List[float] = []
-        for eps in self.epsilon_grid:
-            quantile: float = 1.0 - eps
-            t_prime: float = self.phi_inv(
-                t_hat, 
-                similarities, 
-                labels, 
-                quantile, 
+        eps_array = np.array(self.epsilon_grid)
+        quantiles = 1.0 - eps_array
+        
+        t_primes = np.array([
+            self.phi_inv(
+                t_hat,
+                similarities,
+                labels,
+                q,
                 lambda t, sims, labs: self._binary_cross_entropy_loss(t, sims, labs, metadata.gamma)
-            )
-            alpha_lower_bound: float = (1 - eps) * self._likelihood(s, t_prime, metadata.gamma)
-            taus.append(self._approximate_tau(alpha_lower_bound))
-        upper_lower_bound: float = min(taus)
-        return upper_lower_bound
+            ) for q in quantiles
+        ])
+        
+        likelihoods = self._likelihood(s, t_primes, metadata.gamma)
+        alpha_lower_bounds = (1 - eps_array) * likelihoods
+        taus = 1 - (1 - self.P_c) / (1 - alpha_lower_bounds)
+        
+        return np.min(taus)
 
     def _likelihood(self, s: float, t_prime: float, gamma: float) -> float:
         z = gamma * (s - t_prime)
         return expit(z)
-    
-    def _approximate_tau(self, alpha_lower_bound: float) -> float:
-        return 1 - (1 - self.P_c) / (1 - alpha_lower_bound)
