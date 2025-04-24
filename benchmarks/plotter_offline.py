@@ -2,7 +2,7 @@ import json
 import os
 from datetime import datetime
 
-from ._plotter_combined import (
+from benchmarks._plotter_combined_old import (
     plot_cache_hit_latency_vs_size_comparison,
     plot_duration_comparison,
     plot_duration_vs_error_rate,
@@ -11,7 +11,7 @@ from ._plotter_combined import (
     plot_precision_vs_recall,
     plot_roc_curve,
 )
-from ._plotter_individual import (
+from benchmarks._plotter_individual_old import (
     plot_accuracy,
     plot_cache_hit_latency_vs_size,
     plot_cache_size,
@@ -22,7 +22,7 @@ from ._plotter_individual import (
     plot_recall,
     plot_reuse_rate,
 )
-from .benchmark import Benchmark
+from benchmarks.benchmark_old import Benchmark
 
 
 ########################################################################################################################
@@ -216,7 +216,7 @@ def _generate_plots_for_individual_benchmark(
 ########################################################################################################################
 FONT_SIZE = 24
 MAX_SAMPLES = 10
-results_dir = "results/results_20k_rows/"
+results_dir = "results/"
 
 EMBEDDING_MODEL_1 = (
     "embedding_1",
@@ -249,7 +249,7 @@ DATASET_NAMES = [
 ]
 
 if __name__ == "__main__":
-    datasets = [DATASET_NAMES[1], DATASET_NAMES[2]]
+    datasets = [DATASET_NAMES[0], DATASET_NAMES[1], DATASET_NAMES[2]]
     embedding_models = [EMBEDDING_MODEL_1[1], EMBEDDING_MODEL_2[1]]
     llm_models = [LARGE_LANGUAGE_MODEL_1[1], LARGE_LANGUAGE_MODEL_2[1]]
     GENERATE_INDIVIDUAL_PLOTS = False

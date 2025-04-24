@@ -78,12 +78,12 @@ class VectorQBayesianPolicy(VectorQPolicy):
         loss_function: Callable[[float, np.ndarray, np.ndarray], float],
     ) -> float:
         alpha: float = 2 * (1.0 - quantile)
-        _, upper = self._asymptotic_confidence_interval(
-            t_hat, similarities, labels, alpha, loss_function
+        _, upper = self._confidence_interval_fisher_method(
+            t_hat, similarities, alpha, loss_function
         )
         return upper
 
-    def _asymptotic_confidence_interval(
+    def _confidence_interval_delta_method(
         self,
         t_hat: float,
         sims: np.ndarray,
@@ -92,8 +92,7 @@ class VectorQBayesianPolicy(VectorQPolicy):
         loss_function: Callable[[float, np.ndarray, np.ndarray], float],
     ) -> Tuple[float, float]:
         """
-        Approximate a (1−alpha) confidence interval for t via
-        the delta method (using numerical second derivative).
+        Compute confidence interval using delta method.
         """
         h = 1e-4
         # Variance estimation
@@ -109,6 +108,26 @@ class VectorQBayesianPolicy(VectorQPolicy):
         z = norm.ppf(1 - alpha / 2)  # phi^-1(1 - alpha/2)
         delta = z * np.sqrt(var_t)
         return t_hat - delta, t_hat + delta
+
+    def _confidence_interval_fisher_method(
+        self,
+        t_hat: float,
+        sims: np.ndarray,
+        gamma: float,
+        alpha: float,
+    ) -> Tuple[float, float]:
+        # 1) compute p_i = L(s_i, t_hat)
+        p = expit(gamma * (sims - t_hat))
+        # 2) observed Fisher information
+        i = np.sum(gamma**2 * p * (1 - p))
+        # 3) standard error
+        se = np.sqrt(1.0 / i)
+        # 4) normal quantile
+        z = norm.ppf(1 - alpha/2)
+        delta = z * se
+        lower = t_hat - delta
+        upper = t_hat + delta
+        return lower, upper
 
     def _estimate_parameters(
         self,

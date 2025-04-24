@@ -12,7 +12,7 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
-from benchmarks._plotter_combined import (
+from benchmarks._plotter_combined_old import (
     plot_cache_hit_latency_vs_size_comparison,
     plot_duration_comparison,
     plot_duration_vs_error_rate,
@@ -21,7 +21,7 @@ from benchmarks._plotter_combined import (
     plot_precision_vs_recall,
     plot_roc_curve,
 )
-from benchmarks._plotter_individual import (
+from benchmarks._plotter_individual_old import (
     plot_accuracy,
     plot_bayesian_decision_boundary,
     plot_cache_hit_latency_vs_size,
@@ -69,8 +69,8 @@ logging.basicConfig(
 ########################################################################################################################
 
 # Benchmark Config
-MAX_SAMPLES = 20000
-CONFIDENCE_INTERVALS_ITERATIONS = 1
+MAX_SAMPLES: int = 20000
+CONFIDENCE_INTERVALS_ITERATIONS: int = 1
 EMBEDDING_MODEL_1 = (
     "embedding_1",
     "GteLargeENv1_5",
@@ -101,9 +101,9 @@ SIMILARITY_STRATEGY = (
     "llm_judge_comparison",
 )
 
-embedding_models = [EMBEDDING_MODEL_1, EMBEDDING_MODEL_2]
-llm_models = [LARGE_LANGUAGE_MODEL_1, LARGE_LANGUAGE_MODEL_2]
-candidate_strategy = SIMILARITY_STRATEGY[0]
+embedding_models: List[Tuple[str, str, str, int]] = [EMBEDDING_MODEL_1, EMBEDDING_MODEL_2]
+llm_models: List[Tuple[str, str, str, int]] = [LARGE_LANGUAGE_MODEL_1, LARGE_LANGUAGE_MODEL_2]
+candidate_strategy: str = SIMILARITY_STRATEGY[0]
 
 static_thresholds = np.array(
     [0.74, 0.76, 0.78, 0.8, 0.825, 0.85, 0.875, 0.9, 0.92, 0.94, 0.96]
@@ -111,80 +111,47 @@ static_thresholds = np.array(
 deltas = np.array([0.025, 0.05, 0.075, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35])
 
 # VectorQ Config
-MAX_VECTOR_DB_CAPACITY = 100000
+MAX_VECTOR_DB_CAPACITY: int = 100000
 
-THRESHOLD_TYPES = ["static", "dynamic", "both"]
-THRESHOLD_TYPE = THRESHOLD_TYPES[1]
+THRESHOLD_TYPES: List[str] = ["static", "dynamic", "both"]
+THRESHOLD_TYPE: str = THRESHOLD_TYPES[0]
 
 
 ########################################################################################################################
 ### Benchmark Class ####################################################################################################
 ########################################################################################################################
 class Benchmark(unittest.TestCase):
-    def __init__(self, max_samples, vectorq: VectorQ):
+    def __init__(self, vectorq: VectorQ):
         super().__init__()
-        self.max_samples = max_samples
         self.vectorq: VectorQ = vectorq
-        self.is_dynamic_threshold = None
-        self.threshold = None
-        self.rnd_num_lb = None
-        self.rnd_num_ub = None
-        self.delta = None
-        self.embedding_model = None
-        self.llm_model = None
-        self.filepath = None
-        self.output_folder_path = None
-        self.timestamp = None
-        self.field_to_extract = "text"
-        self.step_size = 1
-        self.current_data_entry = None
-        self.tasks = set()
-        self.task = None
-        self.output_format = None
-        self.candidate_strategy = None
+        self.embedding_model: Tuple[str, str, str, int] = None
+        self.llm_model: Tuple[str, str, str, int] = None
+        self.filepath: str = None
+        self.output_folder_path: str = None
+        self.timestamp: str = None
+        self.threshold: float = None
+        self.delta: float = None
+        self.is_static_threshold: bool = None
 
-    def setUp(self):
-        """Initialize VectorQ with the necessary configuration."""
-        # Initialize counters and result stores first
-        self.correct_answers = 0
-        self.incorrect_answers = 0
-        self.total_reused = 0
-        self.total_duration_direct = 0
-        self.total_duration_vectorq = 0
-        self.incorrect_answers_in_step_size = 0
-        self.true_positive_counter = 0
-        self.false_positive_counter = 0
-        self.true_negative_counter = 0
-        self.false_negative_counter = 0
-        self.cache_size_mb = 0
-
-        # Lists to store results
-        self.sample_sizes = []
-        self.error_rates_relative_to_reused_answers = []
-        self.error_rates_relative_to_step_size = []
-        self.error_rates_absolute = []
-        self.total_reused_list = []
-        self.relative_reuse_rates = []
-        self.inference_time_direct_step_size = []
-        self.inference_time_vectorq_step_size = []  # latency of vectorQ/GPTCache request
-        self.total_duration_direct_list = []
-        self.total_duration_vectorq_list = []
-        self.answers_reused = []
-        self.true_positive_list = []
-        self.false_positive_list = []
-        self.true_negative_list = []
-        self.false_negative_list = []
-        self.precision_list = []
-        self.recall_list = []
-        self.accuracy_list = []
-        self.cache_size_list = []
-        self.observations: Dict[int, List[Tuple[float, int]]] = {}
-        self.gammas: Dict[int, float] = {}
-        self.correct_x: Dict[int, List[float]] = {}
-        self.incorrect_x: Dict[int, List[float]] = {}
-        self.correct_y: Dict[int, List[float]] = {}
-        self.incorrect_y: Dict[int, List[float]] = {}
-        self.posteriors: Dict[int, List[float]] = {}
+    def stats_set_up(self):
+        self.cache_hit_counter: int = 0
+        self.cache_hit_list: List[int] = []
+        self.cache_miss_counter: int = 0
+        self.cache_miss_list: List[int] = []
+        self.correct_answer_counter: int = 0
+        self.correct_answer_list: List[int] = []
+        self.incorrect_answer_counter: int = 0
+        self.incorrect_answer_list: List[int] = []
+        self.true_positive_counter: int = 0
+        self.true_positive_list: List[int] = []
+        self.false_positive_counter: int = 0
+        self.false_positive_list: List[int] = []
+        self.true_negative_counter: int = 0
+        self.true_negative_list: List[int] = []
+        self.false_negative_counter: int = 0
+        self.false_negative_list: List[int] = []
+        self.latency_direct_list: List[float] = []
+        self.latency_vectorq_list: List[float] = []
 
         if self.output_folder_path and not os.path.exists(self.output_folder_path):
             os.makedirs(self.output_folder_path)
@@ -197,78 +164,61 @@ class Benchmark(unittest.TestCase):
 
         try:
             with open(self.filepath, "rb") as file:
-                data_entries = ijson.items(file, "item")
+                data_entries = ijson.items(file)
 
-                pbar = tqdm(total=self.max_samples, desc="Processing entries")
+                pbar = tqdm(total=MAX_SAMPLES, desc="Processing entries")
                 for idx, data_entry in enumerate(data_entries):
-                    if idx >= self.max_samples:
+                    if idx >= MAX_SAMPLES:
                         break
 
-                    self.task = data_entry["task"]
-                    self.tasks.add(self.task)
-                    self.output_format = data_entry["output_format"]
-                    self.current_data_entry = data_entry
-                    review_text = data_entry[self.field_to_extract]
+                    task = data_entry["task"]
+                    output_format = data_entry["output_format"]
+                    review_text = data_entry["text"]
 
-                    emb_generation_latency = float(
+                    emb_generation_latency: float = float(
                         data_entry[self.embedding_model[0] + "_lat"]
                     )
-                    llm_generation_latency = float(
+                    llm_generation_latency: float = float(
                         data_entry[self.llm_model[0] + "_lat"]
                     )
 
-                    start_time_direct = time.time()
-                    direct_answer = data_entry[self.llm_model[0]]
-                    duration_direct = (
-                        time.time() - start_time_direct + llm_generation_latency
-                    )
-                    self.total_duration_direct += duration_direct
+                    direct_answer: str = data_entry[self.llm_model[0]]
+                    latency_direct: float = llm_generation_latency
 
-                    row_embedding = data_entry[self.embedding_model[0]]
-                    start_time_vectorq = time.time()
+                    row_embedding: List[float] = data_entry[self.embedding_model[0]]
+                    start_time_vectorq: float = time.time()
                     vectorQ_answer, cache_hit = await self.get_vectorQ_answer(
-                        review_text, row_embedding
+                        data_entry, task, review_text, row_embedding, output_format
                     )
-                    duration_vectorq = (
+                    latency_vectorq: float = (
                         time.time() - start_time_vectorq + emb_generation_latency
                     )
+                    
                     if not cache_hit:
-                        duration_vectorq += llm_generation_latency
-                    self.total_duration_vectorq += duration_vectorq
+                        latency_vectorq += llm_generation_latency
 
                     if cache_hit:
-                        self.total_reused += 1
-
-                    if cache_hit:
+                        self.cache_hit_counter += 1
                         if answers_have_same_meaning_static(
-                            self.task, direct_answer, vectorQ_answer
+                            task, direct_answer, vectorQ_answer
                         ):
+                            self.correct_answer_counter += 1
                             self.true_positive_counter += 1  # Correctly reused
                         else:
+                            self.incorrect_answer_counter += 1
                             self.false_positive_counter += 1  # Incorrectly reused
                     else:
+                        self.cache_miss_counter += 1
                         if answers_have_same_meaning_static(
-                            self.task, direct_answer, vectorQ_answer
+                            task, direct_answer, vectorQ_answer
                         ):
-                            self.false_negative_counter += (
-                                1  # Should have reused but didn't
-                            )
+                            self.correct_answer_counter += 1
+                            self.false_negative_counter += 1  # Should've reused but didn't
                         else:
+                            self.incorrect_answer_counter += 1
                             self.true_negative_counter += 1  # Correctly didn't reuse
 
-                    if not cache_hit or answers_have_same_meaning_static(
-                        self.task, direct_answer, vectorQ_answer
-                    ):
-                        self.correct_answers += 1
-                    else:
-                        self.incorrect_answers += 1
-                        self.incorrect_answers_in_step_size += 1
-
-                    self.append_results(
-                        idx, duration_direct, duration_vectorq, cache_hit, direct_answer
-                    )
-                    self.incorrect_answers_in_step_size = 0
-
+                    self.append_results(latency_direct, latency_vectorq)
                     pbar.update(1)
 
                 pbar.close()
@@ -277,124 +227,29 @@ class Benchmark(unittest.TestCase):
             logging.error(f"Error processing benchmark: {e}")
             raise e
 
-        self.current_data_entry = None
-
-        plot_error_rate_relative(self)
-        plot_error_rate_absolute(self)
-        plot_reuse_rate(self)
-        plot_duration_trend(self)
-        plot_precision(self)
-        plot_recall(self)
-        plot_accuracy(self)
-        plot_cache_size(self)
-        plot_cache_hit_latency_vs_size(self)
-
-        self.dump_results_to_json()
-        plot_combined_thresholds_and_posteriors(self)
-        plot_bayesian_decision_boundary(self)
+        generate_individual_plots(self)
 
     ########################################################################################################################
     ### Class Helper Functions #############################################################################################
     ########################################################################################################################
 
-    def append_results(
-        self, idx, duration_direct, duration_vectorq, answer_reused, direct_answer
-    ):
-        error_rate_relative = (
-            (self.incorrect_answers / self.total_reused * 100)
-            if self.total_reused > 0
-            else 0
-        )
-        error_rate_absolute = (self.incorrect_answers / idx * 100) if idx > 0 else 0
-        total_reused_rate = (self.total_reused / idx * 100) if idx > 0 else 0
-
-        if len(self.total_reused_list) == 0:
-            prev_reused = 0
-        else:
-            prev_reused = self.total_reused_list[-1]
-        reused_this_interval = self.total_reused - prev_reused
-        relative_reuse_rate = (
-            (reused_this_interval / self.step_size) * 100 if self.step_size > 0 else 0
-        )
-        relative_error_rate_to_step_size = (
-            (self.incorrect_answers_in_step_size / reused_this_interval) * 100
-            if reused_this_interval > 0
-            else 0
-        )
-
-        self.sample_sizes.append(idx)
-        self.error_rates_relative_to_reused_answers.append(error_rate_relative)
-        self.error_rates_relative_to_step_size.append(relative_error_rate_to_step_size)
-        self.error_rates_absolute.append(error_rate_absolute)
-        self.total_reused_list.append(self.total_reused)
-        self.relative_reuse_rates.append(relative_reuse_rate)
-        self.inference_time_direct_step_size.append(duration_direct)
-        self.inference_time_vectorq_step_size.append(duration_vectorq)
-        self.total_duration_direct_list.append(self.total_duration_direct)
-        self.total_duration_vectorq_list.append(self.total_duration_vectorq)
-        self.answers_reused.append(answer_reused)
+    def append_results(self, latency_direct: float, latency_vectorq: float):
+        self.cache_hit_list.append(self.cache_hit_counter)
+        self.cache_miss_list.append(self.cache_miss_counter)
+        self.correct_answer_list.append(self.correct_answer_counter)
+        self.incorrect_answer_list.append(self.incorrect_answer_counter)
         self.true_positive_list.append(self.true_positive_counter)
         self.false_positive_list.append(self.false_positive_counter)
         self.true_negative_list.append(self.true_negative_counter)
         self.false_negative_list.append(self.false_negative_counter)
+        self.latency_direct_list.append(latency_direct)
+        self.latency_vectorq_list.append(latency_vectorq)
 
-        precision = (
-            self.true_positive_counter
-            / (self.true_positive_counter + self.false_positive_counter)
-            if (self.true_positive_counter + self.false_positive_counter) > 0
-            else 0
-        )
-        recall = (
-            self.true_positive_counter
-            / (self.true_positive_counter + self.false_negative_counter)
-            if (self.true_positive_counter + self.false_negative_counter) > 0
-            else 0
-        )
-        accuracy = (
-            (self.true_positive_counter + self.true_negative_counter)
-            / (
-                self.true_positive_counter
-                + self.false_positive_counter
-                + self.true_negative_counter
-                + self.false_negative_counter
-            )
-            if (
-                self.true_positive_counter
-                + self.false_positive_counter
-                + self.true_negative_counter
-                + self.false_negative_counter
-            )
-            > 0
-            else 0
-        )
-        self.precision_list.append(precision)
-        self.recall_list.append(recall)
-        self.accuracy_list.append(accuracy)
-
-        # Update cache size if this was a cache miss (not reused -> got added to cache)
-        if not answer_reused:
-            embedding_dim = self.embedding_model[3]
-            embedding_precision = self.embedding_model[2]
-
-            entry_size_mb = calculate_cache_entry_size_mb(
-                embedding_dim, embedding_precision, direct_answer
-            )
-            self.cache_size_mb += entry_size_mb
-        self.cache_size_list.append(self.cache_size_mb)
-
-        if idx == 0:
-            logging.info(
-                f"VectorQ Config (Client) | Task: {self.task}, Output Format: {self.output_format}, Embedding Model: {self.embedding_model[1]}, LLM Model: {self.llm_model[1]}, Is Dynamic Threshold: {self.is_dynamic_threshold}, Threshold: {self.threshold}, Rnd_num_ub: {self.rnd_num_ub}"
-            )
-
-        if (idx + 1) % 500 == 0:
-            logging.info(
-                f"Sample Size: {idx + 1}, Total Reused: {self.total_reused}, Incorrect Answers: {self.incorrect_answers}, Absolute Error Rate: {error_rate_absolute:.2f}%, Relative Error Rate (Reused Answers): {error_rate_relative:.2f}%, Relative Error Rate (Step Size): {relative_error_rate_to_step_size:.2f}%, Total Reused Rate: {total_reused_rate:.2f}%, Relative Reused Rate (Step Size): {relative_reuse_rate:.2f}%, Cache Size: {self.cache_size_mb:.2f} MB"
-            )
-
-    async def get_vectorQ_answer(self, review_text, row_embedding):
+    async def get_vectorQ_answer(
+        self, data_entry: Dict, task: str, review_text: str, row_embedding: List[float], output_format: str
+    ):
         try:
-            row_embedding = self.current_data_entry[self.embedding_model[0]]
+            row_embedding = data_entry[self.embedding_model[0]]
         except json.JSONDecodeError as e:
             logging.error(
                 f"Could not find embedding in the dataset for {self.embedding_model[0]}"
@@ -402,7 +257,7 @@ class Benchmark(unittest.TestCase):
             raise e
 
         try:
-            candidate_response = self.current_data_entry[self.llm_model[0]]
+            candidate_response = data_entry[self.llm_model[0]]
         except json.JSONDecodeError as e:
             logging.error(
                 f"Could not find LLM response in the dataset for {self.llm_model[0]}"
@@ -413,8 +268,7 @@ class Benchmark(unittest.TestCase):
             row_embedding = row_embedding.tolist()
         elif isinstance(row_embedding, np.ndarray):
             row_embedding = row_embedding.tolist()
-
-        # Ensure all values are standard Python floats, not Decimal objects
+            
         if isinstance(row_embedding, list):
             row_embedding = [
                 float(val) if hasattr(val, "__float__") else val
@@ -425,11 +279,11 @@ class Benchmark(unittest.TestCase):
             candidate_embedding=row_embedding, candidate_response=candidate_response
         )
 
-        vectorQ_prompt = f"{self.task} {review_text}"
+        vectorQ_prompt = f"{task} {review_text}"
         try:
             vectorQ_response, cache_hit = await self.vectorq.create(
                 prompt=vectorQ_prompt,
-                output_format=self.output_format,
+                output_format=output_format,
                 benchmark=vectorQ_benchmark,
             )
         except Exception as e:
@@ -441,17 +295,8 @@ class Benchmark(unittest.TestCase):
         return vectorQ_response, cache_hit
 
     def dump_results_to_json(self):
-        # VectorQ Bayesian Policy ########################
         observations = {}
         gammas = {}
-        ##################################################
-
-        # VectorQ Heuristic Policy #######################
-        correct_x = {}
-        incorrect_x = {}
-        correct_y = {}
-        incorrect_y = {}
-        posteriors = {}
 
         metadata_objects: List[EmbeddingMetadataObj] = (
             self.vectorq.core.cache.get_all_embedding_metadata_objects()
@@ -461,70 +306,29 @@ class Benchmark(unittest.TestCase):
             observations[metadata_object.embedding_id] = metadata_object.observations
             gammas[metadata_object.embedding_id] = metadata_object.gamma
 
-            correct_x[metadata_object.embedding_id] = (
-                metadata_object.correct_similarities
-            )
-            incorrect_x[metadata_object.embedding_id] = (
-                metadata_object.incorrect_similarities
-            )
-            correct_y[metadata_object.embedding_id] = [
-                1 for _ in metadata_object.correct_similarities
-            ]
-            incorrect_y[metadata_object.embedding_id] = [
-                0 for _ in metadata_object.incorrect_similarities
-            ]
-            posteriors[metadata_object.embedding_id] = metadata_object.posteriors
-
         self.observations = observations
         self.gammas = gammas
-
-        self.correct_x = correct_x
-        self.incorrect_x = incorrect_x
-        self.correct_y = correct_y
-        self.incorrect_y = incorrect_y
-        self.posteriors = posteriors
 
         data = {
             "config": {
                 "filepath": self.filepath,
-                "tasks": list(self.tasks),
                 "embedding_model": self.embedding_model,
-                "is_dynamic_threshold": self.is_dynamic_threshold,
+                "is_static_threshold": self.is_static_threshold,
                 "threshold": self.threshold,
-                "rnd_num_lb": self.rnd_num_lb,
-                "rnd_num_ub": self.rnd_num_ub,
                 "delta": self.delta,
             },
-            "sample_sizes": self.sample_sizes,
-            "error_rates_relative_to_reused_answers": self.error_rates_relative_to_reused_answers,
-            "error_rates_relative_to_step_size": self.error_rates_relative_to_step_size,
-            "error_rates_absolute": self.error_rates_absolute,
-            "total_reused_list": self.total_reused_list,
-            "relative_reuse_rates": self.relative_reuse_rates,
-            "inference_time_direct_step_size": self.inference_time_direct_step_size,
-            "inference_time_vectorq_step_size": self.inference_time_vectorq_step_size,
-            "total_duration_direct_list": self.total_duration_direct_list,
-            "total_duration_vectorq_list": self.total_duration_vectorq_list,
-            "answers_reused": self.answers_reused,
-            "observations": self.observations,
-            "gammas": self.gammas,
-            "correct_x": self.correct_x,
-            "incorrect_x": self.incorrect_x,
-            "correct_y": self.correct_y,
-            "incorrect_y": self.incorrect_y,
-            "posteriors": self.posteriors,
+            "cache_hit_list": self.cache_hit_list,
+            "cache_miss_list": self.cache_miss_list,
+            "correct_answer_list": self.correct_answer_list,
+            "incorrect_answer_list": self.incorrect_answer_list,
             "true_positive_list": self.true_positive_list,
             "false_positive_list": self.false_positive_list,
             "true_negative_list": self.true_negative_list,
             "false_negative_list": self.false_negative_list,
-            "precision_list": self.precision_list,
-            "precision": self.precision_list[-1],
-            "recall_list": self.recall_list,
-            "recall": self.recall_list[-1],
-            "accuracy_list": self.accuracy_list,
-            "accuracy": self.accuracy_list[-1],
-            "cache_size_list": self.cache_size_list,
-            "cache_size": self.cache_size_list[-1],
+            "latency_direct_list": self.latency_direct_list,
+            "latency_vectorq_list": self.latency_vectorq_list,
+            "observations": self.observations,
+            "gammas": self.gammas,
         }
 
         filepath = self.output_folder_path + f"/results_{self.timestamp}.json"
@@ -537,22 +341,23 @@ class Benchmark(unittest.TestCase):
 ### Helper Functions ###################################################################################################
 ########################################################################################################################
 
+def generate_individual_plots(
+    benchmark: Benchmark
+):
+    benchmark.dump_results_to_json()
+    plot_error_rate_relative(benchmark)
+    plot_error_rate_absolute(benchmark)
+    plot_reuse_rate(benchmark)
+    plot_duration_trend(benchmark)
+    plot_precision(benchmark)
+    plot_recall(benchmark)
+    plot_accuracy(benchmark)
+    plot_cache_size(benchmark)
+    plot_cache_hit_latency_vs_size(benchmark)
+    plot_combined_thresholds_and_posteriors(benchmark)
+    plot_bayesian_decision_boundary(benchmark)
 
-def calculate_cache_entry_size_mb(embedding_dim, embedding_precision, cached_response):
-    bytes_per_float = (
-        2 if embedding_precision == "float16" else 4
-    )  # float16 = 2 bytes, float32 = 4 bytes
-    embedding_size_bytes = embedding_dim * bytes_per_float
-    response_size_bytes = len(cached_response.encode("utf-8"))
-    posterior = np.linspace(0, 1, 500)
-    metadata_size_bytes = posterior.size * posterior.itemsize
-    total_size_mb = (
-        embedding_size_bytes + response_size_bytes + metadata_size_bytes
-    ) / (1024 * 1024)
-    return total_size_mb
-
-
-def compare_static_vs_dynamic(
+def generate_combined_plots(
     dataset, embedding_model_name, llm_model_name, timestamp, results_dir=None
 ):
     # Use the global results_dir if none is provided
@@ -641,15 +446,15 @@ async def main():
                         )
                         vectorQ: VectorQ = VectorQ(config)
 
-                        benchmark = Benchmark(MAX_SAMPLES, vectorQ)
+                        benchmark = Benchmark(vectorQ)
                         # Set required parameters
                         benchmark.filepath = dataset_file
                         benchmark.embedding_model = embedding_model
                         benchmark.llm_model = llm_model
-                        benchmark.is_dynamic_threshold = False
-                        benchmark.threshold = round(threshold, 2)
                         benchmark.timestamp = timestamp
-                        benchmark.candidate_strategy = candidate_strategy
+                        benchmark.threshold = threshold
+                        benchmark.delta = -1
+                        benchmark.is_static_threshold = True
                         benchmark.output_folder_path = os.path.join(
                             results_dir,
                             dataset,
@@ -659,7 +464,7 @@ async def main():
                         )
 
                         # Run the benchmark
-                        benchmark.setUp()
+                        benchmark.stats_set_up()
                         await benchmark.test_run_benchmark()
                         await vectorQ.shutdown()
 
@@ -684,16 +489,15 @@ async def main():
                             )
                             vectorQ: VectorQ = VectorQ(config)
 
-                            benchmark = Benchmark(MAX_SAMPLES, vectorQ)
+                            benchmark = Benchmark(vectorQ)
                             # Set required parameters
                             benchmark.filepath = dataset_file
                             benchmark.embedding_model = embedding_model
                             benchmark.llm_model = llm_model
-                            benchmark.is_dynamic_threshold = True
-                            benchmark.threshold = None
-                            benchmark.delta = delta
                             benchmark.timestamp = timestamp
-                            benchmark.candidate_strategy = candidate_strategy
+                            benchmark.threshold = -1
+                            benchmark.delta = delta
+                            benchmark.is_static_threshold = False
                             benchmark.output_folder_path = os.path.join(
                                 results_dir,
                                 dataset,
@@ -703,12 +507,12 @@ async def main():
                             )
 
                             # Run the benchmark
-                            benchmark.setUp()
+                            benchmark.stats_set_up()
                             await benchmark.test_run_benchmark()
                             await vectorQ.shutdown()
 
                 if THRESHOLD_TYPE == "both":
-                    compare_static_vs_dynamic(
+                    generate_combined_plots(
                         dataset, embedding_model[1], llm_model[1], timestamp
                     )
 
