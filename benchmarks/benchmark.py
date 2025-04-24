@@ -33,7 +33,7 @@ logging.basicConfig(filename=os.path.join(results_dir, 'benchmark.log'), level=l
 ########################################################################################################################
 
 # Benchmark Config
-MAX_SAMPLES = 20000
+MAX_SAMPLES = 200
 CONFIDENCE_INTERVALS_ITERATIONS = 1
 EMBEDDING_MODEL_1 = ('embedding_1', 'GteLargeENv1_5', "float32", 1024)           # 'Alibaba-NLP/gte-large-en-v1.5'
 EMBEDDING_MODEL_2 = ('embedding_2', 'E5_Mistral_7B_Instruct', "float16", 4096)   # 'intfloat/e5-mistral-7b-instruct'
