@@ -66,6 +66,7 @@ class VectorQBayesianPolicy(VectorQPolicy):
         the delta method (using numerical second derivative).
         """
         h = 1e-4
+        # Variance estimation
         f0 = loss_function(t_hat, sims, labels)
         f1 = loss_function(t_hat + h, sims, labels)
         f2 = loss_function(t_hat - h, sims, labels)
@@ -73,7 +74,9 @@ class VectorQBayesianPolicy(VectorQPolicy):
         n = len(sims)
         var_t = 1.0 / (n * second_deriv + 1e-12)
         var_t = max(var_t, 1e-6)
-        z = norm.ppf(1 - alpha/2)
+        
+        # Compute confidence interval
+        z = norm.ppf(1 - alpha/2) # phi^-1(1 - alpha/2)
         delta = z * np.sqrt(var_t)
         return t_hat - delta, t_hat + delta
     

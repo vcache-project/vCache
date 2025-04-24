@@ -33,7 +33,7 @@ logging.basicConfig(filename=os.path.join(results_dir, 'benchmark.log'), level=l
 ########################################################################################################################
 
 # Benchmark Config
-MAX_SAMPLES = 100
+MAX_SAMPLES = 20000
 CONFIDENCE_INTERVALS_ITERATIONS = 1
 EMBEDDING_MODEL_1 = ('embedding_1', 'GteLargeENv1_5', "float32", 1024)           # 'Alibaba-NLP/gte-large-en-v1.5'
 EMBEDDING_MODEL_2 = ('embedding_2', 'E5_Mistral_7B_Instruct', "float16", 4096)   # 'intfloat/e5-mistral-7b-instruct'
@@ -41,15 +41,15 @@ LARGE_LANGUAGE_MODEL_1 = ('response_1', 'Llama_3_8B_Instruct', "float16", None) 
 LARGE_LANGUAGE_MODEL_2 = ('response_2', 'Llama_3_70B_Instruct', "float16", None) # 'meta-llama/Meta-Llama-3-70B-Instruct'
 SIMILARITY_STRATEGY = ('string_comparison', 'embedding_comparison', 'llm_judge_comparison')
 
-embedding_models = [EMBEDDING_MODEL_1]
-llm_models = [LARGE_LANGUAGE_MODEL_2]
+embedding_models = [EMBEDDING_MODEL_1, EMBEDDING_MODEL_2]
+llm_models = [LARGE_LANGUAGE_MODEL_1, LARGE_LANGUAGE_MODEL_2]
 candidate_strategy = SIMILARITY_STRATEGY[0]
 
 static_thresholds = np.array([0.74, 0.76, 0.78, 0.8, 0.825, 0.85, 0.875, 0.9, 0.92, 0.94, 0.96])
-deltas = np.array([0.025, 0.05, 0.075, 0.1, 0.125, 0.15, 0.175, 0.2])
+deltas = np.array([0.025, 0.05, 0.075, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35])
 
 # VectorQ Config
-MAX_VECTOR_DB_CAPACITY = 1000000
+MAX_VECTOR_DB_CAPACITY = 100000
 
 THRESHOLD_TYPES = ['static', 'dynamic', 'both']
 THRESHOLD_TYPE = THRESHOLD_TYPES[1]
@@ -421,7 +421,7 @@ async def main():
         print(f"Created directory: {datasets_dir}")
     
     datasets_dir = datasets_dir + '/'
-    datasets = [f.split('.')[0] for f in os.listdir(datasets_dir) if (f.endswith('.json') and (f.startswith('sem')))]  
+    datasets = [f.split('.')[0] for f in os.listdir(datasets_dir) if (f.endswith('.json') and (f.startswith('sem') or f.startswith('ama')))]  
     print(f"Datasets to be processed: {datasets}")
     
     timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M')

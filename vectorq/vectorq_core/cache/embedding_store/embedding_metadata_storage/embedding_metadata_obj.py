@@ -19,7 +19,7 @@ class EmbeddingMetadataObj:
         
         # VectorQ Bayesian Policy ########################
         self.observations: List[Tuple[float, int]] = []     # (similarity, label)
-        self.gamma: float = 20.0                            # Initial guess 
+        self.gamma: float = 30.0                            # Initial guess 
         ##################################################
         
         # VectorQ Heuristic Policy #######################
