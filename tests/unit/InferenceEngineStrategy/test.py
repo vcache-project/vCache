@@ -1,10 +1,9 @@
-import unittest
-import pytest
 import os
+import unittest
 
-from vectorq.config import VectorQConfig
-from vectorq.inference_engine import OpenAIInferenceEngine, LangChainInferenceEngine
-from vectorq.inference_engine.inference_engine import InferenceEngine
+import pytest
+
+from vectorq.inference_engine import LangChainInferenceEngine, OpenAIInferenceEngine
 
 INFERENCE_ENGINE_PARAMS = [
     pytest.param(
@@ -50,11 +49,7 @@ class TestInferenceEngineStrategy:
     )
     def test_create(self, inference_engine_class, engine_params):
         """Test creating responses from different inference engines."""
-        # Create inference engine directly
         engine = inference_engine_class(**engine_params)
-        
-        # Create config with the engine
-        config = VectorQConfig(inference_engine=engine)
 
         prompt = "What is the capital of France?"
         response = engine.create(prompt)
@@ -67,11 +62,7 @@ class TestInferenceEngineStrategy:
     )
     def test_create_with_output_format(self, inference_engine_class, engine_params):
         """Test creating responses with specified output format."""
-        # Create inference engine directly
         engine = inference_engine_class(**engine_params)
-        
-        # Create config with the engine
-        config = VectorQConfig(inference_engine=engine)
 
         prompt = "List three European capitals."
         output_format = "Provide the answer as a comma-separated list."
@@ -90,11 +81,7 @@ class TestInferenceEngineStrategy:
     )
     def test_consistent_responses(self, inference_engine_class, engine_params):
         """Test that responses are consistent with temperature=0."""
-        # Create inference engine directly
         engine = inference_engine_class(**engine_params)
-        
-        # Create config with the engine
-        config = VectorQConfig(inference_engine=engine)
 
         prompt = "What is 2+2?"
         response1 = engine.create(prompt)

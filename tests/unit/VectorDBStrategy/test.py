@@ -1,13 +1,12 @@
 import unittest
+
 import pytest
 
-from vectorq.config import VectorQConfig
 from vectorq.vectorq_core.cache.embedding_store.vector_db import (
-    VectorDB,
-    SimilarityMetricType,
-    HNSWLibVectorDB,
+    ChromaVectorDB,
     FAISSVectorDB,
-    ChromaVectorDB
+    HNSWLibVectorDB,
+    SimilarityMetricType,
 )
 
 VECTOR_DB_PARAMS = [
@@ -19,6 +18,7 @@ VECTOR_DB_PARAMS = [
     (ChromaVectorDB, SimilarityMetricType.EUCLIDEAN),
 ]
 
+
 class TestVectorDBStrategy:
     """Test all vector database strategies using parameterization."""
 
@@ -28,18 +28,14 @@ class TestVectorDBStrategy:
     )
     def test_add_and_get_knn(self, vector_db_class, similarity_metric_type):
         """Test adding embeddings and retrieving nearest neighbors."""
-        # Create vector db directly
         vector_db = vector_db_class(similarity_metric_type=similarity_metric_type)
-        
-        # Create config with the vector db
-        config = VectorQConfig(vector_db=vector_db)
 
         # Test with a single embedding
         embedding = [0.1, 0.2, 0.3]
         id1 = vector_db.add(embedding=embedding)
         knn = vector_db.get_knn(embedding=embedding, k=1)
         assert len(knn) == 1
-        assert abs(knn[0][0] - 1.0) < 1e-5 # Should be a perfect match
+        assert abs(knn[0][0] - 1.0) < 1e-5  # Should be a perfect match
         assert knn[0][1] == id1
 
         # Test with multiple embeddings
@@ -60,11 +56,7 @@ class TestVectorDBStrategy:
     )
     def test_remove(self, vector_db_class, similarity_metric_type):
         """Test removing embeddings from the vector database."""
-        # Create vector db directly
         vector_db = vector_db_class(similarity_metric_type=similarity_metric_type)
-        
-        # Create config with the vector db
-        config = VectorQConfig(vector_db=vector_db)
 
         # Add multiple embeddings
         id1 = vector_db.add(embedding=[0.1, 0.2, 0.3])
@@ -88,11 +80,7 @@ class TestVectorDBStrategy:
     )
     def test_reset(self, vector_db_class, similarity_metric_type):
         """Test resetting the vector database."""
-        # Create vector db directly
         vector_db = vector_db_class(similarity_metric_type=similarity_metric_type)
-        
-        # Create config with the vector db
-        config = VectorQConfig(vector_db=vector_db)
 
         # Add multiple embeddings
         vector_db.add(embedding=[0.1, 0.2, 0.3])
