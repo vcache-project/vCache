@@ -25,7 +25,7 @@ class EmbeddingMetadataStorage(ABC):
         pass
 
     @abstractmethod
-    def update(
+    def update_metadata(
         self, embedding_id: int, metadata: EmbeddingMetadataObj
     ) -> EmbeddingMetadataObj:
         """

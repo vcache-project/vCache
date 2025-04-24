@@ -48,7 +48,7 @@ class EmbeddingStore:
     def get_metadata(self, embedding_id: int) -> "EmbeddingMetadataObj":
         return self.embedding_metadata_storage.get_metadata(embedding_id)
 
-    def update(
+    def update_metadata(
         self, embedding_id: int, metadata: "EmbeddingMetadataObj"
     ) -> "EmbeddingMetadataObj":
         return self.embedding_metadata_storage.update(embedding_id, metadata)

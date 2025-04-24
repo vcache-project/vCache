@@ -23,7 +23,7 @@ class LangchainMetadataStorage(EmbeddingMetadataStorage):
         # TODO
         pass
 
-    def update(
+    def update_metadata(
         self, embedding_id: int, metadata: Optional[Dict[str, Any]] = None
     ) -> bool:
         # TODO
