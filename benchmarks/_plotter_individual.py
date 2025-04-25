@@ -5,23 +5,22 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 from benchmarks._plotter_helper import (
-    compute_accuracy_acc_list,
-    compute_avg_latency_score,
-    compute_cache_hit_rate_acc_list,
-    compute_cache_hit_rate_score,
-    compute_cache_miss_rate_score,
-    compute_duration_acc_list,
-    compute_error_rate_acc_list,
-    compute_f1_score_acc_list,
-    compute_precision_acc_list,
-    compute_recall_acc_list,
     convert_to_dataframe_from_benchmark,
-    compute_error_rate_score,
+    compute_accuracy_cumulative_list,
     compute_accuracy_score,
+    compute_precision_cumulative_list,
     compute_precision_score,
+    compute_recall_cumulative_list,
     compute_recall_score,
+    compute_f1_score_cumulative_list,
     compute_f1_score_score,
+    compute_error_rate_cumulative_list,
+    compute_error_rate_score,
+    compute_cache_hit_rate_cumulative_list,
+    compute_cache_hit_rate_score,
+    compute_duration_cumulative_list,
     compute_duration_score,
+    compute_avg_latency_score,
 )
 
 if TYPE_CHECKING:
@@ -43,22 +42,22 @@ def generate_individual_plots(benchmark: "Benchmark", font_size: int):
 def __plot_accuracy_precision_recall_f1_score(
     benchmark: "Benchmark", df: pd.DataFrame, font_size: int
 ):
-    accuracy_acc_list = compute_accuracy_acc_list(
-        tp=df["true_positive_acc_list"],
-        fp=df["false_positive_acc_list"],
-        tn=df["true_negative_acc_list"],
-        fn=df["false_negative_acc_list"],
+    accuracy_acc_list = compute_accuracy_cumulative_list(
+        tp=df["tp_list"],
+        fp=df["fp_list"],
+        tn=df["tn_list"],
+        fn=df["fn_list"],
     )
-    precision_acc_list = compute_precision_acc_list(
-        tp=df["true_positive_acc_list"], fp=df["false_positive_acc_list"]
+    precision_acc_list = compute_precision_cumulative_list(
+        tp=df["tp_list"], fp=df["fp_list"]
     )
-    recall_acc_list = compute_recall_acc_list(
-        tp=df["true_positive_acc_list"], fn=df["false_negative_acc_list"]
+    recall_acc_list = compute_recall_cumulative_list(
+        tp=df["tp_list"], fn=df["fn_list"]
     )
-    f1_score_acc_list = compute_f1_score_acc_list(
-        tp=df["true_positive_acc_list"],
-        fp=df["false_positive_acc_list"],
-        fn=df["false_negative_acc_list"],
+    f1_score_acc_list = compute_f1_score_cumulative_list(
+        tp=df["tp_list"],
+        fp=df["fp_list"],
+        fn=df["fn_list"],
     )
 
     fig, axes = plt.subplots(2, 2, figsize=(15, 10))
@@ -113,22 +112,10 @@ def __plot_accuracy_precision_recall_f1_score(
 def __plot_error_rate_cache_hit_rate_duration_avg_latency(
     benchmark: "Benchmark", df: pd.DataFrame, font_size: int
 ):
-    error_rate_acc_list = compute_error_rate_acc_list(
-        tp=df["true_positive_acc_list"],
-        fp=df["false_positive_acc_list"],
-        tn=df["true_negative_acc_list"],
-        fn=df["false_negative_acc_list"],
-    )
-    cache_hit_rate_acc_list = compute_cache_hit_rate_acc_list(
-        cache_hit_list=df["cache_hit_acc_list"],
-        cache_miss_list=df["cache_miss_acc_list"],
-    )
-    duration_vectorq_acc_list = compute_duration_acc_list(
-        latency_list=df["latency_vectorq_list"]
-    )
-    duration_direct_acc_list = compute_duration_acc_list(
-        latency_list=df["latency_direct_list"]
-    )
+    error_rate_acc_list = compute_error_rate_cumulative_list(fp=df["fp_list"])
+    cache_hit_rate_acc_list = compute_cache_hit_rate_cumulative_list(cache_hit_list=df["cache_hit_list"])
+    duration_vectorq_acc_list = compute_duration_cumulative_list(latency_list=df["latency_vectorq_list"])
+    duration_direct_acc_list = compute_duration_cumulative_list(latency_list=df["latency_direct_list"])
 
     fig, axes = plt.subplots(2, 2, figsize=(15, 10))
     sample_index = range(1, len(error_rate_acc_list) + 1)
@@ -224,17 +211,9 @@ def __plot_avg_latency_cache_hit_rate_cache_miss_rate(
         cache_hit_list_acc=df["cache_hit_acc_list"],
         cache_miss_list_acc=df["cache_miss_acc_list"],
     )
-    cache_miss_rate_vectorq = compute_cache_miss_rate_score(
-        cache_miss_list_acc=df["cache_miss_acc_list"],
-        cache_hit_list_acc=df["cache_hit_acc_list"],
-    )
+    cache_miss_rate_vectorq = 1 - cache_hit_rate_vectorq
     
-    error_rate_vectorq = compute_error_rate_score(
-        tp=df["true_positive_acc_list"],
-        fp=df["false_positive_acc_list"],
-        tn=df["true_negative_acc_list"],
-        fn=df["false_negative_acc_list"],
-    )
+    error_rate_vectorq = compute_error_rate_score(fp=df["fp_list"])
     
     duration_vectorq = compute_duration_score(
         latency_list=df["latency_vectorq_list"]
@@ -245,23 +224,23 @@ def __plot_avg_latency_cache_hit_rate_cache_miss_rate(
     )
     
     accuracy_vectorq = compute_accuracy_score(
-        tp=df["true_positive_acc_list"],
-        fp=df["false_positive_acc_list"],
-        tn=df["true_negative_acc_list"],
-        fn=df["false_negative_acc_list"],
+        tp=df["tp_list"],
+        fp=df["fp_list"],
+        tn=df["tn_list"],
+        fn=df["fn_list"],
     )
     precision_vectorq = compute_precision_score(
-        tp=df["true_positive_acc_list"],
-        fp=df["false_positive_acc_list"],
+        tp=df["tp_list"],
+        fp=df["fp_list"],
     )
     recall_vectorq = compute_recall_score(
-        tp=df["true_positive_acc_list"],
-        fn=df["false_negative_acc_list"],
+        tp=df["tp_list"],
+        fn=df["fn_list"],
     )
     f1_score_vectorq = compute_f1_score_score(
-        tp=df["true_positive_acc_list"],
-        fp=df["false_positive_acc_list"],
-        fn=df["false_negative_acc_list"],
+        tp=df["tp_list"],
+        fp=df["fp_list"],
+        fn=df["fn_list"],
     )
 
     statistics = {

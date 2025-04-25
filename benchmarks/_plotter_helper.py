@@ -68,19 +68,24 @@ def __cumulative_average_stats(data: pd.DataFrame) -> pd.DataFrame:
     """
     return data.cumsum() / np.arange(1, len(data) + 1)
 
-def compute_accuracy_list(
+def compute_accuracy_cumulative_list(
     tp: pd.DataFrame, fp: pd.DataFrame, tn: pd.DataFrame, fn: pd.DataFrame
 ) -> pd.DataFrame:
     """
-    Compute the entry-wise accuracy.
+    Compute the entry-wise accuracy. The function accumulates the values of the true positives, 
+    true negatives, false positives, and false negatives. Afterwards, it computes the accuracy.
     Args:
         tp: pd.DataFrame - True Positives  [0, 1, 0, 0, ...]
         fp: pd.DataFrame - False Positives [1, 0, 0, 0, ...]
         tn: pd.DataFrame - True Negatives  [1, 0, 1, 0, ...]
         fn: pd.DataFrame - False Negatives [0, 0, 0, 0, ...]
     Returns:
-        accuracy: pd.DataFrame - Accuracy [0.5, 1.0, 1.0, 0.0, ...]
+        accuracy: pd.DataFrame - Accuracy [0.xx, 0.xx, 0.xx, 0.xx, ...]
     """
+    tp = tp.cumsum()
+    tn = tn.cumsum()
+    fp = fp.cumsum()
+    fn = fn.cumsum()
     numerator = tp + tn
     denominator = tp + tn + fp + fn
     accuracy = numerator / denominator
@@ -90,7 +95,9 @@ def compute_accuracy_score(
     tp: pd.DataFrame, fp: pd.DataFrame, tn: pd.DataFrame, fn: pd.DataFrame
 ) -> float:
     """
-    Compute the final accuracy score.
+    Compute the final accuracy score. The function accumulates the values of the true positives, 
+    true negatives, false positives, and false negatives. Afterwards, it computes the accuracy and
+    returns the last value of the accuracy.
     Args:
         tp: pd.DataFrame - True Positives  [0, 1, 0, 0, ...]
         fp: pd.DataFrame - False Positives [1, 0, 0, 0, ...]
@@ -99,102 +106,111 @@ def compute_accuracy_score(
     Returns:
         accuracy: float - Accuracy 0.xx
     """
-    accuracy = compute_accuracy_list(tp=tp, fp=fp, tn=tn, fn=fn)
-    accuracy = __cumulative_average_stats(data=accuracy)
+    accuracy = compute_accuracy_cumulative_list(tp=tp, fp=fp, tn=tn, fn=fn)
     return accuracy.iloc[-1]
 
-def compute_precision_list(tp: pd.DataFrame, fp: pd.DataFrame) -> pd.DataFrame:
+def compute_precision_cumulative_list(tp: pd.DataFrame, fp: pd.DataFrame) -> pd.DataFrame:
     """
-    Compute the entry-wise precision.
+    Compute the entry-wise precision. The function accumulates the values of the true positives and
+    false positives. Afterwards, it computes the precision.
     Args:
         tp: pd.DataFrame - True Positives  [0, 1, 1, 0, ...]
         fp: pd.DataFrame - False Positives [1, 0, 1, 0, ...]
     Returns:
-        precision: pd.DataFrame - Precision [0.0, 1.0, 0.5, 0.0, ...]
+        precision: pd.DataFrame - Precision [0.xx, 0.xx, 0.xx, 0.xx, ...]
     """
+    tp = tp.cumsum()
+    fp = fp.cumsum()
     denominator = tp + fp
     precision = tp / denominator
     return precision
 
 def compute_precision_score(tp: pd.DataFrame, fp: pd.DataFrame) -> float:
     """
-    Compute the final precision score.
+    Compute the final precision score. The function accumulates the values of the true positives and
+    false positives. Afterwards, it computes the precision and returns the last value of the precision.
     Args:
         tp: pd.DataFrame - True Positives  [0, 1, 0, 0, ...]
         fp: pd.DataFrame - False Positives [1, 0, 0, 0, ...]
     Returns:
         precision: float - Precision 0.xx
     """
-    precision = compute_precision_list(tp=tp, fp=fp)
-    precision = __cumulative_average_stats(data=precision)
+    precision = compute_precision_cumulative_list(tp=tp, fp=fp)
     return precision.iloc[-1]
 
-def compute_recall_list(tp: pd.DataFrame, fn: pd.DataFrame) -> pd.DataFrame:
+def compute_recall_cumulative_list(tp: pd.DataFrame, fn: pd.DataFrame) -> pd.DataFrame:
     """
-    Compute the entry-wise recall.
+    Compute the entry-wise recall. The function accumulates the values of the true positives and
+    false negatives. Afterwards, it computes the recall.
     Args:
         tp: pd.DataFrame - True Positives  [0, 1, 1, 0, ...]
         fn: pd.DataFrame - False Negatives [1, 0, 1, 0, ...]
     Returns:
-        recall: pd.DataFrame - Recall [0.0, 1.0, 0.5, 0.0, ...]
+        recall: pd.DataFrame - Recall [0.xx, 0.xx, 0.xx, 0.xx, ...]
     """
+    tp = tp.cumsum()
+    fn = fn.cumsum()
     denominator = tp + fn
     recall = tp / denominator
     return recall
 
 def compute_recall_score(tp: pd.DataFrame, fn: pd.DataFrame) -> float:
     """
-    Compute the final recall score.
+    Compute the final recall score. The function accumulates the values of the true positives and
+    false negatives. Afterwards, it computes the recall and returns the last value of the recall.
     Args:
         tp: pd.DataFrame - True Positives  [0, 1, 0, 0, ...]
         fn: pd.DataFrame - False Negatives [1, 0, 1, 0, ...]
     Returns:
         recall: float - Recall 0.xx
     """
-    recall = compute_recall_list(tp=tp, fn=fn)
-    recall = __cumulative_average_stats(data=recall)
+    recall = compute_recall_cumulative_list(tp=tp, fn=fn)
     return recall.iloc[-1]
 
-def compute_false_positive_rate_list(fp: pd.DataFrame, tn: pd.DataFrame) -> pd.DataFrame:
+def compute_false_positive_rate_cumulative_list(fp: pd.DataFrame, tn: pd.DataFrame) -> pd.DataFrame:
     """
-    Compute the entry-wise false positive rate.
+    Compute the entry-wise false positive rate. The function accumulates the values of the false positives and
+    true negatives. Afterwards, it computes the false positive rate.
     Args:
         fp: pd.DataFrame - False Positives [0, 1, 1, 0, ...]
         tn: pd.DataFrame - True Negatives  [1, 0, 1, 0, ...]
     Returns:
-        false_positive_rate: pd.DataFrame - False Positive Rate [0.0, 1.0, 0.5, 0.0, ...]
+        false_positive_rate: pd.DataFrame - False Positive Rate [0.xx, 0.xx, 0.xx, 0.xx, ...]
     """
+    fp = fp.cumsum()
+    tn = tn.cumsum()
     denominator = fp + tn
     false_positive_rate = fp / denominator
     return false_positive_rate
 
 def compute_false_positive_rate_score(fp: pd.DataFrame, tn: pd.DataFrame) -> float:
     """
-    Compute the final false positive rate score.
+    Compute the final false positive rate score. The function accumulates the values of the false positives and
+    true negatives. Afterwards, it computes the false positive rate and returns the last value of the false positive rate.
     Args:
         fp: pd.DataFrame - False Positives [0, 1, 1, 0, ...]
         tn: pd.DataFrame - True Negatives  [1, 0, 1, 0, ...]
     Returns:
         false_positive_rate: float - False Positive Rate 0.xx
     """
-    false_positive_rate = compute_false_positive_rate_list(fp=fp, tn=tn)
-    false_positive_rate = __cumulative_average_stats(data=false_positive_rate)
+    false_positive_rate = compute_false_positive_rate_cumulative_list(fp=fp, tn=tn)
     return false_positive_rate.iloc[-1]
 
-def compute_f1_score_list(
+def compute_f1_score_cumulative_list(
     tp: pd.DataFrame, fp: pd.DataFrame, fn: pd.DataFrame
 ) -> pd.DataFrame:
     """
-    Compute the entry-wise F1 score.
+    Compute the entry-wise F1 score. The function accumulates the values of the true positives, 
+    false positives, and false negatives. Afterwards, it computes the F1 score.
     Args:
         tp: pd.DataFrame - True Positives  [0, 1, 1, 0, ...]
         fp: pd.DataFrame - False Positives [0, 1, 1, 0, ...]
         fn: pd.DataFrame - False Negatives [1, 0, 1, 0, ...]
     Returns:
-        f1_score: pd.DataFrame - F1 Score [0.0, 0.6, 0.5, 0.0, ...]
+        f1_score: pd.DataFrame - F1 Score [0.xx, 0.xx, 0.xx, 0.xx, ...]
     """
-    precision = compute_precision_list(tp=tp, fp=fp)
-    recall = compute_recall_list(tp=tp, fn=fn)
+    precision = compute_precision_cumulative_list(tp=tp, fp=fp)
+    recall = compute_recall_cumulative_list(tp=tp, fn=fn)
 
     numerator = 2 * precision * recall
     denominator = precision + recall
@@ -205,7 +221,8 @@ def compute_f1_score_score(
     tp: pd.DataFrame, fp: pd.DataFrame, fn: pd.DataFrame
 ) -> float:
     """
-    Compute the final F1 score.
+    Compute the final F1 score. The function accumulates the values of the true positives, 
+    false positives, and false negatives. Afterwards, it computes the F1 score and returns the last value of the F1 score.
     Args:
         tp: pd.DataFrame - True Positives  [0, 1, 1, 0, ...]
         fp: pd.DataFrame - False Positives [0, 1, 1, 0, ...]
@@ -213,8 +230,7 @@ def compute_f1_score_score(
     Returns:
         f1_score: float - F1 Score 0.xx
     """
-    f1_score = compute_f1_score_list(tp=tp, fp=fp, fn=fn)
-    f1_score = __cumulative_average_stats(data=f1_score)
+    f1_score = compute_f1_score_cumulative_list(tp=tp, fp=fp, fn=fn)
     return f1_score.iloc[-1]
 
 def compute_error_rate_cumulative_list(fp: pd.DataFrame) -> pd.DataFrame:

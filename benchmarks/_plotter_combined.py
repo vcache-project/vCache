@@ -134,11 +134,11 @@ def __plot_roc(
         df = static_data_frames[threshold]
 
         tpr = compute_recall_score(
-            tp=df["true_positive_acc_list"], fn=df["false_negative_acc_list"]
+            tp=df["tp_list"], fn=df["fn_list"]
         )
 
         fpr = compute_false_positive_rate_score(
-            fp=df["false_positive_acc_list"], tn=df["true_negative_acc_list"]
+            fp=df["fp_list"], tn=df["tn_list"]
         )
 
         static_tpr_values.append(tpr)
@@ -177,11 +177,11 @@ def __plot_roc(
         df = dynamic_data_frames[delta]
 
         tpr = compute_recall_score(
-            tp=df["true_positive_acc_list"], fn=df["false_negative_acc_list"]
+            tp=df["tp_list"], fn=df["fn_list"]
         )
 
         fpr = compute_false_positive_rate_score(
-            fp=df["false_positive_acc_list"], tn=df["true_negative_acc_list"]
+            fp=df["fp_list"], tn=df["tn_list"]
         )
 
         dynamic_tpr_values.append(tpr)
@@ -243,12 +243,8 @@ def __plot_precision_vs_recall(
 
     for threshold in static_thresholds:
         df = static_data_frames[threshold]
-
-        tp = df["true_positive_acc_list"].iloc[-1]
-        fp = df["false_positive_acc_list"].iloc[-1]
-        fn = df["false_negative_acc_list"].iloc[-1]
-        precision = compute_precision_score(tp=pd.Series([tp]), fp=pd.Series([fp]))
-        recall = compute_recall_score(tp=pd.Series([tp]), fn=pd.Series([fn]))
+        precision = compute_precision_score(tp=df["tp_list"], fp=df["fp_list"])
+        recall = compute_recall_score(tp=df["tp_list"], fn=df["fn_list"])
 
         static_precision_values.append(precision)
         static_recall_values.append(recall)
@@ -284,12 +280,8 @@ def __plot_precision_vs_recall(
 
     for delta in dynamic_deltas:
         df = dynamic_data_frames[delta]
-
-        tp = df["true_positive_acc_list"].iloc[-1]
-        fp = df["false_positive_acc_list"].iloc[-1]
-        fn = df["false_negative_acc_list"].iloc[-1]
-        precision = compute_precision_score(tp=pd.Series([tp]), fp=pd.Series([fp]))
-        recall = compute_recall_score(tp=pd.Series([tp]), fn=pd.Series([fn]))
+        precision = compute_precision_score(tp=df["tp_list"], fp=df["fp_list"])
+        recall = compute_recall_score(tp=df["tp_list"], fn=df["fn_list"])
 
         dynamic_precision_values.append(precision)
         dynamic_recall_values.append(recall)
@@ -348,15 +340,9 @@ def __plot_avg_latency_vs_error_rate(
     for threshold in static_thresholds:
         df = static_data_frames[threshold]
 
-        error_rate = compute_error_rate_score(
-            tp=df["true_positive_acc_list"],
-            fp=df["false_positive_acc_list"],
-            tn=df["true_negative_acc_list"],
-            fn=df["false_negative_acc_list"],
-        )
+        error_rate = compute_error_rate_score(fp=df["fp_list"])
 
         avg_latency = compute_avg_latency_score(latency_list=df["latency_vectorq_list"])
-        # Convert seconds to minutes
         avg_latency = avg_latency / 60.0
 
         static_error_rates.append(error_rate)
@@ -369,15 +355,9 @@ def __plot_avg_latency_vs_error_rate(
     for delta in dynamic_deltas:
         df = dynamic_data_frames[delta]
 
-        error_rate = compute_error_rate_score(
-            tp=df["true_positive_acc_list"],
-            fp=df["false_positive_acc_list"],
-            tn=df["true_negative_acc_list"],
-            fn=df["false_negative_acc_list"],
-        )
+        error_rate = compute_error_rate_score(fp=df["fp_list"])
 
         avg_latency = compute_avg_latency_score(latency_list=df["latency_vectorq_list"])
-        # Convert seconds to minutes
         avg_latency = avg_latency / 60.0
 
         dynamic_error_rates.append(error_rate)
@@ -458,17 +438,9 @@ def __plot_cache_hit_vs_error_rate(
     for threshold in static_thresholds:
         df = static_data_frames[threshold]
 
-        cache_hit_rate = compute_cache_hit_rate_score(
-            cache_hit_list_acc=df["cache_hit_acc_list"],
-            cache_miss_list_acc=df["cache_miss_acc_list"],
-        )
+        cache_hit_rate = compute_cache_hit_rate_score(cache_hit_list=df["cache_hit_list"])
 
-        error_rate = compute_error_rate_score(
-            tp=df["true_positive_acc_list"],
-            fp=df["false_positive_acc_list"],
-            tn=df["true_negative_acc_list"],
-            fn=df["false_negative_acc_list"],
-        )
+        error_rate = compute_error_rate_score(fp=df["fp_list"])
 
         static_cache_hit_rates.append(cache_hit_rate)
         static_error_rates.append(error_rate)
@@ -505,17 +477,9 @@ def __plot_cache_hit_vs_error_rate(
     for delta in dynamic_deltas:
         df = dynamic_data_frames[delta]
 
-        cache_hit_rate = compute_cache_hit_rate_score(
-            cache_hit_list_acc=df["cache_hit_acc_list"],
-            cache_miss_list_acc=df["cache_miss_acc_list"],
-        )
+        cache_hit_rate = compute_cache_hit_rate_score(cache_hit_list=df["cache_hit_list"])
 
-        error_rate = compute_error_rate_score(
-            tp=df["true_positive_acc_list"],
-            fp=df["false_positive_acc_list"],
-            tn=df["true_negative_acc_list"],
-            fn=df["false_negative_acc_list"],
-        )
+        error_rate = compute_error_rate_score(fp=df["fp_list"])
 
         dynamic_cache_hit_rates.append(cache_hit_rate)
         dynamic_error_rates.append(error_rate)
@@ -575,12 +539,7 @@ def __plot_delta_accuracy(
         for delta in deltas:
             df = dynamic_data_frames[delta]
 
-            error_rate = compute_error_rate_score(
-                tp=df["true_positive_acc_list"],
-                fp=df["false_positive_acc_list"],
-                tn=df["true_negative_acc_list"],
-                fn=df["false_negative_acc_list"],
-            )
+            error_rate = compute_error_rate_score(fp=df["fp_list"])
 
             error_rates.append(error_rate)
             delta_labels.append(f"{delta:.3f}")
