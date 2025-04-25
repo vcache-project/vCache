@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 
 from benchmarks._plotter_helper import (
+    compute_avg_latency_score,
     compute_cache_hit_rate_score,
     compute_error_rate_score,
     compute_false_positive_rate_score,
@@ -78,7 +79,7 @@ def generate_combined_plots(dataset: str, embedding_model_name: str, llm_model_n
 
     __plot_roc(static_data_frames=static_data_frames, dynamic_data_frames=dynamic_data_frames, results_dir=results_dir, timestamp=timestamp, font_size=font_size)
     __plot_precision_vs_recall(static_data_frames=static_data_frames, dynamic_data_frames=dynamic_data_frames, results_dir=results_dir, timestamp=timestamp, font_size=font_size)
-    __plot_avg_latency(static_data_frames=static_data_frames, dynamic_data_frames=dynamic_data_frames, results_dir=results_dir, timestamp=timestamp, font_size=font_size)
+    __plot_avg_latency_vs_error_rate(static_data_frames=static_data_frames, dynamic_data_frames=dynamic_data_frames, results_dir=results_dir, timestamp=timestamp, font_size=font_size)
     __plot_cache_hit_vs_error_rate(static_data_frames=static_data_frames, dynamic_data_frames=dynamic_data_frames, results_dir=results_dir, timestamp=timestamp, font_size=font_size)
     __plot_delta_accuracy(dynamic_data_frames=dynamic_data_frames, results_dir=results_dir, timestamp=timestamp, font_size=font_size)
     
@@ -252,9 +253,100 @@ def __plot_precision_vs_recall(static_data_frames: Dict[float, pd.DataFrame], dy
     plt.savefig(filename, format="pdf", bbox_inches='tight')
     plt.close()
 
-def __plot_avg_latency(static_data_frames: Dict[float, pd.DataFrame], dynamic_data_frames: Dict[float, pd.DataFrame], results_dir: str, timestamp: str, font_size: int):
+def __plot_avg_latency_vs_error_rate(static_data_frames: Dict[float, pd.DataFrame], dynamic_data_frames: Dict[float, pd.DataFrame], results_dir: str, timestamp: str, font_size: int):
+    plt.figure(figsize=(12, 10))
     
-    filename: str = results_dir + f"/avg_latency_{timestamp}.pdf"
+    static_thresholds = sorted(static_data_frames.keys())
+    static_error_rates = []
+    static_latencies = []
+    
+    for threshold in static_thresholds:
+        df = static_data_frames[threshold]
+        
+        error_rate = compute_error_rate_score(
+            tp=df['true_positive_acc_list'],
+            fp=df['false_positive_acc_list'],
+            tn=df['true_negative_acc_list'],
+            fn=df['false_negative_acc_list']
+        )
+        
+        avg_latency = compute_avg_latency_score(latency_list=df['latency_vectorq_list'])
+        
+        static_error_rates.append(error_rate)
+        static_latencies.append(avg_latency)
+    
+    dynamic_deltas = sorted(dynamic_data_frames.keys())
+    dynamic_error_rates = []
+    dynamic_latencies = []
+    
+    for delta in dynamic_deltas:
+        df = dynamic_data_frames[delta]
+        
+        error_rate = compute_error_rate_score(
+            tp=df['true_positive_acc_list'],
+            fp=df['false_positive_acc_list'],
+            tn=df['true_negative_acc_list'],
+            fn=df['false_negative_acc_list']
+        )
+        
+        avg_latency = compute_avg_latency_score(latency_list=df['latency_vectorq_list'])
+        
+        dynamic_error_rates.append(error_rate)
+        dynamic_latencies.append(avg_latency)
+    
+    if static_thresholds:
+        plt.plot(static_error_rates, static_latencies, 'o-', color='blue', 
+                 linewidth=2, label='Static thresholds', markersize=8)
+        
+        for i, threshold in enumerate(static_thresholds):
+            if i == 0 or i == len(static_thresholds) - 1:
+                label = f"{threshold:.2f}"
+                plt.annotate(label, 
+                           (static_error_rates[i], static_latencies[i]),
+                           textcoords="offset points", 
+                           xytext=(0,10), 
+                           ha='center',
+                           fontsize=font_size-4)
+    
+    if dynamic_deltas:
+        plt.plot(dynamic_error_rates, dynamic_latencies, 'o-', color='green', 
+                 linewidth=2, label='Deltas', markersize=8)
+        
+        for i, delta in enumerate(dynamic_deltas):
+            if i == 0 or i == len(dynamic_deltas) - 1:
+                label = f"{delta:.2f}"
+                plt.annotate(label, 
+                           (dynamic_error_rates[i], dynamic_latencies[i]),
+                           textcoords="offset points", 
+                           xytext=(0,10), 
+                           ha='center',
+                           fontsize=font_size-4)
+    
+    plt.xlabel('Error Rate', fontsize=font_size)
+    plt.ylabel('Average Latency (s)', fontsize=font_size)
+    plt.grid(True, linestyle='--', alpha=0.7)
+    plt.legend(loc='best', fontsize=font_size-2)
+    plt.tick_params(axis='both', labelsize=font_size-2)
+    
+    # Adjust axis limits with padding if data exists
+    if static_error_rates or dynamic_error_rates:
+        all_error_rates = static_error_rates + dynamic_error_rates
+        all_latencies = static_latencies + dynamic_latencies
+        
+        x_min = min(all_error_rates) if all_error_rates else 0
+        x_max = max(all_error_rates) if all_error_rates else 1
+        y_min = min(all_latencies) if all_latencies else 0
+        y_max = max(all_latencies) if all_latencies else 1
+        
+        x_padding = (x_max - x_min) * 0.05 if x_max > x_min else 0.01
+        y_padding = (y_max - y_min) * 0.05 if y_max > y_min else 0.01
+        
+        plt.xlim(max(0, x_min - x_padding), min(1, x_max + x_padding))
+        plt.ylim(max(0, y_min - y_padding), y_max + y_padding)
+    
+    filename = results_dir + f"/avg_latency_vs_error_rate_{timestamp}.pdf"
+    plt.savefig(filename, format="pdf", bbox_inches='tight')
+    plt.close()
 
 def __plot_cache_hit_vs_error_rate(static_data_frames: Dict[float, pd.DataFrame], dynamic_data_frames: Dict[float, pd.DataFrame], results_dir: str, timestamp: str, font_size: int):
     plt.figure(figsize=(12, 10))
@@ -348,12 +440,7 @@ def __plot_cache_hit_vs_error_rate(static_data_frames: Dict[float, pd.DataFrame]
     plt.savefig(filename, format="pdf", bbox_inches='tight')
     plt.close()
 
-def __plot_delta_accuracy(dynamic_data_frames: Dict[float, pd.DataFrame], results_dir: str, timestamp: str, font_size: int):
-    # Box plot of accuracy for each delta/ the achieved error rate (compute_error_rate_score)
-    # Upper bound is the delta, the achieved error rate should be below the delta
-    # The delta should be a horizontal line
-    # Use a Python library to plot the box plot
-    
+def __plot_delta_accuracy(dynamic_data_frames: Dict[float, pd.DataFrame], results_dir: str, timestamp: str, font_size: int):    
     plt.figure(figsize=(12, 10))
     
     deltas = sorted(dynamic_data_frames.keys())
