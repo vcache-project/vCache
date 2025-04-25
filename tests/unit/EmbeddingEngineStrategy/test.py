@@ -1,17 +1,18 @@
-import unittest
-import pytest
 import os
+import unittest
 
-from vectorq.config import VectorQConfig
+import pytest
+
 from vectorq.vectorq_core.cache.embedding_engine import (
-    EmbeddingEngine,
-    OpenAIEmbeddingEngine,
     LangChainEmbeddingEngine,
+    OpenAIEmbeddingEngine,
 )
 
-# Define test parameters once at the module level
 EMBEDDING_ENGINE_PARAMS = [
-    (LangChainEmbeddingEngine, {"model_name": "sentence-transformers/all-MiniLM-L6-v2"}),
+    (
+        LangChainEmbeddingEngine,
+        {"model_name": "sentence-transformers/all-MiniLM-L6-v2"},
+    ),
     pytest.param(
         OpenAIEmbeddingEngine,
         {"model_name": "text-embedding-ada-002"},
@@ -31,11 +32,7 @@ class TestEmbeddingEngineStrategy:
     )
     def test_get_embedding(self, embedding_engine_class, engine_params):
         """Test getting embeddings from different embedding engines."""
-        # Create embedding engine directly
         engine = embedding_engine_class(**engine_params)
-        
-        # Create config with the engine
-        config = VectorQConfig(embedding_engine=engine)
 
         text = "This is a test embedding."
         embedding = engine.get_embedding(text)
@@ -62,9 +59,9 @@ class TestEmbeddingEngineStrategy:
             if abs(embedding[i] - different_embedding[i]) > 1e-6:
                 has_different_values = True
                 break
-        assert (
-            has_different_values
-        ), "Different texts should produce different embeddings"
+        assert has_different_values, (
+            "Different texts should produce different embeddings"
+        )
 
     @pytest.mark.parametrize(
         "embedding_engine_class, engine_params", EMBEDDING_ENGINE_PARAMS
@@ -73,11 +70,7 @@ class TestEmbeddingEngineStrategy:
         self, embedding_engine_class, engine_params
     ):
         """Test that embeddings from the same engine have consistent dimensions."""
-        # Create embedding engine directly
         engine = embedding_engine_class(**engine_params)
-        
-        # Create config with the engine
-        config = VectorQConfig(embedding_engine=engine)
 
         text1 = "First text for embedding."
         text2 = "Second text for embedding."
@@ -86,9 +79,9 @@ class TestEmbeddingEngineStrategy:
         embedding2 = engine.get_embedding(text2)
 
         # Verify both embeddings have the same dimension
-        assert len(embedding1) == len(
-            embedding2
-        ), "Embeddings should have consistent dimensions"
+        assert len(embedding1) == len(embedding2), (
+            "Embeddings should have consistent dimensions"
+        )
 
     @pytest.mark.parametrize(
         "embedding_engine_class, engine_params", EMBEDDING_ENGINE_PARAMS
@@ -97,11 +90,7 @@ class TestEmbeddingEngineStrategy:
         self, embedding_engine_class, engine_params
     ):
         """Test that similar texts have more similar embeddings than dissimilar texts."""
-        # Create embedding engine directly
         engine = embedding_engine_class(**engine_params)
-        
-        # Create config with the engine
-        config = VectorQConfig(embedding_engine=engine)
 
         text1 = "The cat sat on the mat."
         similar_text = "A cat was sitting on a mat."
@@ -129,9 +118,9 @@ class TestEmbeddingEngineStrategy:
         sim_to_different = cosine_similarity(embedding1, different_embedding)
 
         # Similar texts should have higher cosine similarity than different texts
-        assert (
-            sim_to_similar > sim_to_different
-        ), "Similar texts should have more similar embeddings"
+        assert sim_to_similar > sim_to_different, (
+            "Similar texts should have more similar embeddings"
+        )
 
 
 if __name__ == "__main__":

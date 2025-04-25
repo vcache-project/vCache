@@ -1,12 +1,18 @@
-import faiss
 from typing import List
-from vectorq.vectorq_core.cache.embedding_store.vector_db.vector_db import SimilarityMetricType, VectorDB
+
+import faiss
 import numpy as np
+
+from vectorq.vectorq_core.cache.embedding_store.vector_db.vector_db import (
+    SimilarityMetricType,
+    VectorDB,
+)
 
 
 class FAISSVectorDB(VectorDB):
-
-    def __init__(self, similarity_metric_type: SimilarityMetricType = SimilarityMetricType.COSINE):
+    def __init__(
+        self, similarity_metric_type: SimilarityMetricType = SimilarityMetricType.COSINE
+    ):
         self.similarity_metric_type = similarity_metric_type
         self.__next_embedding_id = 0
         self.index = None

@@ -1,11 +1,17 @@
-import chromadb
 from typing import List
-from vectorq.vectorq_core.cache.embedding_store.vector_db.vector_db import SimilarityMetricType, VectorDB
+
+import chromadb
+
+from vectorq.vectorq_core.cache.embedding_store.vector_db.vector_db import (
+    SimilarityMetricType,
+    VectorDB,
+)
 
 
 class ChromaVectorDB(VectorDB):
-
-    def __init__(self, similarity_metric_type: SimilarityMetricType = SimilarityMetricType.COSINE):
+    def __init__(
+        self, similarity_metric_type: SimilarityMetricType = SimilarityMetricType.COSINE
+    ):
         self.__next_embedding_id = 0
         self.collection = None
         self.client = None
@@ -37,7 +43,12 @@ class ChromaVectorDB(VectorDB):
         distances = results.get("distances", [[]])[0]
         ids = results.get("ids", [[]])[0]
         return [
-            (self.transform_similarity_score(float(dist), self.similarity_metric_type.value), int(idx))
+            (
+                self.transform_similarity_score(
+                    float(dist), self.similarity_metric_type.value
+                ),
+                int(idx),
+            )
             for dist, idx in zip(distances, ids)
         ]
 
