@@ -49,7 +49,7 @@ logging.basicConfig(
 ########################################################################################################################
 
 # Benchmark Config
-MAX_SAMPLES: int = 20000
+MAX_SAMPLES: int = 2000
 CONFIDENCE_INTERVALS_ITERATIONS: int = 1
 EMBEDDING_MODEL_1 = (
     "embedding_1",
@@ -109,7 +109,7 @@ MAX_VECTOR_DB_CAPACITY: int = 100000
 PLOT_FONT_SIZE: int = 24
 
 THRESHOLD_TYPES: List[str] = ["static", "dynamic", "both"]
-THRESHOLD_TYPE: str = THRESHOLD_TYPES[2]
+THRESHOLD_TYPE: str = THRESHOLD_TYPES[1]
 
 
 ########################################################################################################################

@@ -26,6 +26,7 @@ class VectorQBayesianPolicy(VectorQPolicy):
                     np.ndarray,
                     float,
                     Callable[[float, np.ndarray, np.ndarray, float], float],
+                    float,
                 ],
                 float,
             ]
@@ -76,10 +77,14 @@ class VectorQBayesianPolicy(VectorQPolicy):
         labels: np.ndarray,
         quantile: float,
         loss_function: Callable[[float, np.ndarray, np.ndarray], float],
+        gamma: float,
     ) -> float:
         alpha: float = 2 * (1.0 - quantile)
         _, upper = self._confidence_interval_fisher_method(
-            t_hat, similarities, alpha, loss_function
+            t_hat=t_hat,
+            sims=similarities,
+            gamma=gamma,
+            alpha=alpha,
         )
         return upper
 
@@ -174,13 +179,14 @@ class VectorQBayesianPolicy(VectorQPolicy):
         t_primes = np.array(
             [
                 self.phi_inv(
-                    t_hat,
-                    similarities,
-                    labels,
-                    q,
-                    lambda t, sims, labs: self._binary_cross_entropy_loss(
+                    t_hat=t_hat,
+                    similarities=similarities,
+                    labels=labels,
+                    quantile=q,
+                    loss_function=lambda t, sims, labs: self._binary_cross_entropy_loss(
                         t, sims, labs, metadata.gamma
                     ),
+                    gamma=metadata.gamma,
                 )
                 for q in quantiles
             ]
