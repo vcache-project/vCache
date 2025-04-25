@@ -5,12 +5,36 @@ import os
 import time
 import unittest
 from datetime import datetime
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 import ijson
 import numpy as np
 import torch
+from tqdm import tqdm
 
+from benchmarks._plotter_combined import (
+    plot_cache_hit_latency_vs_size_comparison,
+    plot_duration_comparison,
+    plot_duration_vs_error_rate,
+    plot_hit_rate_vs_error,
+    plot_hit_rate_vs_latency,
+    plot_precision_vs_recall,
+    plot_roc_curve,
+)
+from benchmarks._plotter_individual import (
+    plot_accuracy,
+    plot_bayesian_decision_boundary,
+    plot_cache_hit_latency_vs_size,
+    plot_cache_size,
+    plot_combined_thresholds_and_posteriors,
+    plot_duration_trend,
+    plot_error_rate_absolute,
+    plot_error_rate_relative,
+    plot_precision,
+    plot_recall,
+    plot_reuse_rate,
+)
+from benchmarks.common.comparison import answers_have_same_meaning_static
 from vectorq.config import VectorQConfig
 from vectorq.main import VectorQ, VectorQBenchmark
 from vectorq.vectorq_core.cache.embedding_store.embedding_metadata_storage import (
@@ -26,29 +50,9 @@ from vectorq.vectorq_core.cache.embedding_store.vector_db import (
 from vectorq.vectorq_core.similarity_evaluator.strategies.string_comparison import (
     StringComparisonSimilarityEvaluator,
 )
-
-from ._plotter_combined import (
-    plot_cache_hit_latency_vs_size_comparison,
-    plot_duration_comparison,
-    plot_duration_vs_error_rate,
-    plot_hit_rate_vs_error,
-    plot_hit_rate_vs_latency,
-    plot_precision_vs_recall,
-    plot_roc_curve,
+from vectorq.vectorq_core.vectorq_policy.strategies.bayesian import (
+    VectorQBayesianPolicy,
 )
-from ._plotter_individual import (
-    plot_accuracy,
-    plot_cache_hit_latency_vs_size,
-    plot_cache_size,
-    plot_combined_thresholds_and_posteriors,
-    plot_duration_trend,
-    plot_error_rate_absolute,
-    plot_error_rate_relative,
-    plot_precision,
-    plot_recall,
-    plot_reuse_rate,
-)
-from .common.comparison import answers_have_same_meaning_static
 
 repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 results_dir = os.path.join(repo_root, "benchmarks", "results")
@@ -64,10 +68,9 @@ logging.basicConfig(
 ### Parameters #########################################################################################################
 ########################################################################################################################
 
-# VectorQ Config
-MAX_CAPACITY = 200
-
 # Benchmark Config
+MAX_SAMPLES = 20000
+CONFIDENCE_INTERVALS_ITERATIONS = 1
 EMBEDDING_MODEL_1 = (
     "embedding_1",
     "GteLargeENv1_5",
@@ -97,19 +100,21 @@ SIMILARITY_STRATEGY = (
     "embedding_comparison",
     "llm_judge_comparison",
 )
-MAX_SAMPLES = 200
 
-embedding_models = [EMBEDDING_MODEL_1]
-llm_models = [LARGE_LANGUAGE_MODEL_2]
+embedding_models = [EMBEDDING_MODEL_1, EMBEDDING_MODEL_2]
+llm_models = [LARGE_LANGUAGE_MODEL_1, LARGE_LANGUAGE_MODEL_2]
 candidate_strategy = SIMILARITY_STRATEGY[0]
 
 static_thresholds = np.array(
     [0.74, 0.76, 0.78, 0.8, 0.825, 0.85, 0.875, 0.9, 0.92, 0.94, 0.96]
 )
-vectorq_rnd_num_ubs = np.array([0.1, 0.2, 0.4, 0.6, 0.8, 1.0])
+deltas = np.array([0.025, 0.05, 0.075, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35])
+
+# VectorQ Config
+MAX_VECTOR_DB_CAPACITY = 100000
 
 THRESHOLD_TYPES = ["static", "dynamic", "both"]
-THRESHOLD_TYPE = THRESHOLD_TYPES[2]
+THRESHOLD_TYPE = THRESHOLD_TYPES[1]
 
 
 ########################################################################################################################
@@ -124,6 +129,7 @@ class Benchmark(unittest.TestCase):
         self.threshold = None
         self.rnd_num_lb = None
         self.rnd_num_ub = None
+        self.delta = None
         self.embedding_model = None
         self.llm_model = None
         self.filepath = None
@@ -172,13 +178,14 @@ class Benchmark(unittest.TestCase):
         self.recall_list = []
         self.accuracy_list = []
         self.cache_size_list = []
+        self.observations: Dict[int, List[Tuple[float, int]]] = {}
+        self.gammas: Dict[int, float] = {}
         self.correct_x: Dict[int, List[float]] = {}
         self.incorrect_x: Dict[int, List[float]] = {}
         self.correct_y: Dict[int, List[float]] = {}
         self.incorrect_y: Dict[int, List[float]] = {}
         self.posteriors: Dict[int, List[float]] = {}
 
-        # Create output directory if it doesn't exist
         if self.output_folder_path and not os.path.exists(self.output_folder_path):
             os.makedirs(self.output_folder_path)
 
@@ -188,21 +195,11 @@ class Benchmark(unittest.TestCase):
                 f"Required parameters not set: filepath: {self.filepath}, embedding_model: {self.embedding_model}, or llm_model: {self.llm_model}"
             )
 
-        if self.is_dynamic_threshold:
-            print(
-                f"Running benchmark for {self.filepath} with VectorQ, rnd_num_ub: {self.rnd_num_ub}, embedding model: {self.embedding_model[1]}, LLM model: {self.llm_model[1]}"
-            )
-        else:
-            print(
-                f"Running benchmark for {self.filepath} with Static Threshold, threshold: {self.threshold}, embedding model: {self.embedding_model[1]}, LLM model: {self.llm_model[1]}"
-            )
-
         try:
-            with open(self.filepath, "rb") as file:  # Open in binary mode for ijson
-                data_entries = ijson.items(
-                    file, "item"
-                )  # Streams JSON file one entry at a time
+            with open(self.filepath, "rb") as file:
+                data_entries = ijson.items(file, "item")
 
+                pbar = tqdm(total=self.max_samples, desc="Processing entries")
                 for idx, data_entry in enumerate(data_entries):
                     if idx >= self.max_samples:
                         break
@@ -272,6 +269,10 @@ class Benchmark(unittest.TestCase):
                     )
                     self.incorrect_answers_in_step_size = 0
 
+                    pbar.update(1)
+
+                pbar.close()
+
         except Exception as e:
             logging.error(f"Error processing benchmark: {e}")
             raise e
@@ -290,6 +291,7 @@ class Benchmark(unittest.TestCase):
 
         self.dump_results_to_json()
         plot_combined_thresholds_and_posteriors(self)
+        plot_bayesian_decision_boundary(self)
 
     ########################################################################################################################
     ### Class Helper Functions #############################################################################################
@@ -439,6 +441,12 @@ class Benchmark(unittest.TestCase):
         return vectorQ_response, cache_hit
 
     def dump_results_to_json(self):
+        # VectorQ Bayesian Policy ########################
+        observations = {}
+        gammas = {}
+        ##################################################
+
+        # VectorQ Heuristic Policy #######################
         correct_x = {}
         incorrect_x = {}
         correct_y = {}
@@ -448,7 +456,11 @@ class Benchmark(unittest.TestCase):
         metadata_objects: List[EmbeddingMetadataObj] = (
             self.vectorq.core.cache.get_all_embedding_metadata_objects()
         )
+
         for metadata_object in metadata_objects:
+            observations[metadata_object.embedding_id] = metadata_object.observations
+            gammas[metadata_object.embedding_id] = metadata_object.gamma
+
             correct_x[metadata_object.embedding_id] = (
                 metadata_object.correct_similarities
             )
@@ -462,6 +474,9 @@ class Benchmark(unittest.TestCase):
                 0 for _ in metadata_object.incorrect_similarities
             ]
             posteriors[metadata_object.embedding_id] = metadata_object.posteriors
+
+        self.observations = observations
+        self.gammas = gammas
 
         self.correct_x = correct_x
         self.incorrect_x = incorrect_x
@@ -478,6 +493,7 @@ class Benchmark(unittest.TestCase):
                 "threshold": self.threshold,
                 "rnd_num_lb": self.rnd_num_lb,
                 "rnd_num_ub": self.rnd_num_ub,
+                "delta": self.delta,
             },
             "sample_sizes": self.sample_sizes,
             "error_rates_relative_to_reused_answers": self.error_rates_relative_to_reused_answers,
@@ -490,6 +506,8 @@ class Benchmark(unittest.TestCase):
             "total_duration_direct_list": self.total_duration_direct_list,
             "total_duration_vectorq_list": self.total_duration_vectorq_list,
             "answers_reused": self.answers_reused,
+            "observations": self.observations,
+            "gammas": self.gammas,
             "correct_x": self.correct_x,
             "incorrect_x": self.incorrect_x,
             "correct_y": self.correct_y,
@@ -582,7 +600,7 @@ async def main():
     datasets = [
         f.split(".")[0]
         for f in os.listdir(datasets_dir)
-        if (f.endswith(".json") and (f.startswith("sem")))
+        if (f.endswith(".json") and (f.startswith("sem") or f.startswith("ama")))
     ]
     print(f"Datasets to be processed: {datasets}")
 
@@ -608,15 +626,15 @@ async def main():
                 # Static thresholds
                 if THRESHOLD_TYPE in ["static", "both"]:
                     for threshold in static_thresholds:
-                        print(f"\n\n  - Using static threshold: {threshold}")
+                        print(f"Using static threshold: {threshold}")
 
                         config = VectorQConfig(
                             enable_cache=True,
                             is_static_threshold=True,
                             static_threshold=threshold,
-                            max_capacity=MAX_CAPACITY,
                             vector_db=HNSWLibVectorDB(
-                                similarity_metric_type=SimilarityMetricType.COSINE
+                                similarity_metric_type=SimilarityMetricType.COSINE,
+                                max_capacity=MAX_VECTOR_DB_CAPACITY,
                             ),
                             embedding_metadata_storage=InMemoryEmbeddingMetadataStorage(),
                             similarity_evaluator=StringComparisonSimilarityEvaluator(),
@@ -647,24 +665,22 @@ async def main():
 
                 # Dynamic thresholds (VectorQ)
                 if THRESHOLD_TYPE in ["dynamic", "both"]:
-                    for rnd_num_ub in vectorq_rnd_num_ubs:
-                        for i in range(
-                            0, 3
-                        ):  # 3 runs per combination for confidence intervals
+                    for delta in deltas:
+                        for i in range(0, CONFIDENCE_INTERVALS_ITERATIONS):
                             print(
-                                f"\n\n  - Using dynamic threshold with rnd_num_ub: {rnd_num_ub}. Run {i + 1} of 3"
+                                f"Using dynamic threshold with delta: {delta}. Run {i + 1} of {CONFIDENCE_INTERVALS_ITERATIONS}"
                             )
 
                             config = VectorQConfig(
                                 enable_cache=True,
                                 is_static_threshold=False,
-                                rnd_num_ub=rnd_num_ub,
-                                max_capacity=MAX_CAPACITY,
                                 vector_db=HNSWLibVectorDB(
-                                    similarity_metric_type=SimilarityMetricType.COSINE
+                                    similarity_metric_type=SimilarityMetricType.COSINE,
+                                    max_capacity=MAX_VECTOR_DB_CAPACITY,
                                 ),
                                 embedding_metadata_storage=InMemoryEmbeddingMetadataStorage(),
                                 similarity_evaluator=StringComparisonSimilarityEvaluator(),
+                                vectorq_policy=VectorQBayesianPolicy(delta=delta),
                             )
                             vectorQ: VectorQ = VectorQ(config)
 
@@ -675,7 +691,7 @@ async def main():
                             benchmark.llm_model = llm_model
                             benchmark.is_dynamic_threshold = True
                             benchmark.threshold = None
-                            benchmark.rnd_num_ub = round(rnd_num_ub, 1)
+                            benchmark.delta = delta
                             benchmark.timestamp = timestamp
                             benchmark.candidate_strategy = candidate_strategy
                             benchmark.output_folder_path = os.path.join(
@@ -683,7 +699,7 @@ async def main():
                                 dataset,
                                 embedding_model[1],
                                 llm_model[1],
-                                f"vectorq_{rnd_num_ub}_run_{i + 1}",
+                                f"vectorq_{delta}_run_{i + 1}",
                             )
 
                             # Run the benchmark

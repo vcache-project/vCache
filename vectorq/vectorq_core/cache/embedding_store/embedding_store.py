@@ -48,10 +48,10 @@ class EmbeddingStore:
     def get_metadata(self, embedding_id: int) -> "EmbeddingMetadataObj":
         return self.embedding_metadata_storage.get_metadata(embedding_id)
 
-    def update(
+    def update_metadata(
         self, embedding_id: int, metadata: "EmbeddingMetadataObj"
     ) -> "EmbeddingMetadataObj":
-        return self.embedding_metadata_storage.update(embedding_id, metadata)
+        return self.embedding_metadata_storage.update_metadata(embedding_id, metadata)
 
     def is_empty(self) -> bool:
         return self.vector_db.is_empty()

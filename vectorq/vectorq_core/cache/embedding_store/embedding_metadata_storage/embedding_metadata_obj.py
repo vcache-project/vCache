@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List
+from typing import List, Tuple
 
 import numpy as np
 
@@ -16,13 +16,21 @@ class EmbeddingMetadataObj:
     ):
         self.embedding_id: int = embedding_id
         self.response: str = response
+        self.last_accessed: datetime = last_accessed
+
+        # VectorQ Bayesian Policy ########################
+        self.observations: List[Tuple[float, int]] = []  # (similarity, label)
+        self.gamma: float = 64.0
+        ##################################################
+
+        # VectorQ Heuristic Policy #######################
         self.prior: np.ndarray = prior
         self.posterior: np.ndarray = posterior
         self.region_reject: List[float] = region_reject
-        self.last_accessed: datetime = last_accessed
         self.correct_similarities: List[float] = []
         self.incorrect_similarities: List[float] = []
         self.posteriors: List[float] = []
+        ##################################################
 
     def __eq__(self, other):
         if not isinstance(other, EmbeddingMetadataObj):
@@ -42,9 +50,9 @@ class EmbeddingMetadataObj:
             embedding_id={self.embedding_id},
             response={self.response},
             last_accessed={self.last_accessed},
-            len(correct_similarities)={len(self.correct_similarities)},
-            len(incorrect_similarities)={len(self.incorrect_similarities)},
-            len(posteriors)={len(self.posteriors)}
+            len(observations)={len(self.observations)},
+            observations={self.observations},
+            gamma={self.gamma},
         )
         """
 

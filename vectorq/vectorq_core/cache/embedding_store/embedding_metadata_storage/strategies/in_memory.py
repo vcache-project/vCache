@@ -26,7 +26,7 @@ class InMemoryEmbeddingMetadataStorage(EmbeddingMetadataStorage):
         else:
             return self.metadata_storage[embedding_id]
 
-    def update(
+    def update_metadata(
         self, embedding_id: int, metadata: Optional[Dict[str, Any]] = None
     ) -> bool:
         if embedding_id not in self.metadata_storage:

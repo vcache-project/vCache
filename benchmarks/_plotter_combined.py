@@ -1160,7 +1160,7 @@ def plot_cache_hit_latency_vs_size_comparison(
                 linewidth=3,
                 label=f"Static Trend: {z_static[0]:.6f}x + {z_static[1]:.6f}",
             )
-        except:  # noqa: E722
+        except Exception:
             pass
 
     # Fit dynamic trend line if enough points
@@ -1176,7 +1176,7 @@ def plot_cache_hit_latency_vs_size_comparison(
                 linewidth=3,
                 label=f"Dynamic Trend: {z_dynamic[0]:.6f}x + {z_dynamic[1]:.6f}",
             )
-        except:  # noqa: E722
+        except Exception:  # Replace bare except
             pass
 
     plt.xlabel("Cache Size (MB)")

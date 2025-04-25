@@ -20,7 +20,7 @@ class TestEmbeddingMetadataStorageStrategy(unittest.TestCase):
         assert embedding_metadata_storage.get_metadata(embedding_id=0) == initial_obj
 
         updated_obj = EmbeddingMetadataObj(embedding_id=0, response="test2")
-        embedding_metadata_storage.update(embedding_id=0, metadata=updated_obj)
+        embedding_metadata_storage.update_metadata(embedding_id=0, metadata=updated_obj)
         assert embedding_metadata_storage.get_metadata(embedding_id=0) == updated_obj
 
         embedding_metadata_storage.flush()
