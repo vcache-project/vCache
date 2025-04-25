@@ -49,7 +49,7 @@ logging.basicConfig(
 ########################################################################################################################
 
 # Benchmark Config
-MAX_SAMPLES: int = 20000
+MAX_SAMPLES: int = 200
 CONFIDENCE_INTERVALS_ITERATIONS: int = 1
 EMBEDDING_MODEL_1 = (
     "embedding_1",
@@ -99,17 +99,18 @@ llm_models: List[Tuple[str, str, str, int]] = [
 ]
 candidate_strategy: str = SIMILARITY_STRATEGY[0]
 
-static_thresholds = np.array(
-    [0.74, 0.76, 0.78, 0.8, 0.825, 0.85, 0.875, 0.9, 0.92, 0.94, 0.96]
-)
-deltas = np.array([0.025, 0.05, 0.075, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35])
+# static_thresholds = np.array(
+#     [0.74, 0.76, 0.78, 0.8, 0.825, 0.85, 0.875, 0.9, 0.92, 0.94, 0.96]
+# )
+static_thresholds = np.array([0.7, 0.9])
+deltas = np.array([0.1, 0.2]) #np.array([0.025, 0.05, 0.075, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35])
 
 # VectorQ Config
 MAX_VECTOR_DB_CAPACITY: int = 100000
 PLOT_FONT_SIZE: int = 24
 
 THRESHOLD_TYPES: List[str] = ["static", "dynamic", "both"]
-THRESHOLD_TYPE: str = THRESHOLD_TYPES[1]
+THRESHOLD_TYPE: str = THRESHOLD_TYPES[2]
 
 
 ########################################################################################################################
@@ -455,15 +456,15 @@ async def main():
                             await benchmark.test_run_benchmark()
                             await vectorQ.shutdown()
 
-                #if THRESHOLD_TYPE == "both":
-                generate_combined_plots(
-                    dataset=dataset,
-                    embedding_model_name=embedding_model[1],
-                    llm_model_name=llm_model[1],
-                    results_dir=results_dir,
-                    timestamp=timestamp,
-                    font_size=PLOT_FONT_SIZE,
-                )
+                if THRESHOLD_TYPE == "both":
+                    generate_combined_plots(
+                        dataset=dataset,
+                        embedding_model_name=embedding_model[1],
+                        llm_model_name=llm_model[1],
+                        results_dir=results_dir,
+                        timestamp=timestamp,
+                        font_size=PLOT_FONT_SIZE,
+                    )
 
                 end_time_llm_model = time.time()
                 logging.info(

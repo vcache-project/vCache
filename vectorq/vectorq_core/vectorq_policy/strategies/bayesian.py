@@ -1,5 +1,6 @@
 import random
 from typing import Callable, Optional, Sequence, Tuple
+from math import inf
 
 import numpy as np
 from scipy.optimize import minimize
@@ -125,6 +126,9 @@ class VectorQBayesianPolicy(VectorQPolicy):
         p = expit(gamma * (sims - t_hat))
         # 2) observed Fisher information
         i = np.sum(gamma**2 * p * (1 - p))
+        if i <= 0:
+            # no information ⇒ infinite‐width interval
+            return -inf, inf
         # 3) standard error
         se = np.sqrt(1.0 / i)
         # 4) normal quantile

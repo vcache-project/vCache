@@ -174,8 +174,8 @@ def __plot_avg_latency_cache_hit_rate_cache_miss_rate(
         latency_list=df["latency_direct_list"]
     )
 
-    cache_hit_mask = df["cache_hit_acc_list"] > 0
-    cache_miss_mask = df["cache_miss_acc_list"] > 0
+    cache_hit_mask = df["cache_hit_list"] > 0
+    cache_miss_mask = df["cache_miss_list"] > 0
 
     latency_vectorq_cache_hit_list = df.loc[cache_hit_mask, "latency_vectorq_list"]
     latency_vectorq_cache_miss_list = df.loc[cache_miss_mask, "latency_vectorq_list"]
@@ -207,10 +207,7 @@ def __plot_avg_latency_cache_hit_rate_cache_miss_rate(
             latency_list=latency_direct_cache_miss_list
         )
 
-    cache_hit_rate_vectorq = compute_cache_hit_rate_score(
-        cache_hit_list_acc=df["cache_hit_acc_list"],
-        cache_miss_list_acc=df["cache_miss_acc_list"],
-    )
+    cache_hit_rate_vectorq = compute_cache_hit_rate_score(cache_hit_list=df["cache_hit_list"])
     cache_miss_rate_vectorq = 1 - cache_hit_rate_vectorq
     
     error_rate_vectorq = compute_error_rate_score(fp=df["fp_list"])
@@ -286,8 +283,8 @@ def __plot_avg_latency_cache_hit_rate_cache_miss_rate(
             "hit_rate": float(cache_hit_rate_vectorq),
             "miss_rate": float(cache_miss_rate_vectorq),
             "total_samples": int(len(df["latency_vectorq_list"])),
-            "hits": int(df["cache_hit_acc_list"].iloc[-1]),
-            "misses": int(df["cache_miss_acc_list"].iloc[-1]),
+            "hits": int(df["cache_hit_list"].iloc[-1]),
+            "misses": int(df["cache_miss_list"].iloc[-1]),
             "error_rate": float(error_rate_vectorq),
         },
         "duration": {
