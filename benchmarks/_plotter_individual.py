@@ -58,7 +58,6 @@ def __plot_accuracy_precision_recall_f1_score(
     )
 
     fig, axes = plt.subplots(2, 2, figsize=(15, 10))
-    fig.suptitle("Accuracy, Precision, Recall, and F1 Score", fontsize=font_size + 2)
     sample_index = range(1, len(accuracy_acc_list) + 1)
 
     # Plot Accuracy
@@ -124,7 +123,6 @@ def __plot_error_rate_cache_hit_rate_duration_avg_latency(
     )
 
     fig, axes = plt.subplots(2, 2, figsize=(15, 10))
-    fig.suptitle("Error Rate, Cache Hit Rate, and Duration", fontsize=font_size + 2)
     sample_index = range(1, len(error_rate_acc_list) + 1)
 
     # Plot Error Rate

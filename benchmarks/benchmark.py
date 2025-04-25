@@ -49,7 +49,7 @@ logging.basicConfig(
 ########################################################################################################################
 
 # Benchmark Config
-MAX_SAMPLES: int = 50
+MAX_SAMPLES: int = 40
 CONFIDENCE_INTERVALS_ITERATIONS: int = 1
 EMBEDDING_MODEL_1 = (
     "embedding_1",
@@ -81,6 +81,16 @@ SIMILARITY_STRATEGY = (
     "llm_judge_comparison",
 )
 
+DATASETS: List[str] = [
+    "amazon_instant_video.json",
+    "commonsense_qa.json",
+    "ecommerce_dataset.json",
+    "semantic_prompt_cache_benchmark.json"
+]
+DATASETS_TO_EXCLUDE: List[str] = [
+    DATASETS[0], DATASETS[1], DATASETS[2]
+]
+
 embedding_models: List[Tuple[str, str, str, int]] = [
     EMBEDDING_MODEL_1,
     EMBEDDING_MODEL_2,
@@ -92,7 +102,7 @@ llm_models: List[Tuple[str, str, str, int]] = [
 candidate_strategy: str = SIMILARITY_STRATEGY[0]
 
 static_thresholds = np.array(
-    [0.74, 0.76, 0.78, 0.8, 0.825, 0.85, 0.875, 0.9, 0.92, 0.94, 0.96]
+    [0.74, 0.76]#[0.74, 0.76, 0.78, 0.8, 0.825, 0.85, 0.875, 0.9, 0.92, 0.94, 0.96]
 )
 deltas = np.array([0.025, 0.05, 0.075, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35])
 
@@ -101,7 +111,7 @@ MAX_VECTOR_DB_CAPACITY: int = 100000
 PLOT_FONT_SIZE: int = 24
 
 THRESHOLD_TYPES: List[str] = ["static", "dynamic", "both"]
-THRESHOLD_TYPE: str = THRESHOLD_TYPES[0]
+THRESHOLD_TYPE: str = THRESHOLD_TYPES[2]
 
 
 ########################################################################################################################
@@ -210,6 +220,7 @@ class Benchmark(unittest.TestCase):
             logging.error(f"Error processing benchmark: {e}")
             raise e
 
+        self.dump_results_to_json()
         generate_individual_plots(self, font_size=PLOT_FONT_SIZE)
 
     ########################################################################################################################
@@ -339,7 +350,7 @@ async def main():
     datasets = [
         f.split(".")[0]
         for f in os.listdir(datasets_dir)
-        if (f.endswith(".json") and (f.startswith("sem") or f.startswith("ama")))
+        if (f.endswith(".json") and (f not in DATASETS_TO_EXCLUDE))
     ]
     print(f"Datasets to be processed: {datasets}")
 
