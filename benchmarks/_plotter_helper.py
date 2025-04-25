@@ -53,6 +53,11 @@ def compute_recall_acc_list(tp: pd.DataFrame, fn: pd.DataFrame) -> pd.DataFrame:
     recall = tp / denominator
     return recall
 
+def compute_false_positive_rate_acc_list(fp: pd.DataFrame, tn: pd.DataFrame) -> pd.DataFrame:
+    denominator = fp + tn
+    false_positive_rate = fp / denominator
+    return false_positive_rate
+
 def compute_f1_score_acc_list(tp: pd.DataFrame, fp: pd.DataFrame, fn: pd.DataFrame) -> pd.DataFrame:
     precision = compute_precision_acc_list(tp, fp)
     recall = compute_recall_acc_list(tp, fn)
@@ -87,12 +92,20 @@ def compute_recall_score(tp: pd.DataFrame, fn: pd.DataFrame) -> float:
     recall = compute_recall_acc_list(tp, fn)
     return recall[-1]
 
+def compute_false_positive_rate_score(fp: pd.DataFrame, tn: pd.DataFrame) -> float:
+    false_positive_rate = compute_false_positive_rate_acc_list(fp, tn)
+    return false_positive_rate[-1]
+
 def compute_f1_score_score(tp: pd.DataFrame, fp: pd.DataFrame, fn: pd.DataFrame) -> float:
     f1_score = compute_f1_score_acc_list(tp, fp, fn)
     return f1_score[-1]
 
 def compute_avg_latency_score(latency_list: pd.DataFrame) -> float:
     return latency_list.mean()
+
+def compute_error_rate_score(tp: pd.DataFrame, fp: pd.DataFrame, tn: pd.DataFrame, fn: pd.DataFrame) -> float:
+    error_rate = compute_error_rate_acc_list(tp, fp, tn, fn)
+    return error_rate[-1]
 
 def compute_cache_hit_rate_score(cache_hit_list_acc: pd.DataFrame, cache_miss_list_acc: pd.DataFrame) -> float:
     return cache_hit_list_acc[-1] / (cache_hit_list_acc[-1] + cache_miss_list_acc[-1])

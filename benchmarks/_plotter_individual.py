@@ -20,11 +20,11 @@ if TYPE_CHECKING:
     from benchmarks.benchmark import Benchmark
     
 def generate_individual_plots(benchmark: "Benchmark", font_size: int):
-    plot_accuracy_precision_recall_f1_score(benchmark=benchmark, font_size=font_size)
-    plot_error_rate_cache_hit_rate_duration_avg_latency(benchmark=benchmark, font_size=font_size)
-    plot_avg_latency_cache_hit_rate_cache_miss_rate(benchmark=benchmark)
+    __plot_accuracy_precision_recall_f1_score(benchmark=benchmark, font_size=font_size)
+    __plot_error_rate_cache_hit_rate_duration_avg_latency(benchmark=benchmark, font_size=font_size)
+    __plot_avg_latency_cache_hit_rate_cache_miss_rate(benchmark=benchmark)
     
-def plot_accuracy_precision_recall_f1_score(benchmark: "Benchmark", font_size: int):
+def __plot_accuracy_precision_recall_f1_score(benchmark: "Benchmark", font_size: int):
     accuracy_acc_list = compute_accuracy_acc_list(tp=benchmark.true_positive_acc_list, fp=benchmark.false_positive_acc_list, tn=benchmark.true_negative_acc_list, fn=benchmark.false_negative_acc_list)
     precision_acc_list = compute_precision_acc_list(tp=benchmark.true_positive_acc_list, fp=benchmark.false_positive_acc_list)
     recall_acc_list = compute_recall_acc_list(tp=benchmark.true_positive_acc_list, fn=benchmark.false_negative_acc_list)
@@ -74,7 +74,7 @@ def plot_accuracy_precision_recall_f1_score(benchmark: "Benchmark", font_size: i
     plt.savefig(filename, format="pdf")
     plt.close()
     
-def plot_error_rate_cache_hit_rate_duration_avg_latency(benchmark: "Benchmark", font_size: int):
+def __plot_error_rate_cache_hit_rate_duration_avg_latency(benchmark: "Benchmark", font_size: int):
     error_rate_acc_list = compute_error_rate_acc_list(tp=benchmark.true_positive_acc_list, fp=benchmark.false_positive_acc_list, tn=benchmark.true_negative_acc_list, fn=benchmark.false_negative_acc_list)
     cache_hit_rate_acc_list = compute_cache_hit_rate_acc_list(cache_hit_list=benchmark.cache_hit_acc_list, cache_miss_list=benchmark.cache_miss_acc_list)
     duration_vectorq_acc_list = compute_duration_acc_list(latency_list=benchmark.latency_vectorq_list)
@@ -124,7 +124,7 @@ def plot_error_rate_cache_hit_rate_duration_avg_latency(benchmark: "Benchmark", 
     plt.savefig(filename, format="pdf")
     plt.close()
     
-def plot_avg_latency_cache_hit_rate_cache_miss_rate(benchmark: "Benchmark"):
+def __plot_avg_latency_cache_hit_rate_cache_miss_rate(benchmark: "Benchmark"):
     avg_latency_vectorq_overall = compute_avg_latency_score(latency_list=benchmark.latency_vectorq_list)
     avg_latency_direct_overall = compute_avg_latency_score(latency_list=benchmark.latency_direct_list)
     

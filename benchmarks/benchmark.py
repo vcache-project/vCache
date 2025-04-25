@@ -12,31 +12,11 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
-from benchmarks._plotter_combined_old import (
-    plot_cache_hit_latency_vs_size_comparison,
-    plot_duration_comparison,
-    plot_duration_vs_error_rate,
-    plot_hit_rate_vs_error,
-    plot_hit_rate_vs_latency,
-    plot_precision_vs_recall,
-    plot_roc_curve,
-)
-from benchmarks._plotter_individual_old import (
-    plot_accuracy,
-    plot_bayesian_decision_boundary,
-    plot_cache_hit_latency_vs_size,
-    plot_cache_size,
-    plot_combined_thresholds_and_posteriors,
-    plot_duration_trend,
-    plot_error_rate_absolute,
-    plot_error_rate_relative,
-    plot_precision,
-    plot_recall,
-    plot_reuse_rate,
-)
 from benchmarks.common.comparison import answers_have_same_meaning_static
 from vectorq.config import VectorQConfig
 from vectorq.main import VectorQ, VectorQBenchmark
+from benchmarks._plotter_individual import generate_individual_plots
+from benchmarks._plotter_combined import generate_combined_plots
 from vectorq.vectorq_core.cache.embedding_store.embedding_metadata_storage import (
     InMemoryEmbeddingMetadataStorage,
 )
@@ -112,10 +92,10 @@ deltas = np.array([0.025, 0.05, 0.075, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35])
 
 # VectorQ Config
 MAX_VECTOR_DB_CAPACITY: int = 100000
+PLOT_FONT_SIZE: int = 24
 
 THRESHOLD_TYPES: List[str] = ["static", "dynamic", "both"]
 THRESHOLD_TYPE: str = THRESHOLD_TYPES[0]
-
 
 ########################################################################################################################
 ### Benchmark Class ####################################################################################################
@@ -221,7 +201,7 @@ class Benchmark(unittest.TestCase):
             logging.error(f"Error processing benchmark: {e}")
             raise e
 
-        generate_individual_plots(self)
+        generate_individual_plots(self, font_size=PLOT_FONT_SIZE)
 
     ########################################################################################################################
     ### Class Helper Functions #############################################################################################
@@ -325,59 +305,6 @@ class Benchmark(unittest.TestCase):
         with open(filepath, "w") as json_file:
             json.dump(data, json_file, indent=4)
         print(f"Results successfully dumped to {filepath}")
-
-
-########################################################################################################################
-### Helper Functions ###################################################################################################
-########################################################################################################################
-
-def generate_individual_plots(
-    benchmark: Benchmark
-):
-    benchmark.dump_results_to_json()
-    plot_error_rate_relative(benchmark)
-    plot_error_rate_absolute(benchmark)
-    plot_reuse_rate(benchmark)
-    plot_duration_trend(benchmark)
-    plot_precision(benchmark)
-    plot_recall(benchmark)
-    plot_accuracy(benchmark)
-    plot_cache_size(benchmark)
-    plot_cache_hit_latency_vs_size(benchmark)
-    plot_combined_thresholds_and_posteriors(benchmark)
-    plot_bayesian_decision_boundary(benchmark)
-
-def generate_combined_plots(
-    dataset, embedding_model_name, llm_model_name, timestamp, results_dir=None
-):
-    # Use the global results_dir if none is provided
-    if results_dir is None:
-        results_dir = os.path.join(repo_root, "results")
-    print(
-        f"\n\nComparing static vs dynamic thresholds for {dataset}, {embedding_model_name}, {llm_model_name}"
-    )
-    plot_hit_rate_vs_error(
-        dataset, embedding_model_name, llm_model_name, timestamp, results_dir
-    )
-    plot_precision_vs_recall(
-        dataset, embedding_model_name, llm_model_name, timestamp, results_dir
-    )
-    plot_duration_comparison(
-        dataset, embedding_model_name, llm_model_name, timestamp, results_dir
-    )
-    plot_duration_vs_error_rate(
-        dataset, embedding_model_name, llm_model_name, timestamp, results_dir
-    )
-    plot_cache_hit_latency_vs_size_comparison(
-        dataset, embedding_model_name, llm_model_name, timestamp, results_dir
-    )
-    plot_hit_rate_vs_latency(
-        dataset, embedding_model_name, llm_model_name, timestamp, results_dir
-    )
-    plot_roc_curve(
-        dataset, embedding_model_name, llm_model_name, timestamp, results_dir
-    )
-
 
 ########################################################################################################################
 ### Main ###############################################################################################################
@@ -503,7 +430,12 @@ async def main():
 
                 if THRESHOLD_TYPE == "both":
                     generate_combined_plots(
-                        dataset, embedding_model[1], llm_model[1], timestamp
+                        dataset=dataset,
+                        embedding_model_name=embedding_model[1],
+                        llm_model_name=llm_model[1],
+                        results_dir=results_dir,
+                        timestamp=timestamp,
+                        font_size=PLOT_FONT_SIZE
                     )
 
                 end_time_llm_model = time.time()
