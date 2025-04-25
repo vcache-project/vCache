@@ -1,19 +1,23 @@
 from typing import TYPE_CHECKING, Any
 
 import pandas as pd
+import numpy as np
 
 if TYPE_CHECKING:
     from benchmarks.benchmark import Benchmark
 
 
+###################################################################################
+### Conversion Functions ##########################################################
+###################################################################################
 def convert_to_dataframe_from_benchmark(benchmark: "Benchmark") -> tuple:
     data = {
-        "cache_hit_acc_list": benchmark.cache_hit_acc_list,
-        "cache_miss_acc_list": benchmark.cache_miss_acc_list,
-        "true_positive_acc_list": benchmark.true_positive_acc_list,
-        "false_positive_acc_list": benchmark.false_positive_acc_list,
-        "true_negative_acc_list": benchmark.true_negative_acc_list,
-        "false_negative_acc_list": benchmark.false_negative_acc_list,
+        "cache_hit_list": benchmark.cache_hit_list,
+        "cache_miss_list": benchmark.cache_miss_list,
+        "tp_list": benchmark.tp_list,
+        "fp_list": benchmark.fp_list,
+        "tn_list": benchmark.tn_list,
+        "fn_list": benchmark.fn_list,
         "latency_direct_list": benchmark.latency_direct_list,
         "latency_vectorq_list": benchmark.latency_vectorq_list,
     }
@@ -29,12 +33,12 @@ def convert_to_dataframe_from_benchmark(benchmark: "Benchmark") -> tuple:
 
 def convert_to_dataframe_from_json_file(json_data: Any) -> tuple:
     data = {
-        "cache_hit_acc_list": json_data["cache_hit_acc_list"],
-        "cache_miss_acc_list": json_data["cache_miss_acc_list"],
-        "true_positive_acc_list": json_data["true_positive_acc_list"],
-        "false_positive_acc_list": json_data["false_positive_acc_list"],
-        "true_negative_acc_list": json_data["true_negative_acc_list"],
-        "false_negative_acc_list": json_data["false_negative_acc_list"],
+        "cache_hit_list": json_data["cache_hit_list"],
+        "cache_miss_list": json_data["cache_miss_list"],
+        "tp_list": json_data["tp_list"],
+        "fp_list": json_data["fp_list"],
+        "tn_list": json_data["tn_list"],
+        "fn_list": json_data["fn_list"],
         "latency_direct_list": json_data["latency_direct_list"],
         "latency_vectorq_list": json_data["latency_vectorq_list"],
     }
@@ -48,121 +52,245 @@ def convert_to_dataframe_from_json_file(json_data: Any) -> tuple:
     return df, metadata
 
 
-def compute_accuracy_acc_list(
+###################################################################################
+### Stat Functions ################################################################
+###################################################################################
+def __cumulative_average_stats(data: pd.DataFrame) -> pd.DataFrame:
+    """
+    Compute the cumulative average stats of <data>.
+    Args:
+        data: pd.DataFrame - Data [0, 1, 2, 3, 4, 5, ...]
+    Returns:
+        cumulative_data: pd.DataFrame - Cumulative Data [0/1, 1/2, 3/3, 6/4, 10/5, 15/6, ...]
+    Example:
+        data = [0.5, 1.0, 1.0, 0.0, ...] # Accuracy
+        cumulative_data = [0.5/1, 1.5/2, 2.5/3, 2.5/4, 2.5/5, 3.5/6, ...]
+    """
+    return data.cumsum() / np.arange(1, len(data) + 1)
+
+def compute_accuracy_list(
     tp: pd.DataFrame, fp: pd.DataFrame, tn: pd.DataFrame, fn: pd.DataFrame
 ) -> pd.DataFrame:
+    """
+    Compute the entry-wise accuracy.
+    Args:
+        tp: pd.DataFrame - True Positives  [0, 1, 0, 0, ...]
+        fp: pd.DataFrame - False Positives [1, 0, 0, 0, ...]
+        tn: pd.DataFrame - True Negatives  [1, 0, 1, 0, ...]
+        fn: pd.DataFrame - False Negatives [0, 0, 0, 0, ...]
+    Returns:
+        accuracy: pd.DataFrame - Accuracy [0.5, 1.0, 1.0, 0.0, ...]
+    """
     numerator = tp + tn
     denominator = tp + tn + fp + fn
     accuracy = numerator / denominator
     return accuracy
 
+def compute_accuracy_score(
+    tp: pd.DataFrame, fp: pd.DataFrame, tn: pd.DataFrame, fn: pd.DataFrame
+) -> float:
+    """
+    Compute the final accuracy score.
+    Args:
+        tp: pd.DataFrame - True Positives  [0, 1, 0, 0, ...]
+        fp: pd.DataFrame - False Positives [1, 0, 0, 0, ...]
+        tn: pd.DataFrame - True Negatives  [1, 0, 1, 0, ...]
+        fn: pd.DataFrame - False Negatives [0, 0, 0, 0, ...]
+    Returns:
+        accuracy: float - Accuracy 0.xx
+    """
+    accuracy = compute_accuracy_list(tp=tp, fp=fp, tn=tn, fn=fn)
+    accuracy = __cumulative_average_stats(data=accuracy)
+    return accuracy.iloc[-1]
 
-def compute_precision_acc_list(tp: pd.DataFrame, fp: pd.DataFrame) -> pd.DataFrame:
+def compute_precision_list(tp: pd.DataFrame, fp: pd.DataFrame) -> pd.DataFrame:
+    """
+    Compute the entry-wise precision.
+    Args:
+        tp: pd.DataFrame - True Positives  [0, 1, 1, 0, ...]
+        fp: pd.DataFrame - False Positives [1, 0, 1, 0, ...]
+    Returns:
+        precision: pd.DataFrame - Precision [0.0, 1.0, 0.5, 0.0, ...]
+    """
     denominator = tp + fp
     precision = tp / denominator
     return precision
 
+def compute_precision_score(tp: pd.DataFrame, fp: pd.DataFrame) -> float:
+    """
+    Compute the final precision score.
+    Args:
+        tp: pd.DataFrame - True Positives  [0, 1, 0, 0, ...]
+        fp: pd.DataFrame - False Positives [1, 0, 0, 0, ...]
+    Returns:
+        precision: float - Precision 0.xx
+    """
+    precision = compute_precision_list(tp=tp, fp=fp)
+    precision = __cumulative_average_stats(data=precision)
+    return precision.iloc[-1]
 
-def compute_recall_acc_list(tp: pd.DataFrame, fn: pd.DataFrame) -> pd.DataFrame:
+def compute_recall_list(tp: pd.DataFrame, fn: pd.DataFrame) -> pd.DataFrame:
+    """
+    Compute the entry-wise recall.
+    Args:
+        tp: pd.DataFrame - True Positives  [0, 1, 1, 0, ...]
+        fn: pd.DataFrame - False Negatives [1, 0, 1, 0, ...]
+    Returns:
+        recall: pd.DataFrame - Recall [0.0, 1.0, 0.5, 0.0, ...]
+    """
     denominator = tp + fn
     recall = tp / denominator
     return recall
 
+def compute_recall_score(tp: pd.DataFrame, fn: pd.DataFrame) -> float:
+    """
+    Compute the final recall score.
+    Args:
+        tp: pd.DataFrame - True Positives  [0, 1, 0, 0, ...]
+        fn: pd.DataFrame - False Negatives [1, 0, 1, 0, ...]
+    Returns:
+        recall: float - Recall 0.xx
+    """
+    recall = compute_recall_list(tp=tp, fn=fn)
+    recall = __cumulative_average_stats(data=recall)
+    return recall.iloc[-1]
 
-def compute_false_positive_rate_acc_list(
-    fp: pd.DataFrame, tn: pd.DataFrame
-) -> pd.DataFrame:
+def compute_false_positive_rate_list(fp: pd.DataFrame, tn: pd.DataFrame) -> pd.DataFrame:
+    """
+    Compute the entry-wise false positive rate.
+    Args:
+        fp: pd.DataFrame - False Positives [0, 1, 1, 0, ...]
+        tn: pd.DataFrame - True Negatives  [1, 0, 1, 0, ...]
+    Returns:
+        false_positive_rate: pd.DataFrame - False Positive Rate [0.0, 1.0, 0.5, 0.0, ...]
+    """
     denominator = fp + tn
     false_positive_rate = fp / denominator
     return false_positive_rate
 
+def compute_false_positive_rate_score(fp: pd.DataFrame, tn: pd.DataFrame) -> float:
+    """
+    Compute the final false positive rate score.
+    Args:
+        fp: pd.DataFrame - False Positives [0, 1, 1, 0, ...]
+        tn: pd.DataFrame - True Negatives  [1, 0, 1, 0, ...]
+    Returns:
+        false_positive_rate: float - False Positive Rate 0.xx
+    """
+    false_positive_rate = compute_false_positive_rate_list(fp=fp, tn=tn)
+    false_positive_rate = __cumulative_average_stats(data=false_positive_rate)
+    return false_positive_rate.iloc[-1]
 
-def compute_f1_score_acc_list(
+def compute_f1_score_list(
     tp: pd.DataFrame, fp: pd.DataFrame, fn: pd.DataFrame
 ) -> pd.DataFrame:
-    precision = compute_precision_acc_list(tp, fp)
-    recall = compute_recall_acc_list(tp, fn)
+    """
+    Compute the entry-wise F1 score.
+    Args:
+        tp: pd.DataFrame - True Positives  [0, 1, 1, 0, ...]
+        fp: pd.DataFrame - False Positives [0, 1, 1, 0, ...]
+        fn: pd.DataFrame - False Negatives [1, 0, 1, 0, ...]
+    Returns:
+        f1_score: pd.DataFrame - F1 Score [0.0, 0.6, 0.5, 0.0, ...]
+    """
+    precision = compute_precision_list(tp=tp, fp=fp)
+    recall = compute_recall_list(tp=tp, fn=fn)
 
     numerator = 2 * precision * recall
     denominator = precision + recall
     f1_score = numerator / denominator
     return f1_score
 
-
-def compute_error_rate_acc_list(
-    tp: pd.DataFrame, fp: pd.DataFrame, tn: pd.DataFrame, fn: pd.DataFrame
-) -> pd.DataFrame:
-    denominator = tp + tn + fp + fn
-    error_rate = fp / denominator
-    return error_rate
-
-
-def compute_cache_hit_rate_acc_list(
-    cache_hit_list: pd.DataFrame, cache_miss_list: pd.DataFrame
-) -> pd.DataFrame:
-    denominator = cache_hit_list + cache_miss_list
-    cache_hit_rate = cache_hit_list / denominator
-    return cache_hit_rate
-
-
-def compute_duration_acc_list(latency_list: pd.DataFrame) -> pd.DataFrame:
-    return latency_list.cumsum()
-
-
-def compute_accuracy_score(
-    tp: pd.DataFrame, fp: pd.DataFrame, tn: pd.DataFrame, fn: pd.DataFrame
-) -> float:
-    accuracy = compute_accuracy_acc_list(tp, fp, tn, fn)
-    return accuracy.iloc[-1]
-
-
-def compute_precision_score(tp: pd.DataFrame, fp: pd.DataFrame) -> float:
-    precision = compute_precision_acc_list(tp, fp)
-    return precision.iloc[-1]
-
-
-def compute_recall_score(tp: pd.DataFrame, fn: pd.DataFrame) -> float:
-    recall = compute_recall_acc_list(tp, fn)
-    return recall.iloc[-1]
-
-
-def compute_false_positive_rate_score(fp: pd.DataFrame, tn: pd.DataFrame) -> float:
-    false_positive_rate = compute_false_positive_rate_acc_list(fp, tn)
-    return false_positive_rate.iloc[-1]
-
-
 def compute_f1_score_score(
     tp: pd.DataFrame, fp: pd.DataFrame, fn: pd.DataFrame
 ) -> float:
-    f1_score = compute_f1_score_acc_list(tp, fp, fn)
+    """
+    Compute the final F1 score.
+    Args:
+        tp: pd.DataFrame - True Positives  [0, 1, 1, 0, ...]
+        fp: pd.DataFrame - False Positives [0, 1, 1, 0, ...]
+        fn: pd.DataFrame - False Negatives [1, 0, 1, 0, ...]
+    Returns:
+        f1_score: float - F1 Score 0.xx
+    """
+    f1_score = compute_f1_score_list(tp=tp, fp=fp, fn=fn)
+    f1_score = __cumulative_average_stats(data=f1_score)
     return f1_score.iloc[-1]
 
-
-def compute_avg_latency_score(latency_list: pd.DataFrame) -> float:
-    return latency_list.mean()
-
+def compute_error_rate_cumulative_list(fp: pd.DataFrame) -> pd.DataFrame:
+    """
+    Compute the cumulative error rate.
+    Args:
+        fp: pd.DataFrame - False Positives  [0, 1, 0, 0, 0, 1, ...]
+    Returns:
+        error_rate: pd.DataFrame - Error Rate [0/1, 1/2, 1/3, 1/4, 1/5, 2/6, ...]
+    """
+    error_rate = __cumulative_average_stats(data=fp)
+    return error_rate
 
 def compute_error_rate_score(
-    tp: pd.DataFrame, fp: pd.DataFrame, tn: pd.DataFrame, fn: pd.DataFrame
+    fp: pd.DataFrame
 ) -> float:
-    error_rate = compute_error_rate_acc_list(tp, fp, tn, fn)
+    """
+    Compute the final error rate score.
+    Args:
+        fp: pd.DataFrame - False Positives [0, 1, 0, 0, 0, 1, ...]
+    Returns:
+        error_rate: float - Error Rate 0.xx
+    """
+    error_rate = compute_error_rate_cumulative_list(fp=fp)
     return error_rate.iloc[-1]
 
+def compute_cache_hit_rate_cumulative_list(cache_hit_list: pd.DataFrame) -> pd.DataFrame:
+    """
+    Compute the cumulative cache hit rate.
+    Args:
+        cache_hit_list: pd.DataFrame - Cache Hits [0, 1, 0, 0, 0, 1, ...]
+    Returns:
+        cache_hit_rate: pd.DataFrame - Cache Hit Rate [0/1, 1/2, 1/3, 1/4, 1/5, 2/6, ...]
+    """
+    cache_hit_rate = __cumulative_average_stats(data=cache_hit_list)
+    return cache_hit_rate
 
 def compute_cache_hit_rate_score(
-    cache_hit_list_acc: pd.DataFrame, cache_miss_list_acc: pd.DataFrame
+    cache_hit_list: pd.DataFrame
 ) -> float:
-    hit_rate = cache_hit_list_acc.iloc[-1]
-    miss_rate = cache_miss_list_acc.iloc[-1]
-    return hit_rate / (hit_rate + miss_rate)
+    """
+    Compute the final cache hit rate score.
+    Args:
+        cache_hit_list: pd.DataFrame - Cache Hits [0, 1, 0, 0, 0, 1, ...]
+    Returns:
+        cache_hit_rate: float - Cache Hit Rate 0.xx
+    """
+    cache_hit_rate = compute_cache_hit_rate_cumulative_list(cache_hit_list=cache_hit_list)
+    return cache_hit_rate.iloc[-1]
 
-
-def compute_cache_miss_rate_score(
-    cache_miss_list_acc: pd.DataFrame, cache_hit_list_acc: pd.DataFrame
-) -> float:
-    hit_rate = cache_hit_list_acc.iloc[-1]
-    miss_rate = cache_miss_list_acc.iloc[-1]
-    return miss_rate / (hit_rate + miss_rate)
+def compute_duration_cumulative_list(latency_list: pd.DataFrame) -> pd.DataFrame:
+    """
+    Compute the cumulative duration.
+    Args:
+        latency_list: pd.DataFrame - Latency [0, 1, 2, 3, 4, 5, ...]
+    Returns:
+        duration: pd.DataFrame - Duration [0, 1, 3, 6, 10, 15, ...]
+    """
+    return latency_list.cumsum()
 
 def compute_duration_score(latency_list: pd.DataFrame) -> float:
+    """
+    Compute the final duration score.
+    Args:
+        latency_list: pd.DataFrame - Latency [0, 1, 2, 3, 4, 5, ...]
+    Returns:
+        duration: float - Duration 0.xx
+    """
     return latency_list.sum()
+
+def compute_avg_latency_score(latency_list: pd.DataFrame) -> float:
+    """
+    Compute the final average latency score.
+    Args:
+        latency_list: pd.DataFrame - Latency [0, 1, 0.5, 2, 1.5, 0.3, ...]
+    Returns:
+        avg_latency: float - Average Latency 0.xx
+    """
+    return latency_list.mean()

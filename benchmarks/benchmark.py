@@ -129,18 +129,12 @@ class Benchmark(unittest.TestCase):
         self.is_static_threshold: bool = None
 
     def stats_set_up(self):
-        self.cache_hit_counter: int = 0
-        self.cache_hit_acc_list: List[int] = []
-        self.cache_miss_counter: int = 0
-        self.cache_miss_acc_list: List[int] = []
-        self.true_positive_counter: int = 0
-        self.true_positive_acc_list: List[int] = []
-        self.false_positive_counter: int = 0
-        self.false_positive_acc_list: List[int] = []
-        self.true_negative_counter: int = 0
-        self.true_negative_acc_list: List[int] = []
-        self.false_negative_counter: int = 0
-        self.false_negative_acc_list: List[int] = []
+        self.cache_hit_list: List[int] = []
+        self.cache_miss_list: List[int] = []
+        self.tp_list: List[int] = []
+        self.fp_list: List[int] = []
+        self.tn_list: List[int] = []
+        self.fn_list: List[int] = []
         self.latency_direct_list: List[float] = []
         self.latency_vectorq_list: List[float] = []
         self.observations_dict: Dict[str, Dict[str, float]] = {}
@@ -164,6 +158,7 @@ class Benchmark(unittest.TestCase):
                     if idx >= MAX_SAMPLES:
                         break
 
+                    # 1) Get Data
                     task = data_entry["task"]
                     output_format = data_entry["output_format"]
                     review_text = data_entry["text"]
@@ -175,41 +170,28 @@ class Benchmark(unittest.TestCase):
                         data_entry[self.llm_model[0] + "_lat"]
                     )
 
+                    # 2.1) Direct Inference (No Cache)
                     direct_answer: str = data_entry[self.llm_model[0]]
                     latency_direct: float = llm_generation_latency
 
+                    # 2.2) VectorQ Inference (With Cache)
                     row_embedding: List[float] = data_entry[self.embedding_model[0]]
-                    start_time_vectorq: float = time.time()
-                    vectorQ_answer, cache_hit = await self.get_vectorQ_answer(
+                    vectorQ_answer, cache_hit, latency_vectorq_logic = await self.get_vectorQ_answer(
                         data_entry, task, review_text, row_embedding, output_format
                     )
-                    latency_vectorq: float = (
-                        time.time() - start_time_vectorq + emb_generation_latency
-                    )
-
+                    latency_vectorq: float = latency_vectorq_logic + emb_generation_latency
                     if not cache_hit:
                         latency_vectorq += llm_generation_latency
 
-                    if cache_hit:
-                        self.cache_hit_counter += 1
-                        if answers_have_same_meaning_static(
-                            task, direct_answer, vectorQ_answer
-                        ):
-                            self.true_positive_counter += 1  # Correctly reused
-                        else:
-                            self.false_positive_counter += 1  # Incorrectly reused
-                    else:
-                        self.cache_miss_counter += 1
-                        if answers_have_same_meaning_static(
-                            task, direct_answer, vectorQ_answer
-                        ):
-                            self.false_negative_counter += (
-                                1  # Should've reused but didn't
-                            )
-                        else:
-                            self.true_negative_counter += 1  # Correctly didn't reuse
+                    # 3) Update Stats
+                    responses_match = answers_have_same_meaning_static(task, direct_answer, vectorQ_answer)
+                    self.update_stats(
+                        is_cache_hit=cache_hit,
+                        responses_match=responses_match,
+                        latency_direct=latency_direct,
+                        latency_vectorq=latency_vectorq,
+                    )
 
-                    self.append_results(latency_direct, latency_vectorq)
                     pbar.update(1)
 
                 pbar.close()
@@ -224,14 +206,30 @@ class Benchmark(unittest.TestCase):
     ########################################################################################################################
     ### Class Helper Functions #############################################################################################
     ########################################################################################################################
-
-    def append_results(self, latency_direct: float, latency_vectorq: float):
-        self.cache_hit_acc_list.append(self.cache_hit_counter)
-        self.cache_miss_acc_list.append(self.cache_miss_counter)
-        self.true_positive_acc_list.append(self.true_positive_counter)
-        self.false_positive_acc_list.append(self.false_positive_counter)
-        self.true_negative_acc_list.append(self.true_negative_counter)
-        self.false_negative_acc_list.append(self.false_negative_counter)
+    def update_stats(self, is_cache_hit: bool, responses_match: bool, latency_direct: float, latency_vectorq: float):
+        if is_cache_hit:
+            self.cache_hit_list.append(1)
+            self.cache_miss_list.append(0)
+            if responses_match:
+                self.tp_list.append(1)  # Correctly reused
+                self.fp_list.append(0)
+            else:
+                self.fp_list.append(1)  # Incorrectly reused
+                self.tp_list.append(0)
+            self.tn_list.append(0)
+            self.fn_list.append(0)
+        else:
+            self.cache_miss_list.append(1)
+            self.cache_hit_list.append(0)
+            if responses_match:
+                self.fn_list.append(1)  # Should've reused but didn't
+                self.tn_list.append(0)
+            else:
+                self.tn_list.append(1)  # Correctly didn't reuse
+                self.fn_list.append(0)
+            self.tp_list.append(0)
+            self.fp_list.append(0)
+        
         self.latency_direct_list.append(latency_direct)
         self.latency_vectorq_list.append(latency_vectorq)
 
@@ -275,7 +273,9 @@ class Benchmark(unittest.TestCase):
         )
 
         vectorQ_prompt = f"{task} {review_text}"
+        latency_vectorq_logic: float = time.time()
         try:
+            
             vectorQ_response, cache_hit = await self.vectorq.create(
                 prompt=vectorQ_prompt,
                 output_format=output_format,
@@ -287,7 +287,8 @@ class Benchmark(unittest.TestCase):
             )
             raise e
 
-        return vectorQ_response, cache_hit
+        latency_vectorq_logic = time.time() - latency_vectorq_logic
+        return vectorQ_response, cache_hit, latency_vectorq_logic
 
     def dump_results_to_json(self):
         observations_dict = {}
@@ -314,12 +315,12 @@ class Benchmark(unittest.TestCase):
                 "threshold": self.threshold,
                 "delta": self.delta,
             },
-            "cache_hit_acc_list": self.cache_hit_acc_list,
-            "cache_miss_acc_list": self.cache_miss_acc_list,
-            "true_positive_acc_list": self.true_positive_acc_list,
-            "false_positive_acc_list": self.false_positive_acc_list,
-            "true_negative_acc_list": self.true_negative_acc_list,
-            "false_negative_acc_list": self.false_negative_acc_list,
+            "cache_hit_list": self.cache_hit_list,
+            "cache_miss_list": self.cache_miss_list,
+            "tp_list": self.tp_list,
+            "fp_list": self.fp_list,
+            "tn_list": self.tn_list,
+            "fn_list": self.fn_list,
             "latency_direct_list": self.latency_direct_list,
             "latency_vectorq_list": self.latency_vectorq_list,
             "observations_dict": self.observations_dict,

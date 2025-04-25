@@ -67,7 +67,10 @@ class VectorQCore:
             )
             sim, embedding_id = knn[0]
             if sim >= self.vectorq_config.static_threshold:
-                return True, self.cache.get_metadata(embedding_id=embedding_id).response
+                metadata_obj: EmbeddingMetadataObj = self.cache.get_metadata(
+                    embedding_id=embedding_id
+                )
+                return True, metadata_obj.response
             else:
                 response: str = self.__create(
                     prompt=prompt, benchmark=benchmark, output_format=output_format

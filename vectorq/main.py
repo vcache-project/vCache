@@ -1,5 +1,5 @@
 import asyncio
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 
 from vectorq.config import VectorQConfig
 from vectorq.inference_engine.inference_engine import InferenceEngine
@@ -44,10 +44,10 @@ class VectorQ:
             try:
                 request = await self.request_queue.get()
 
-                prompt = request["prompt"]
-                output_format = request["output_format"]
-                benchmark = request["benchmark"]
-                future = request["future"]
+                prompt: str = request["prompt"]
+                output_format: str = request["output_format"]
+                benchmark: VectorQBenchmark = request["benchmark"]
+                future: asyncio.Future = request["future"]
 
                 try:
                     if self.vectorq_config.enable_cache:
@@ -76,8 +76,8 @@ class VectorQ:
         benchmark: VectorQBenchmark - The optional benchmark object containing the pre-computed embedding and response.
         Returns: Tuple[str, bool] - The response to the prompt and whether the response was cached.
         """
-        future = asyncio.Future()
-        request = {
+        future: asyncio.Future = asyncio.Future()
+        request: Dict = {
             "prompt": prompt,
             "output_format": output_format,
             "benchmark": benchmark,

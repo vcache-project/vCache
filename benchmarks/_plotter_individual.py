@@ -230,8 +230,10 @@ def __plot_avg_latency_cache_hit_rate_cache_miss_rate(
     )
     
     error_rate_vectorq = compute_error_rate_score(
-        cache_hit_list_acc=df["cache_hit_acc_list"],
-        cache_miss_list_acc=df["cache_miss_acc_list"],
+        tp=df["true_positive_acc_list"],
+        fp=df["false_positive_acc_list"],
+        tn=df["true_negative_acc_list"],
+        fn=df["false_negative_acc_list"],
     )
     
     duration_vectorq = compute_duration_score(
@@ -243,20 +245,23 @@ def __plot_avg_latency_cache_hit_rate_cache_miss_rate(
     )
     
     accuracy_vectorq = compute_accuracy_score(
-        cache_hit_list_acc=df["cache_hit_acc_list"],
-        cache_miss_list_acc=df["cache_miss_acc_list"],
+        tp=df["true_positive_acc_list"],
+        fp=df["false_positive_acc_list"],
+        tn=df["true_negative_acc_list"],
+        fn=df["false_negative_acc_list"],
     )
     precision_vectorq = compute_precision_score(
-        cache_hit_list_acc=df["cache_hit_acc_list"],
-        cache_miss_list_acc=df["cache_miss_acc_list"],
+        tp=df["true_positive_acc_list"],
+        fp=df["false_positive_acc_list"],
     )
     recall_vectorq = compute_recall_score(
-        cache_hit_list_acc=df["cache_hit_acc_list"],
-        cache_miss_list_acc=df["cache_miss_acc_list"],
+        tp=df["true_positive_acc_list"],
+        fn=df["false_negative_acc_list"],
     )
     f1_score_vectorq = compute_f1_score_score(
-        cache_hit_list_acc=df["cache_hit_acc_list"],
-        cache_miss_list_acc=df["cache_miss_acc_list"],
+        tp=df["true_positive_acc_list"],
+        fp=df["false_positive_acc_list"],
+        fn=df["false_negative_acc_list"],
     )
 
     statistics = {
