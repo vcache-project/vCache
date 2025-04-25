@@ -49,7 +49,7 @@ logging.basicConfig(
 ########################################################################################################################
 
 # Benchmark Config
-MAX_SAMPLES: int = 40
+MAX_SAMPLES: int = 20000
 CONFIDENCE_INTERVALS_ITERATIONS: int = 1
 EMBEDDING_MODEL_1 = (
     "embedding_1",
@@ -85,11 +85,9 @@ DATASETS: List[str] = [
     "amazon_instant_video.json",
     "commonsense_qa.json",
     "ecommerce_dataset.json",
-    "semantic_prompt_cache_benchmark.json"
+    "semantic_prompt_cache_benchmark.json",
 ]
-DATASETS_TO_EXCLUDE: List[str] = [
-    DATASETS[0], DATASETS[1], DATASETS[2]
-]
+DATASETS_TO_EXCLUDE: List[str] = [DATASETS[1]]
 
 embedding_models: List[Tuple[str, str, str, int]] = [
     EMBEDDING_MODEL_1,
@@ -102,7 +100,7 @@ llm_models: List[Tuple[str, str, str, int]] = [
 candidate_strategy: str = SIMILARITY_STRATEGY[0]
 
 static_thresholds = np.array(
-    [0.74, 0.76]#[0.74, 0.76, 0.78, 0.8, 0.825, 0.85, 0.875, 0.9, 0.92, 0.94, 0.96]
+    [0.74, 0.76, 0.78, 0.8, 0.825, 0.85, 0.875, 0.9, 0.92, 0.94, 0.96]
 )
 deltas = np.array([0.025, 0.05, 0.075, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35])
 
@@ -159,7 +157,7 @@ class Benchmark(unittest.TestCase):
 
         try:
             with open(self.filepath, "rb") as file:
-                data_entries = ijson.items(file, 'item')
+                data_entries = ijson.items(file, "item")
 
                 pbar = tqdm(total=MAX_SAMPLES, desc="Processing entries")
                 for idx, data_entry in enumerate(data_entries):

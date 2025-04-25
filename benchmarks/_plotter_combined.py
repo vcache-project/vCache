@@ -52,7 +52,9 @@ def generate_combined_plots(
     timestamp: str,
     font_size: int,
 ):
-    results_dir: str = f"{results_dir}/{dataset}/{embedding_model_name}/{llm_model_name}/"
+    results_dir: str = (
+        f"{results_dir}/{dataset}/{embedding_model_name}/{llm_model_name}/"
+    )
 
     static_files, dynamic_files = __get_result_files(results_dir)
 
@@ -354,6 +356,8 @@ def __plot_avg_latency_vs_error_rate(
         )
 
         avg_latency = compute_avg_latency_score(latency_list=df["latency_vectorq_list"])
+        # Convert seconds to minutes
+        avg_latency = avg_latency / 60.0
 
         static_error_rates.append(error_rate)
         static_latencies.append(avg_latency)
@@ -373,6 +377,8 @@ def __plot_avg_latency_vs_error_rate(
         )
 
         avg_latency = compute_avg_latency_score(latency_list=df["latency_vectorq_list"])
+        # Convert seconds to minutes
+        avg_latency = avg_latency / 60.0
 
         dynamic_error_rates.append(error_rate)
         dynamic_latencies.append(avg_latency)
@@ -424,7 +430,7 @@ def __plot_avg_latency_vs_error_rate(
                 )
 
     plt.xlabel("Error Rate", fontsize=font_size)
-    plt.ylabel("Average Latency (s)", fontsize=font_size)
+    plt.ylabel("Average Latency (min)", fontsize=font_size)
     plt.xlim(left=0.0)
     plt.ylim(bottom=0.0)
     plt.grid(True, linestyle="--", alpha=0.7)
@@ -596,13 +602,15 @@ def __plot_delta_accuracy(
                 linewidth=2,
             )
 
-        # Remove the scatter plot to eliminate the red dots
-        # Keep the label by adding it to the legend manually
         custom_lines = [
             Line2D([0], [0], color="red", linestyle="dashed", lw=2),
-            Line2D([0], [0], color="skyblue", lw=4)
+            Line2D([0], [0], color="skyblue", lw=4),
         ]
-        plt.legend(custom_lines, ['Delta (Upper Bound)', 'Achieved Error Rate'], fontsize=font_size - 2)
+        plt.legend(
+            custom_lines,
+            ["Delta (Upper Bound)", "Achieved Error Rate"],
+            fontsize=font_size - 2,
+        )
 
         plt.xlabel("Delta Values", fontsize=font_size)
         plt.ylabel("Error Rate", fontsize=font_size)
@@ -618,7 +626,7 @@ def __plot_delta_accuracy(
                 va="bottom",
                 fontsize=font_size - 2,
             )
-            # Add back the delta value labels
+
             plt.text(
                 x_pos[i],
                 deltas[i] + 0.002,
@@ -629,11 +637,10 @@ def __plot_delta_accuracy(
                 color="red",
             )
 
-        # Calculate appropriate y-axis limits
         all_values = error_rates + deltas
         if all_values:
-            y_min = 0  # Start at 0 for error rates
-            y_max = max(all_values) * 1.15  # Increase top padding to 15% to accommodate labels
+            y_min = 0
+            y_max = max(all_values) * 1.15
             plt.ylim(y_min, y_max)
 
     filename = results_dir + f"/delta_accuracy_{timestamp}.pdf"

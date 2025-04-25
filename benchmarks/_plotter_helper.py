@@ -18,12 +18,12 @@ def convert_to_dataframe_from_benchmark(benchmark: "Benchmark") -> tuple:
         "latency_vectorq_list": benchmark.latency_vectorq_list,
     }
     df = pd.DataFrame(data)
-    
+
     metadata = {
         "observations_dict": benchmark.observations_dict,
-        "gammas_dict": benchmark.gammas_dict
+        "gammas_dict": benchmark.gammas_dict,
     }
-    
+
     return df, metadata
 
 
@@ -39,12 +39,12 @@ def convert_to_dataframe_from_json_file(json_data: Any) -> tuple:
         "latency_vectorq_list": json_data["latency_vectorq_list"],
     }
     df = pd.DataFrame(data)
-    
+
     metadata = {
         "observations_dict": json_data["observations_dict"],
-        "gammas_dict": json_data["gammas_dict"]
+        "gammas_dict": json_data["gammas_dict"],
     }
-    
+
     return df, metadata
 
 
