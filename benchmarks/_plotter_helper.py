@@ -163,3 +163,6 @@ def compute_cache_miss_rate_score(
     hit_rate = cache_hit_list_acc.iloc[-1]
     miss_rate = cache_miss_list_acc.iloc[-1]
     return miss_rate / (hit_rate + miss_rate)
+
+def compute_duration_score(latency_list: pd.DataFrame) -> float:
+    return latency_list.sum()

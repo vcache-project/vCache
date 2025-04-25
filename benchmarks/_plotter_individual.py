@@ -16,6 +16,12 @@ from benchmarks._plotter_helper import (
     compute_precision_acc_list,
     compute_recall_acc_list,
     convert_to_dataframe_from_benchmark,
+    compute_error_rate_score,
+    compute_accuracy_score,
+    compute_precision_score,
+    compute_recall_score,
+    compute_f1_score_score,
+    compute_duration_score,
 )
 
 if TYPE_CHECKING:
@@ -134,7 +140,6 @@ def __plot_error_rate_cache_hit_rate_duration_avg_latency(
     axes[0, 0].set_ylabel("Error Rate", fontsize=font_size)
     axes[0, 0].grid(True)
     axes[0, 0].tick_params(axis="both", labelsize=font_size - 2)
-    axes[0, 0].set_ylim(0, 1)
 
     # Plot Cache Hit Rate
     axes[0, 1].plot(sample_index, cache_hit_rate_acc_list, "g-", linewidth=2)
@@ -143,7 +148,6 @@ def __plot_error_rate_cache_hit_rate_duration_avg_latency(
     axes[0, 1].set_ylabel("Hit Rate", fontsize=font_size)
     axes[0, 1].grid(True)
     axes[0, 1].tick_params(axis="both", labelsize=font_size - 2)
-    axes[0, 1].set_ylim(0, 1)
 
     # Plot VectorQ Duration
     duration_vectorq_minutes = [d / 60.0 for d in duration_vectorq_acc_list]
@@ -224,6 +228,36 @@ def __plot_avg_latency_cache_hit_rate_cache_miss_rate(
         cache_miss_list_acc=df["cache_miss_acc_list"],
         cache_hit_list_acc=df["cache_hit_acc_list"],
     )
+    
+    error_rate_vectorq = compute_error_rate_score(
+        cache_hit_list_acc=df["cache_hit_acc_list"],
+        cache_miss_list_acc=df["cache_miss_acc_list"],
+    )
+    
+    duration_vectorq = compute_duration_score(
+        latency_list=df["latency_vectorq_list"]
+    )
+    
+    duration_direct = compute_duration_score(
+        latency_list=df["latency_direct_list"]
+    )
+    
+    accuracy_vectorq = compute_accuracy_score(
+        cache_hit_list_acc=df["cache_hit_acc_list"],
+        cache_miss_list_acc=df["cache_miss_acc_list"],
+    )
+    precision_vectorq = compute_precision_score(
+        cache_hit_list_acc=df["cache_hit_acc_list"],
+        cache_miss_list_acc=df["cache_miss_acc_list"],
+    )
+    recall_vectorq = compute_recall_score(
+        cache_hit_list_acc=df["cache_hit_acc_list"],
+        cache_miss_list_acc=df["cache_miss_acc_list"],
+    )
+    f1_score_vectorq = compute_f1_score_score(
+        cache_hit_list_acc=df["cache_hit_acc_list"],
+        cache_miss_list_acc=df["cache_miss_acc_list"],
+    )
 
     statistics = {
         "avg_latency": {
@@ -270,6 +304,17 @@ def __plot_avg_latency_cache_hit_rate_cache_miss_rate(
             "total_samples": int(len(df["latency_vectorq_list"])),
             "hits": int(df["cache_hit_acc_list"].iloc[-1]),
             "misses": int(df["cache_miss_acc_list"].iloc[-1]),
+            "error_rate": float(error_rate_vectorq),
+        },
+        "duration": {
+            "vectorq": float(duration_vectorq),
+            "direct": float(duration_direct),
+        },
+        "statistics": {
+            "accuracy": float(accuracy_vectorq),
+            "precision": float(precision_vectorq),
+            "recall": float(recall_vectorq),
+            "f1_score": float(f1_score_vectorq),
         },
     }
 

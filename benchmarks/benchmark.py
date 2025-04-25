@@ -49,7 +49,7 @@ logging.basicConfig(
 ########################################################################################################################
 
 # Benchmark Config
-MAX_SAMPLES: int = 2000
+MAX_SAMPLES: int = 20000
 CONFIDENCE_INTERVALS_ITERATIONS: int = 1
 EMBEDDING_MODEL_1 = (
     "embedding_1",
@@ -454,15 +454,15 @@ async def main():
                             await benchmark.test_run_benchmark()
                             await vectorQ.shutdown()
 
-                if THRESHOLD_TYPE == "both":
-                    generate_combined_plots(
-                        dataset=dataset,
-                        embedding_model_name=embedding_model[1],
-                        llm_model_name=llm_model[1],
-                        results_dir=results_dir,
-                        timestamp=timestamp,
-                        font_size=PLOT_FONT_SIZE,
-                    )
+                #if THRESHOLD_TYPE == "both":
+                generate_combined_plots(
+                    dataset=dataset,
+                    embedding_model_name=embedding_model[1],
+                    llm_model_name=llm_model[1],
+                    results_dir=results_dir,
+                    timestamp=timestamp,
+                    font_size=PLOT_FONT_SIZE,
+                )
 
                 end_time_llm_model = time.time()
                 logging.info(
