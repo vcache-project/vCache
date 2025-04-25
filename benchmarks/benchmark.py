@@ -12,11 +12,11 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
+from benchmarks._plotter_combined import generate_combined_plots
+from benchmarks._plotter_individual import generate_individual_plots
 from benchmarks.common.comparison import answers_have_same_meaning_static
 from vectorq.config import VectorQConfig
 from vectorq.main import VectorQ, VectorQBenchmark
-from benchmarks._plotter_individual import generate_individual_plots
-from benchmarks._plotter_combined import generate_combined_plots
 from vectorq.vectorq_core.cache.embedding_store.embedding_metadata_storage import (
     InMemoryEmbeddingMetadataStorage,
 )
@@ -49,7 +49,7 @@ logging.basicConfig(
 ########################################################################################################################
 
 # Benchmark Config
-MAX_SAMPLES: int = 20000
+MAX_SAMPLES: int = 50
 CONFIDENCE_INTERVALS_ITERATIONS: int = 1
 EMBEDDING_MODEL_1 = (
     "embedding_1",
@@ -81,8 +81,14 @@ SIMILARITY_STRATEGY = (
     "llm_judge_comparison",
 )
 
-embedding_models: List[Tuple[str, str, str, int]] = [EMBEDDING_MODEL_1, EMBEDDING_MODEL_2]
-llm_models: List[Tuple[str, str, str, int]] = [LARGE_LANGUAGE_MODEL_1, LARGE_LANGUAGE_MODEL_2]
+embedding_models: List[Tuple[str, str, str, int]] = [
+    EMBEDDING_MODEL_1,
+    EMBEDDING_MODEL_2,
+]
+llm_models: List[Tuple[str, str, str, int]] = [
+    LARGE_LANGUAGE_MODEL_1,
+    LARGE_LANGUAGE_MODEL_2,
+]
 candidate_strategy: str = SIMILARITY_STRATEGY[0]
 
 static_thresholds = np.array(
@@ -96,6 +102,7 @@ PLOT_FONT_SIZE: int = 24
 
 THRESHOLD_TYPES: List[str] = ["static", "dynamic", "both"]
 THRESHOLD_TYPE: str = THRESHOLD_TYPES[0]
+
 
 ########################################################################################################################
 ### Benchmark Class ####################################################################################################
@@ -142,7 +149,7 @@ class Benchmark(unittest.TestCase):
 
         try:
             with open(self.filepath, "rb") as file:
-                data_entries = ijson.items(file)
+                data_entries = ijson.items(file, 'item')
 
                 pbar = tqdm(total=MAX_SAMPLES, desc="Processing entries")
                 for idx, data_entry in enumerate(data_entries):
@@ -171,7 +178,7 @@ class Benchmark(unittest.TestCase):
                     latency_vectorq: float = (
                         time.time() - start_time_vectorq + emb_generation_latency
                     )
-                    
+
                     if not cache_hit:
                         latency_vectorq += llm_generation_latency
 
@@ -188,7 +195,9 @@ class Benchmark(unittest.TestCase):
                         if answers_have_same_meaning_static(
                             task, direct_answer, vectorQ_answer
                         ):
-                            self.false_negative_counter += 1  # Should've reused but didn't
+                            self.false_negative_counter += (
+                                1  # Should've reused but didn't
+                            )
                         else:
                             self.true_negative_counter += 1  # Correctly didn't reuse
 
@@ -218,7 +227,12 @@ class Benchmark(unittest.TestCase):
         self.latency_vectorq_list.append(latency_vectorq)
 
     async def get_vectorQ_answer(
-        self, data_entry: Dict, task: str, review_text: str, row_embedding: List[float], output_format: str
+        self,
+        data_entry: Dict,
+        task: str,
+        review_text: str,
+        row_embedding: List[float],
+        output_format: str,
     ):
         try:
             row_embedding = data_entry[self.embedding_model[0]]
@@ -240,7 +254,7 @@ class Benchmark(unittest.TestCase):
             row_embedding = row_embedding.tolist()
         elif isinstance(row_embedding, np.ndarray):
             row_embedding = row_embedding.tolist()
-            
+
         if isinstance(row_embedding, list):
             row_embedding = [
                 float(val) if hasattr(val, "__float__") else val
@@ -275,7 +289,9 @@ class Benchmark(unittest.TestCase):
         )
 
         for metadata_object in metadata_objects:
-            observations_dict[metadata_object.embedding_id] = metadata_object.observations
+            observations_dict[metadata_object.embedding_id] = (
+                metadata_object.observations
+            )
             gammas_dict[metadata_object.embedding_id] = metadata_object.gamma
 
         self.observations_dict = observations_dict
@@ -305,6 +321,7 @@ class Benchmark(unittest.TestCase):
         with open(filepath, "w") as json_file:
             json.dump(data, json_file, indent=4)
         print(f"Results successfully dumped to {filepath}")
+
 
 ########################################################################################################################
 ### Main ###############################################################################################################
@@ -435,7 +452,7 @@ async def main():
                         llm_model_name=llm_model[1],
                         results_dir=results_dir,
                         timestamp=timestamp,
-                        font_size=PLOT_FONT_SIZE
+                        font_size=PLOT_FONT_SIZE,
                     )
 
                 end_time_llm_model = time.time()

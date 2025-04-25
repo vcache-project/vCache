@@ -104,9 +104,7 @@ def plot_hit_rate_vs_error(
     # For new runs with multiple files per delta, compute average and confidence intervals
     if vectorq_results:
         # For each delta, compute average and append to dynamic lists
-        for delta, values in sorted(
-            vectorq_results.items(), key=lambda x: float(x[0])
-        ):
+        for delta, values in sorted(vectorq_results.items(), key=lambda x: float(x[0])):
             hit_rates = values["hit_rates"]
             error_rates = values["error_rates"]
 
@@ -346,9 +344,7 @@ def plot_precision_vs_recall(
     # For new runs with multiple files per delta, compute average and confidence intervals
     if vectorq_results:
         # For each delta, compute average and append to dynamic lists
-        for delta, values in sorted(
-            vectorq_results.items(), key=lambda x: float(x[0])
-        ):
+        for delta, values in sorted(vectorq_results.items(), key=lambda x: float(x[0])):
             precisions = values["precisions"]
             recalls = values["recalls"]
 
@@ -609,9 +605,7 @@ def plot_duration_comparison(
     dynamic_durations = []
     dynamic_rnd_ubs = []
 
-    for delta, values in sorted(
-        vectorq_results.items(), key=lambda x: float(x[0])
-    ):
+    for delta, values in sorted(vectorq_results.items(), key=lambda x: float(x[0])):
         if values["durations"]:
             avg_duration = np.mean(values["durations"])
             dynamic_durations.append(avg_duration)
@@ -772,9 +766,7 @@ def plot_duration_vs_error_rate(
 
     # For new runs with multiple files per delta, compute average
     if vectorq_results:
-        for delta, values in sorted(
-            vectorq_results.items(), key=lambda x: float(x[0])
-        ):
+        for delta, values in sorted(vectorq_results.items(), key=lambda x: float(x[0])):
             durations = values["durations"]
             error_rates = values["error_rates"]
 
@@ -1320,9 +1312,7 @@ def plot_hit_rate_vs_latency(
     # For new runs with multiple files per delta, compute average and confidence intervals
     if vectorq_results:
         # For each delta, compute average and append to dynamic lists
-        for delta, values in sorted(
-            vectorq_results.items(), key=lambda x: float(x[0])
-        ):
+        for delta, values in sorted(vectorq_results.items(), key=lambda x: float(x[0])):
             hit_rates = values["hit_rates"]
             latencies = values["latencies"]
 

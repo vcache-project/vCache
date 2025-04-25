@@ -123,7 +123,7 @@ class VectorQBayesianPolicy(VectorQPolicy):
         # 3) standard error
         se = np.sqrt(1.0 / i)
         # 4) normal quantile
-        z = norm.ppf(1 - alpha/2)
+        z = norm.ppf(1 - alpha / 2)
         delta = z * se
         lower = t_hat - delta
         upper = t_hat + delta
