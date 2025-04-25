@@ -217,62 +217,37 @@ class LLMEmbeddingBenchmark:
             
         try:
             with open(self.output_file, 'r') as f:
-                try:
-                    processed_samples = json.load(f)
-                    for sample in processed_samples:
+                for line in f:
+                    try:
+                        sample = json.loads(line)
                         if "ID" in sample:
                             processed_ids.add(sample["ID"])
-                    logger.info(f"Found {len(processed_ids)} previously processed samples")
-                except json.JSONDecodeError:
-                    logger.warning(f"Could not decode JSON from {self.output_file}. Starting from scratch.")
+                    except json.JSONDecodeError:
+                        logger.warning(f"Skipping invalid JSON line in {self.output_file}: {line.strip()}")
+                logger.info(f"Found {len(processed_ids)} previously processed samples in {self.output_file}")
+        except FileNotFoundError:
+            logger.info(f"Output file {self.output_file} not found. Starting fresh.")
         except Exception as e:
-            logger.error(f"Error loading processed samples: {e}")
+            logger.error(f"Error loading processed samples from {self.output_file}: {e}")
             
         return processed_ids
     
     @staticmethod
     def _save_result_worker(output_file, lock, result):
-        """Worker function for saving results, to be used by each process."""
+        """Worker function for saving results by appending to a JSON Lines file."""
         with lock:
             try:
-                # Create a temp file to avoid corruption if the process is interrupted while writing
-                temp_dir = os.path.dirname(output_file)
-                with tempfile.NamedTemporaryFile(mode='w', dir=temp_dir, delete=False) as temp_file:
-                    temp_path = temp_file.name
-                    
-                    if os.path.exists(output_file) and os.path.getsize(output_file) > 0:
-                        # File exists and has content, read existing results
-                        with open(output_file, 'r') as f:
-                            try:
-                                results = json.load(f)
-                            except json.JSONDecodeError:
-                                logger.warning(f"Could not decode JSON from {output_file}. Creating new results array.")
-                                results = []
-                    else:
-                        # File doesn't exist or is empty
-                        results = []
-                    
-                    # Append the new result
-                    results.append(result)
-                    
-                    # Write to temp file
-                    json.dump(results, temp_file, indent=2)
-                    
-                    # Ensure data is written to disk
-                    temp_file.flush()
-                    os.fsync(temp_file.fileno())
-                
-                # Atomically replace the output file with the temp file
-                os.replace(temp_path, output_file)
+                # Convert result to JSON string
+                json_string = json.dumps(result)
+
+                # Append the JSON string as a new line
+                with open(output_file, 'a') as f:
+                    f.write(json_string + '\n')
+                    f.flush()  # Ensure it's written to disk immediately
+                    os.fsync(f.fileno()) # Force write to disk
                 return True
             except Exception as e:
-                logger.error(f"Error saving result: {e}")
-                # Try to clean up the temp file
-                try:
-                    if 'temp_path' in locals():
-                        os.remove(temp_path)
-                except:
-                    pass
+                logger.error(f"Error saving result to {output_file}: {e}")
                 return False
     
     def process_sample_for_mp(self, sample, lock, processed_counter, processed_ids_dict, total_count):
@@ -315,6 +290,42 @@ class LLMEmbeddingBenchmark:
                 last_value = current_value
             time.sleep(0.1)  # Small sleep to avoid CPU hogging
     
+    def _convert_json_to_jsonl(self, file_path: str):
+        """Converts a file containing a JSON array to JSON Lines format."""
+        logger.info(f"Converting existing JSON file {file_path} to JSON Lines format...")
+        try:
+            with open(file_path, 'r') as f:
+                data = json.load(f)
+
+            if not isinstance(data, list):
+                logger.warning(f"File {file_path} is not a JSON array. Skipping conversion.")
+                return
+
+            # Write to a temporary file first
+            temp_dir = os.path.dirname(file_path)
+            with tempfile.NamedTemporaryFile(mode='w', dir=temp_dir, delete=False, suffix=".jsonl") as temp_f:
+                temp_path = temp_f.name
+                for item in data:
+                    temp_f.write(json.dumps(item) + '\n')
+                temp_f.flush()
+                os.fsync(temp_f.fileno())
+
+            # Replace original file with the converted temp file
+            os.replace(temp_path, file_path)
+            logger.info(f"Successfully converted {file_path} to JSON Lines format.")
+
+        except json.JSONDecodeError:
+            logger.warning(f"File {file_path} is not valid JSON. Assuming it might already be JSON Lines or corrupted. Skipping conversion.")
+        except Exception as e:
+            logger.error(f"Error converting {file_path} to JSON Lines: {e}")
+            # Attempt to clean up temp file if it exists
+            if 'temp_path' in locals() and os.path.exists(temp_path):
+                try:
+                    os.remove(temp_path)
+                except OSError:
+                    pass
+            raise  # Re-raise the exception
+
     def run_benchmark(self):
         """Run the benchmark to fill in missing fields in the dataset."""
         try:
@@ -337,20 +348,38 @@ class LLMEmbeddingBenchmark:
             # Create output directory if it doesn't exist
             os.makedirs(os.path.dirname(os.path.abspath(self.output_file)), exist_ok=True)
             
-            # Initialize output file with an empty JSON array if it doesn't exist
-            if not os.path.exists(self.output_file):
-                with open(self.output_file, 'w') as f:
-                    json.dump([], f)
+            # Output file is appended to, so no initial '[]' needed.
+            # Just ensure the file exists if we are not resuming or it's empty.
+            if not self.resume and (not os.path.exists(self.output_file) or os.path.getsize(self.output_file) == 0):
+                 # Create the file if it doesn't exist to avoid FileNotFoundError later
+                 open(self.output_file, 'a').close()
             
             # Set up multiprocessing shared objects
             manager = Manager()
-            # Use a dict to simulate a set since Manager doesn't have a set() method
             processed_ids_dict = manager.dict()
             lock = manager.Lock()
             processed_counter = manager.Value('i', 0)
             
             # Load already processed samples for resuming
             if self.resume:
+                # Check if output file exists and needs conversion from JSON array to JSON Lines
+                if os.path.exists(self.output_file) and os.path.getsize(self.output_file) > 0:
+                    try:
+                        with open(self.output_file, 'r') as f:
+                            # Check the first non-whitespace character
+                            first_char = ""
+                            for line in f:
+                                stripped_line = line.strip()
+                                if stripped_line:
+                                    first_char = stripped_line[0]
+                                    break
+                        if first_char == '[':
+                            self._convert_json_to_jsonl(self.output_file)
+                    except Exception as e:
+                         logger.error(f"Error checking or converting output file {self.output_file}: {e}")
+                         # Decide how to proceed - perhaps halt or try to continue assuming JSONL
+                         logger.warning("Attempting to proceed assuming JSON Lines format despite error during check/conversion.")
+
                 for id in self.load_processed_samples():
                     processed_ids_dict[id] = True
                 pending_count = len(data) - len(processed_ids_dict)
@@ -424,7 +453,7 @@ def parse_arguments():
     parser.add_argument("--input", type=str, required=True, 
                         help="Path to input JSON file containing partial samples")
     parser.add_argument("--output", type=str, 
-                        help="Path to output JSON file (default: input_filled_TIMESTAMP.json)")
+                        help="Path to output JSON file (default: input_filled_TIMESTAMP.jsonl)")
     parser.add_argument("--api-key", type=str, 
                         help="OpenAI API key (if not set as environment variable)")
     parser.add_argument("--max-samples", type=int, 
@@ -449,7 +478,8 @@ def main():
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         input_basename = os.path.basename(args.input)
         input_name = os.path.splitext(input_basename)[0]
-        args.output = f"{input_name}_filled_{timestamp}.json"
+        # Default to .jsonl extension
+        args.output = f"{input_name}_filled_{timestamp}.jsonl"
     
     # Create benchmark and run
     benchmark = LLMEmbeddingBenchmark(
