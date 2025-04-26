@@ -1,4 +1,3 @@
-import asyncio
 import json
 import logging
 import os
@@ -99,11 +98,10 @@ llm_models: List[Tuple[str, str, str, int]] = [
 ]
 candidate_strategy: str = SIMILARITY_STRATEGY[0]
 
-# static_thresholds = np.array(
-#     [0.74, 0.76, 0.78, 0.8, 0.825, 0.85, 0.875, 0.9, 0.92, 0.94, 0.96]
-# )
-static_thresholds = np.array([0.7, 0.9])
-deltas = np.array([0.1, 0.2]) #np.array([0.025, 0.05, 0.075, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35])
+static_thresholds = np.array(
+    [0.74, 0.76, 0.78, 0.8, 0.825, 0.85, 0.875, 0.9, 0.92, 0.94, 0.96]
+)
+deltas = np.array([0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1])
 
 # VectorQ Config
 MAX_VECTOR_DB_CAPACITY: int = 100000
@@ -144,7 +142,7 @@ class Benchmark(unittest.TestCase):
         if self.output_folder_path and not os.path.exists(self.output_folder_path):
             os.makedirs(self.output_folder_path)
 
-    async def test_run_benchmark(self):
+    def test_run_benchmark(self):
         if not self.filepath or not self.embedding_model or not self.llm_model:
             raise ValueError(
                 f"Required parameters not set: filepath: {self.filepath}, embedding_model: {self.embedding_model}, or llm_model: {self.llm_model}"
@@ -172,23 +170,24 @@ class Benchmark(unittest.TestCase):
                     )
 
                     # 2.1) Direct Inference (No Cache)
-                    direct_answer: str = data_entry[self.llm_model[0]]
+                    label_response: str = data_entry[self.llm_model[0]]
                     latency_direct: float = llm_generation_latency
 
                     # 2.2) VectorQ Inference (With Cache)
                     row_embedding: List[float] = data_entry[self.embedding_model[0]]
-                    vectorQ_answer, cache_hit, latency_vectorq_logic = await self.get_vectorQ_answer(
+                    is_cache_hit, actual_response, nn_response, latency_vectorq_logic = self.get_vectorQ_answer(
                         data_entry, task, review_text, row_embedding, output_format
                     )
                     latency_vectorq: float = latency_vectorq_logic + emb_generation_latency
-                    if not cache_hit:
+                    if not is_cache_hit:
                         latency_vectorq += llm_generation_latency
 
                     # 3) Update Stats
-                    responses_match = answers_have_same_meaning_static(task, direct_answer, vectorQ_answer)
                     self.update_stats(
-                        is_cache_hit=cache_hit,
-                        responses_match=responses_match,
+                        is_cache_hit=is_cache_hit,
+                        label_response=label_response,
+                        actual_response=actual_response,
+                        nn_response=nn_response,
                         latency_direct=latency_direct,
                         latency_vectorq=latency_vectorq,
                     )
@@ -207,26 +206,25 @@ class Benchmark(unittest.TestCase):
     ########################################################################################################################
     ### Class Helper Functions #############################################################################################
     ########################################################################################################################
-    def update_stats(self, is_cache_hit: bool, responses_match: bool, latency_direct: float, latency_vectorq: float):
-        if is_cache_hit:
-            self.cache_hit_list.append(1)
-            self.cache_miss_list.append(0)
-            if responses_match:
-                self.tp_list.append(1)  # Correctly reused
+    def update_stats(self, is_cache_hit: bool, label_response: str, actual_response: str, nn_response: str, latency_direct: float, latency_vectorq: float):
+        
+        if is_cache_hit: # If cache hit, the actual response is the nearest neighbor response (actual_response == nn_response)
+            actual_response_correct: bool = answers_have_same_meaning_static(label_response, actual_response)
+            if actual_response_correct:
+                self.tp_list.append(1)
                 self.fp_list.append(0)
             else:
-                self.fp_list.append(1)  # Incorrectly reused
+                self.fp_list.append(1)
                 self.tp_list.append(0)
-            self.tn_list.append(0)
             self.fn_list.append(0)
-        else:
-            self.cache_miss_list.append(1)
-            self.cache_hit_list.append(0)
-            if responses_match:
-                self.fn_list.append(1)  # Should've reused but didn't
+            self.tn_list.append(0)
+        else: # If cache miss, the actual response is the label response 
+            nn_response_correct: bool = answers_have_same_meaning_static(label_response, nn_response)
+            if nn_response_correct:
+                self.fn_list.append(1)
                 self.tn_list.append(0)
             else:
-                self.tn_list.append(1)  # Correctly didn't reuse
+                self.tn_list.append(1)
                 self.fn_list.append(0)
             self.tp_list.append(0)
             self.fp_list.append(0)
@@ -234,14 +232,17 @@ class Benchmark(unittest.TestCase):
         self.latency_direct_list.append(latency_direct)
         self.latency_vectorq_list.append(latency_vectorq)
 
-    async def get_vectorQ_answer(
+    def get_vectorQ_answer(
         self,
         data_entry: Dict,
         task: str,
         review_text: str,
         row_embedding: List[float],
         output_format: str,
-    ):
+    ) -> Tuple[bool, str, str, float]:
+        """
+        Returns: Tuple[bool, str, str, float] - [is_cache_hit, actual_response, nn_response, latency_vectorq_logic]
+        """
         try:
             row_embedding = data_entry[self.embedding_model[0]]
         except json.JSONDecodeError as e:
@@ -277,7 +278,7 @@ class Benchmark(unittest.TestCase):
         latency_vectorq_logic: float = time.time()
         try:
             
-            vectorQ_response, cache_hit = await self.vectorq.create(
+            is_cache_hit, actual_response, nn_response = self.vectorq.create(
                 prompt=vectorQ_prompt,
                 output_format=output_format,
                 benchmark=vectorQ_benchmark,
@@ -289,7 +290,7 @@ class Benchmark(unittest.TestCase):
             raise e
 
         latency_vectorq_logic = time.time() - latency_vectorq_logic
-        return vectorQ_response, cache_hit, latency_vectorq_logic
+        return is_cache_hit, actual_response, nn_response, latency_vectorq_logic
 
     def dump_results_to_json(self):
         observations_dict = {}
@@ -339,7 +340,7 @@ class Benchmark(unittest.TestCase):
 ########################################################################################################################
 
 
-async def main():
+def main():
     benchmarks_dir = os.path.dirname(os.path.abspath(__file__))
     datasets_dir = os.path.join(benchmarks_dir, "data", "large_scale")
     if not os.path.exists(datasets_dir):
@@ -372,47 +373,7 @@ async def main():
                     f"Running benchmark for dataset: {dataset}, embedding model: {embedding_model[1]}, LLM model: {llm_model[1]}\n"
                 )
                 start_time_llm_model = time.time()
-
-                # Static thresholds
-                if THRESHOLD_TYPE in ["static", "both"]:
-                    for threshold in static_thresholds:
-                        print(f"Using static threshold: {threshold}")
-
-                        config = VectorQConfig(
-                            enable_cache=True,
-                            is_static_threshold=True,
-                            static_threshold=threshold,
-                            vector_db=HNSWLibVectorDB(
-                                similarity_metric_type=SimilarityMetricType.COSINE,
-                                max_capacity=MAX_VECTOR_DB_CAPACITY,
-                            ),
-                            embedding_metadata_storage=InMemoryEmbeddingMetadataStorage(),
-                            similarity_evaluator=StringComparisonSimilarityEvaluator(),
-                        )
-                        vectorQ: VectorQ = VectorQ(config)
-
-                        benchmark = Benchmark(vectorQ)
-                        # Set required parameters
-                        benchmark.filepath = dataset_file
-                        benchmark.embedding_model = embedding_model
-                        benchmark.llm_model = llm_model
-                        benchmark.timestamp = timestamp
-                        benchmark.threshold = threshold
-                        benchmark.delta = -1
-                        benchmark.is_static_threshold = True
-                        benchmark.output_folder_path = os.path.join(
-                            results_dir,
-                            dataset,
-                            embedding_model[1],
-                            llm_model[1],
-                            f"static_{threshold}",
-                        )
-
-                        # Run the benchmark
-                        benchmark.stats_set_up()
-                        await benchmark.test_run_benchmark()
-                        await vectorQ.shutdown()
-
+                
                 # Dynamic thresholds (VectorQ)
                 if THRESHOLD_TYPE in ["dynamic", "both"]:
                     for delta in deltas:
@@ -453,8 +414,46 @@ async def main():
 
                             # Run the benchmark
                             benchmark.stats_set_up()
-                            await benchmark.test_run_benchmark()
-                            await vectorQ.shutdown()
+                            benchmark.test_run_benchmark()
+
+                # Static thresholds
+                if THRESHOLD_TYPE in ["static", "both"]:
+                    for threshold in static_thresholds:
+                        print(f"Using static threshold: {threshold}")
+
+                        config = VectorQConfig(
+                            enable_cache=True,
+                            is_static_threshold=True,
+                            static_threshold=threshold,
+                            vector_db=HNSWLibVectorDB(
+                                similarity_metric_type=SimilarityMetricType.COSINE,
+                                max_capacity=MAX_VECTOR_DB_CAPACITY,
+                            ),
+                            embedding_metadata_storage=InMemoryEmbeddingMetadataStorage(),
+                            similarity_evaluator=StringComparisonSimilarityEvaluator(),
+                        )
+                        vectorQ: VectorQ = VectorQ(config)
+
+                        benchmark = Benchmark(vectorQ)
+                        # Set required parameters
+                        benchmark.filepath = dataset_file
+                        benchmark.embedding_model = embedding_model
+                        benchmark.llm_model = llm_model
+                        benchmark.timestamp = timestamp
+                        benchmark.threshold = threshold
+                        benchmark.delta = -1
+                        benchmark.is_static_threshold = True
+                        benchmark.output_folder_path = os.path.join(
+                            results_dir,
+                            dataset,
+                            embedding_model[1],
+                            llm_model[1],
+                            f"static_{threshold}",
+                        )
+
+                        # Run the benchmark
+                        benchmark.stats_set_up()
+                        benchmark.test_run_benchmark()
 
                 if THRESHOLD_TYPE == "both":
                     generate_combined_plots(
@@ -483,4 +482,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

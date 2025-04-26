@@ -1,4 +1,4 @@
-def answers_have_same_meaning_static(question, answer_a, answer_b, threshold=0.88):
+def answers_have_same_meaning_static(answer_a, answer_b):
     answer_a = (
         str(answer_a)
         .strip()

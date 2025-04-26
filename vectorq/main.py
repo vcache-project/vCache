@@ -1,4 +1,3 @@
-import asyncio
 from typing import List, Tuple, Dict
 
 from vectorq.config import VectorQConfig
@@ -23,69 +22,30 @@ class VectorQ:
 
     def __init__(self, vectorq_config=VectorQConfig()):
         self.vectorq_config = vectorq_config
-        self.request_queue = asyncio.Queue()
-        self.queue_processor_task = None
-        self.running = False
 
         try:
             self.inference_engine = self.vectorq_config.inference_engine
             self.core = VectorQCore(vectorq_config=vectorq_config)
-            self.start_queue_processor()
         except Exception as e:
             print(f"Error initializing VectorQ: {e}")
             raise Exception(f"Error initializing VectorQ: {e}")
 
-    def start_queue_processor(self):
-        self.running = True
-        self.queue_processor_task = asyncio.create_task(self._process_request_queue())
-
-    async def _process_request_queue(self):
-        while self.running:
-            try:
-                request = await self.request_queue.get()
-
-                prompt: str = request["prompt"]
-                output_format: str = request["output_format"]
-                benchmark: VectorQBenchmark = request["benchmark"]
-                future: asyncio.Future = request["future"]
-
-                try:
-                    if self.vectorq_config.enable_cache:
-                        cache_hit, response = self.core.process_request(
-                            prompt, benchmark, output_format
-                        )
-                        future.set_result((response, cache_hit))
-                    else:
-                        response = self.inference_engine.create(prompt, output_format)
-                        future.set_result((response, False))
-                except Exception:
-                    future.set_result((f"[ERROR] Failed to process: {prompt}", False))
-
-                self.request_queue.task_done()
-            except asyncio.CancelledError:
-                break
-            except Exception as e:
-                print(f"Error in queue processor: {e}")
-                continue
-
-    async def create(
+    def create(
         self, prompt: str, output_format: str = None, benchmark: VectorQBenchmark = None
-    ) -> Tuple[str, bool]:
+    ) -> Tuple[bool, str, str]:
         """
         prompt: str - The prompt to create a response for.
         benchmark: VectorQBenchmark - The optional benchmark object containing the pre-computed embedding and response.
-        Returns: Tuple[str, bool] - The response to the prompt and whether the response was cached.
+        Returns: Tuple[bool, str, str] - [is_cache_hit, actual_response, nn_response] (the actual response is the one supposed to be used by the user, the nn_response is for benchmarking purposes)
         """
-        future: asyncio.Future = asyncio.Future()
-        request: Dict = {
-            "prompt": prompt,
-            "output_format": output_format,
-            "benchmark": benchmark,
-            "future": future,
-        }
-        await self.request_queue.put(request)
-
-        return await future
+        if self.vectorq_config.enable_cache:
+            is_cache_hit, actual_response, nn_response = self.core.process_request(
+                prompt, benchmark, output_format
+            )
+            return is_cache_hit, actual_response, nn_response
+        else:
+            response = self.inference_engine.create(prompt, output_format)
+            return False, response, response
 
     def import_data(self, data: List[str]) -> bool:
         # TODO
@@ -102,12 +62,3 @@ class VectorQ:
     def get_inference_engine(self) -> InferenceEngine:
         # TODO
         return self.inference_engine
-
-    async def shutdown(self):
-        if self.queue_processor_task:
-            self.running = False
-            self.queue_processor_task.cancel()
-            try:
-                await self.queue_processor_task
-            except asyncio.CancelledError:
-                pass
