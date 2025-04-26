@@ -5,22 +5,22 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 from benchmarks._plotter_helper import (
-    convert_to_dataframe_from_benchmark,
     compute_accuracy_cumulative_list,
     compute_accuracy_score,
-    compute_precision_cumulative_list,
-    compute_precision_score,
-    compute_recall_cumulative_list,
-    compute_recall_score,
-    compute_f1_score_cumulative_list,
-    compute_f1_score_score,
-    compute_error_rate_cumulative_list,
-    compute_error_rate_score,
+    compute_avg_latency_score,
     compute_cache_hit_rate_cumulative_list,
     compute_cache_hit_rate_score,
     compute_duration_cumulative_list,
     compute_duration_score,
-    compute_avg_latency_score,
+    compute_error_rate_cumulative_list,
+    compute_error_rate_score,
+    compute_f1_score_cumulative_list,
+    compute_f1_score_score,
+    compute_precision_cumulative_list,
+    compute_precision_score,
+    compute_recall_cumulative_list,
+    compute_recall_score,
+    convert_to_dataframe_from_benchmark,
 )
 
 if TYPE_CHECKING:
@@ -136,21 +136,24 @@ def __plot_error_rate_cache_hit_rate_duration_avg_latency(
     axes[0, 1].grid(True)
     axes[0, 1].tick_params(axis="both", labelsize=font_size - 2)
 
-    # Plot VectorQ Duration
+    # Plot VectorQ and DirectDuration
     duration_vectorq_minutes = [d / 60.0 for d in duration_vectorq_acc_list]
-    axes[1, 0].plot(sample_index, duration_vectorq_minutes, "b-", linewidth=2)
-    axes[1, 0].set_title("VectorQ Cumulative Duration", fontsize=font_size)
+    duration_direct_minutes = [d / 60.0 for d in duration_direct_acc_list]
+    axes[1, 0].plot(sample_index, duration_vectorq_minutes, "b-", linewidth=2, label="VectorQ")
+    axes[1, 0].plot(sample_index, duration_direct_minutes, "m-", linewidth=2, label="Direct")
+    axes[1, 0].set_title("Duration Comparison", fontsize=font_size)
     axes[1, 0].set_xlabel("Samples", fontsize=font_size)
     axes[1, 0].set_ylabel("Duration (min)", fontsize=font_size)
     axes[1, 0].grid(True)
     axes[1, 0].tick_params(axis="both", labelsize=font_size - 2)
+    axes[1, 0].legend(fontsize=font_size - 2)
 
-    # Plot Direct Duration
-    duration_direct_minutes = [d / 60.0 for d in duration_direct_acc_list]
-    axes[1, 1].plot(sample_index, duration_direct_minutes, "m-", linewidth=2)
-    axes[1, 1].set_title("Direct Cumulative Duration", fontsize=font_size)
+    # Plot VectorQ and Direct Latency
+    axes[1, 1].plot(sample_index, df["latency_vectorq_list"], "b-", linewidth=2, label="VectorQ")
+    axes[1, 1].plot(sample_index, df["latency_direct_list"], "m-", linewidth=2, label="Direct")
+    axes[1, 1].set_title("Latency Comparison", fontsize=font_size)
     axes[1, 1].set_xlabel("Samples", fontsize=font_size)
-    axes[1, 1].set_ylabel("Duration (min)", fontsize=font_size)
+    axes[1, 1].set_ylabel("Latency (s)", fontsize=font_size)
     axes[1, 1].grid(True)
     axes[1, 1].tick_params(axis="both", labelsize=font_size - 2)
 

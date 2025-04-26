@@ -209,6 +209,8 @@ class Benchmark(unittest.TestCase):
     def update_stats(self, is_cache_hit: bool, label_response: str, actual_response: str, nn_response: str, latency_direct: float, latency_vectorq: float):
         
         if is_cache_hit: # If cache hit, the actual response is the nearest neighbor response (actual_response == nn_response)
+            self.cache_hit_list.append(1)
+            self.cache_miss_list.append(0)
             actual_response_correct: bool = answers_have_same_meaning_static(label_response, actual_response)
             if actual_response_correct:
                 self.tp_list.append(1)
@@ -219,6 +221,8 @@ class Benchmark(unittest.TestCase):
             self.fn_list.append(0)
             self.tn_list.append(0)
         else: # If cache miss, the actual response is the label response 
+            self.cache_miss_list.append(1)
+            self.cache_hit_list.append(0)
             nn_response_correct: bool = answers_have_same_meaning_static(label_response, nn_response)
             if nn_response_correct:
                 self.fn_list.append(1)
