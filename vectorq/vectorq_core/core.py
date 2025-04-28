@@ -89,7 +89,7 @@ class VectorQCore:
                 prompt=prompt, benchmark=benchmark, output_format=output_format
             )
             self.__add(prompt=prompt, response=response, benchmark=benchmark)
-            return False, response, response
+            return False, response, ""
         else:
             knn: List[tuple[float, int]] = self.cache.get_knn(
                 prompt=prompt, k=1, benchmark=benchmark
@@ -110,12 +110,14 @@ class VectorQCore:
                     a=response, b=metadata_obj.response
                 )
                 if should_have_exploited:
+                    # TODO: Update policy directly in metadata object
                     self.vectorq_policy.update_policy(
                         similarity_score=similarity_score,
                         is_correct=True,
                         metadata=metadata_obj,
                     )
                 else:
+                    # TODO: Update policy directly in metadata object
                     self.vectorq_policy.update_policy(
                         similarity_score=similarity_score,
                         is_correct=False,

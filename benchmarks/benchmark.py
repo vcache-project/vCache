@@ -48,7 +48,7 @@ logging.basicConfig(
 ########################################################################################################################
 
 # Benchmark Config
-MAX_SAMPLES: int = 200
+MAX_SAMPLES: int = 45000
 CONFIDENCE_INTERVALS_ITERATIONS: int = 1
 EMBEDDING_MODEL_1 = (
     "embedding_1",
@@ -99,16 +99,16 @@ llm_models: List[Tuple[str, str, str, int]] = [
 candidate_strategy: str = SIMILARITY_STRATEGY[0]
 
 static_thresholds = np.array(
-    [0.74, 0.76, 0.78, 0.8, 0.825, 0.85, 0.875, 0.9, 0.92, 0.94, 0.96]
+    [0.76, 0.78, 0.80, 0.82, 0.84, 0.86, 0.88, 0.90, 0.92, 0.94, 0.96]
 )
-deltas = np.array([0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1])
+deltas = np.array([0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.11, 0.12])
 
 # VectorQ Config
 MAX_VECTOR_DB_CAPACITY: int = 100000
 PLOT_FONT_SIZE: int = 24
 
 THRESHOLD_TYPES: List[str] = ["static", "dynamic", "both"]
-THRESHOLD_TYPE: str = THRESHOLD_TYPES[2]
+THRESHOLD_TYPE: str = THRESHOLD_TYPES[1]
 
 
 ########################################################################################################################
@@ -174,9 +174,13 @@ class Benchmark(unittest.TestCase):
                     latency_direct: float = llm_generation_latency
 
                     # 2.2) VectorQ Inference (With Cache)
-                    row_embedding: List[float] = data_entry[self.embedding_model[0]]
-                    is_cache_hit, actual_response, nn_response, latency_vectorq_logic = self.get_vectorQ_answer(
-                        data_entry, task, review_text, row_embedding, output_format
+                    candidate_embedding: List[float] = data_entry[self.embedding_model[0]]
+                    is_cache_hit, cache_response, nn_response, latency_vectorq_logic = self.get_vectorQ_answer(
+                        task=task,
+                        review_text=review_text,
+                        candidate_embedding=candidate_embedding,
+                        label_response=label_response,
+                        output_format=output_format,
                     )
                     latency_vectorq: float = latency_vectorq_logic + emb_generation_latency
                     if not is_cache_hit:
@@ -186,7 +190,7 @@ class Benchmark(unittest.TestCase):
                     self.update_stats(
                         is_cache_hit=is_cache_hit,
                         label_response=label_response,
-                        actual_response=actual_response,
+                        cache_response=cache_response,
                         nn_response=nn_response,
                         latency_direct=latency_direct,
                         latency_vectorq=latency_vectorq,
@@ -206,13 +210,13 @@ class Benchmark(unittest.TestCase):
     ########################################################################################################################
     ### Class Helper Functions #############################################################################################
     ########################################################################################################################
-    def update_stats(self, is_cache_hit: bool, label_response: str, actual_response: str, nn_response: str, latency_direct: float, latency_vectorq: float):
+    def update_stats(self, is_cache_hit: bool, label_response: str, cache_response: str, nn_response: str, latency_direct: float, latency_vectorq: float):
         
-        if is_cache_hit: # If cache hit, the actual response is the nearest neighbor response (actual_response == nn_response)
+        if is_cache_hit: # If cache hit, the actual response is the nearest neighbor response (cache_response == nn_response)
             self.cache_hit_list.append(1)
             self.cache_miss_list.append(0)
-            actual_response_correct: bool = answers_have_same_meaning_static(label_response, actual_response)
-            if actual_response_correct:
+            cache_response_correct: bool = answers_have_same_meaning_static(label_response, cache_response)
+            if cache_response_correct:
                 self.tp_list.append(1)
                 self.fp_list.append(0)
             else:
@@ -238,51 +242,34 @@ class Benchmark(unittest.TestCase):
 
     def get_vectorQ_answer(
         self,
-        data_entry: Dict,
         task: str,
         review_text: str,
-        row_embedding: List[float],
+        candidate_embedding: List[float],
+        label_response: str,
         output_format: str,
     ) -> Tuple[bool, str, str, float]:
         """
-        Returns: Tuple[bool, str, str, float] - [is_cache_hit, actual_response, nn_response, latency_vectorq_logic]
+        Returns: Tuple[bool, str, str, float] - [is_cache_hit, cache_response, nn_response, latency_vectorq_logic]
         """
-        try:
-            row_embedding = data_entry[self.embedding_model[0]]
-        except json.JSONDecodeError as e:
-            logging.error(
-                f"Could not find embedding in the dataset for {self.embedding_model[0]}"
-            )
-            raise e
+        if isinstance(candidate_embedding, torch.Tensor):
+            candidate_embedding = candidate_embedding.tolist()
+        elif isinstance(candidate_embedding, np.ndarray):
+            candidate_embedding = candidate_embedding.tolist()
 
-        try:
-            candidate_response = data_entry[self.llm_model[0]]
-        except json.JSONDecodeError as e:
-            logging.error(
-                f"Could not find LLM response in the dataset for {self.llm_model[0]}"
-            )
-            raise e
-
-        if isinstance(row_embedding, torch.Tensor):
-            row_embedding = row_embedding.tolist()
-        elif isinstance(row_embedding, np.ndarray):
-            row_embedding = row_embedding.tolist()
-
-        if isinstance(row_embedding, list):
-            row_embedding = [
+        if isinstance(candidate_embedding, list):
+            candidate_embedding = [
                 float(val) if hasattr(val, "__float__") else val
-                for val in row_embedding
+                for val in candidate_embedding
             ]
 
         vectorQ_benchmark = VectorQBenchmark(
-            candidate_embedding=row_embedding, candidate_response=candidate_response
+            candidate_embedding=candidate_embedding, candidate_response=label_response
         )
 
         vectorQ_prompt = f"{task} {review_text}"
         latency_vectorq_logic: float = time.time()
         try:
-            
-            is_cache_hit, actual_response, nn_response = self.vectorq.create(
+            is_cache_hit, cache_response, nn_response = self.vectorq.create(
                 prompt=vectorQ_prompt,
                 output_format=output_format,
                 benchmark=vectorQ_benchmark,
@@ -294,7 +281,7 @@ class Benchmark(unittest.TestCase):
             raise e
 
         latency_vectorq_logic = time.time() - latency_vectorq_logic
-        return is_cache_hit, actual_response, nn_response, latency_vectorq_logic
+        return is_cache_hit, cache_response, nn_response, latency_vectorq_logic
 
     def dump_results_to_json(self):
         observations_dict = {}
