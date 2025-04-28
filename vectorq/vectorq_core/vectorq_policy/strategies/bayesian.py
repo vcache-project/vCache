@@ -183,8 +183,10 @@ class VectorQBayesianPolicy(VectorQPolicy):
         if i <= 0:
             # no information ⇒ infinite‐width interval
             return -inf, inf
+        variance = 1.0 / i
+        #variance = variance / 8.0
         # 3) standard error
-        se = np.sqrt(1.0 / i)
+        se = np.sqrt(variance)
         # 4) normal quantile
         z = norm.ppf(1 - alpha / 2)
         delta = z * se

@@ -48,11 +48,7 @@ logging.basicConfig(
 ########################################################################################################################
 
 # Benchmark Config
-<<<<<<< HEAD
-MAX_SAMPLES: int = 45000
-=======
-MAX_SAMPLES: int = 25000
->>>>>>> d0ea8e7dfc62420da6168973d96de276d254c7c9
+MAX_SAMPLES: int = 10000
 CONFIDENCE_INTERVALS_ITERATIONS: int = 1
 EMBEDDING_MODEL_1 = (
     "embedding_1",
