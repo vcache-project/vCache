@@ -48,7 +48,11 @@ logging.basicConfig(
 ########################################################################################################################
 
 # Benchmark Config
+<<<<<<< HEAD
 MAX_SAMPLES: int = 45000
+=======
+MAX_SAMPLES: int = 25000
+>>>>>>> d0ea8e7dfc62420da6168973d96de276d254c7c9
 CONFIDENCE_INTERVALS_ITERATIONS: int = 1
 EMBEDDING_MODEL_1 = (
     "embedding_1",
@@ -86,7 +90,7 @@ DATASETS: List[str] = [
     "ecommerce_dataset.json",
     "semantic_prompt_cache_benchmark.json",
 ]
-DATASETS_TO_EXCLUDE: List[str] = [DATASETS[1]]
+DATASETS_TO_EXCLUDE: List[str] = [DATASETS[0], DATASETS[1], DATASETS[2]]
 
 embedding_models: List[Tuple[str, str, str, int]] = [
     EMBEDDING_MODEL_1,
@@ -286,6 +290,7 @@ class Benchmark(unittest.TestCase):
     def dump_results_to_json(self):
         observations_dict = {}
         gammas_dict = {}
+        t_hats_dict = {}
 
         metadata_objects: List[EmbeddingMetadataObj] = (
             self.vectorq.core.cache.get_all_embedding_metadata_objects()
@@ -296,9 +301,11 @@ class Benchmark(unittest.TestCase):
                 metadata_object.observations
             )
             gammas_dict[metadata_object.embedding_id] = metadata_object.gamma
+            t_hats_dict[metadata_object.embedding_id] = metadata_object.t_hat
 
         self.observations_dict = observations_dict
         self.gammas_dict = gammas_dict
+        self.t_hats_dict = t_hats_dict
 
         data = {
             "config": {
@@ -318,6 +325,7 @@ class Benchmark(unittest.TestCase):
             "latency_vectorq_list": self.latency_vectorq_list,
             "observations_dict": self.observations_dict,
             "gammas_dict": self.gammas_dict,
+            "t_hats_dict": self.t_hats_dict,
         }
 
         filepath = self.output_folder_path + f"/results_{self.timestamp}.json"
