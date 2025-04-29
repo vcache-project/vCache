@@ -61,6 +61,7 @@ class VectorQBayesianPolicy(VectorQPolicy):
         Returns
             Action - Explore or Exploit
         """
+        similarity_score = round(similarity_score, 3)
         similarities: np.ndarray = np.array([obs[0] for obs in metadata.observations])
         labels: np.ndarray = np.array([obs[1] for obs in metadata.observations])
 
@@ -73,8 +74,7 @@ class VectorQBayesianPolicy(VectorQPolicy):
         )
         end_time_parameter_estimation = time.time()
         sorted_observations = sorted(metadata.observations, key=lambda x: x[0])
-        logging.info(f"Embedding {metadata.embedding_id} | Observations: {sorted_observations}")
-        logging.info(f"Duration para estimation: {(time.time() - start_time):.4f} sec")
+        logging.info(f"Embedding {metadata.embedding_id} | similarity: {similarity_score} | Observations: {sorted_observations}")
         if t_hat == -1:
             return Action.EXPLORE
         metadata.gamma = gamma
@@ -134,7 +134,7 @@ class VectorQBayesianPolicy(VectorQPolicy):
             perfect_seperation = np.min(similarities_col[labels == 1]) > np.max(similarities_col[labels == 0])
             var_t = self._get_var_t(perfect_seperation=perfect_seperation, n_observations=len(similarities), X=similarities, gamma=gamma, intercept=intercept)
             
-            return round(t_hat, 3), round(gamma, 3), round(var_t, 3)
+            return round(t_hat, 3), round(gamma, 3), round(var_t, 4)
 
         except Exception as e:
             print(f"Logistic regression failed: {e}")
@@ -147,6 +147,7 @@ class VectorQBayesianPolicy(VectorQPolicy):
             else:
                 max_observations = max(self.variance_map.keys())
                 var_t = self.variance_map[max_observations]
+            logging.info(f"var_t (map): {round(var_t, 4)}")
             return var_t
         else:
         
@@ -155,8 +156,9 @@ class VectorQBayesianPolicy(VectorQPolicy):
             W = p * (1 - p)                         # shape (n_samples,)
             H = X.T @ (W[:, None] * X)            # shape (2,2)
             
-            ridge = 1e-6 * np.eye(2)
-            cov_beta = np.linalg.inv(H + ridge)   # shape (2,2)
+            #ridge = 1e-6 * np.eye(2)
+            #cov_beta = np.linalg.inv(H + ridge)   # shape (2,2)
+            cov_beta = np.linalg.inv(H)
 
             grad = np.array([
                 -1.0 / gamma,
@@ -165,7 +167,7 @@ class VectorQBayesianPolicy(VectorQPolicy):
 
             var_t_hat = float(grad @ cov_beta @ grad)
             var_t_hat = max(0.0, var_t_hat)
-            logging.info(f"var_t_hat (delta method): {var_t_hat}")
+            logging.info(f"var_t_hat (delta method): {round(var_t_hat, 4)}")
             return var_t_hat
         
 
@@ -231,7 +233,7 @@ class VectorQBayesianPolicy(VectorQPolicy):
                 for i in range(len(self.epsilon_grid))
             ]
         )
-        logging.info(f"var_t: {var_t}, t_primes: {t_primes}")
+        logging.info(f"t_primes: {t_primes}")
         return t_primes
 
     def __bootstrap_variance(

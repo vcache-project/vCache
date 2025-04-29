@@ -48,7 +48,7 @@ logging.basicConfig(
 ########################################################################################################################
 
 # Benchmark Config
-MAX_SAMPLES: int = 10000
+MAX_SAMPLES: int = 20000
 CONFIDENCE_INTERVALS_ITERATIONS: int = 1
 EMBEDDING_MODEL_1 = (
     "embedding_1",
@@ -211,7 +211,7 @@ class Benchmark(unittest.TestCase):
             raise e
 
         self.dump_results_to_json()
-        generate_individual_plots(self, font_size=PLOT_FONT_SIZE)
+        generate_individual_plots(self, font_size=PLOT_FONT_SIZE, is_static=self.is_static_threshold, parameter=self.threshold if self.is_static_threshold else self.delta)
 
     ########################################################################################################################
     ### Class Helper Functions #############################################################################################
@@ -390,7 +390,7 @@ def main():
                 if THRESHOLD_TYPE in ["dynamic", "both"]:
                     for delta in deltas:
                         for i in range(0, CONFIDENCE_INTERVALS_ITERATIONS):
-                            print(
+                            logging.info(
                                 f"Using dynamic threshold with delta: {delta}. Run {i + 1} of {CONFIDENCE_INTERVALS_ITERATIONS}"
                             )
 
@@ -431,7 +431,7 @@ def main():
                 # Static thresholds
                 if THRESHOLD_TYPE in ["static", "both"]:
                     for threshold in static_thresholds:
-                        print(f"Using static threshold: {threshold}")
+                        logging.info(f"Using static threshold: {threshold}")
 
                         config = VectorQConfig(
                             enable_cache=True,

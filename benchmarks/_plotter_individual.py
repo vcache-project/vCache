@@ -28,14 +28,14 @@ if TYPE_CHECKING:
     from benchmarks.benchmark import Benchmark
 
 
-def generate_individual_plots(benchmark: "Benchmark", font_size: int):
+def generate_individual_plots(benchmark: "Benchmark", font_size: int, is_static: bool, parameter: float):
     df, _ = convert_to_dataframe_from_benchmark(benchmark)
 
     __plot_accuracy_precision_recall_f1_score(
         benchmark=benchmark, df=df, font_size=font_size
     )
     __plot_error_rate_cache_hit_rate_duration_avg_latency(
-        benchmark=benchmark, df=df, font_size=font_size
+        benchmark=benchmark, df=df, font_size=font_size, is_static=is_static, parameter=parameter
     )
     __plot_avg_latency_cache_hit_rate_cache_miss_rate(benchmark=benchmark, df=df)
 
