@@ -211,7 +211,12 @@ class Benchmark(unittest.TestCase):
             raise e
 
         self.dump_results_to_json()
-        generate_individual_plots(self, font_size=PLOT_FONT_SIZE, is_static=self.is_static_threshold, parameter=self.threshold if self.is_static_threshold else self.delta)
+        generate_individual_plots(
+            self,
+            font_size=PLOT_FONT_SIZE,
+            is_static=self.is_static_threshold,
+            parameter=self.threshold if self.is_static_threshold else self.delta,
+        )
 
     ########################################################################################################################
     ### Class Helper Functions #############################################################################################

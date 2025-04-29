@@ -8,7 +8,6 @@ import statsmodels.api as sm
 from scipy.special import expit
 from scipy.stats import norm
 from sklearn.linear_model import LogisticRegression
-from sklearn.utils import resample
 
 from vectorq.vectorq_core.cache.embedding_store.embedding_metadata_storage.embedding_metadata_obj import (
     EmbeddingMetadataObj,
@@ -25,15 +24,51 @@ class VectorQBayesianPolicy(VectorQPolicy):
         self.logistic_regression: LogisticRegression = LogisticRegression(
             penalty=None, solver="lbfgs", tol=1e-8, max_iter=1000, fit_intercept=False
         )
-        self.logistic_regression_regularized: LogisticRegression = LogisticRegression(
-            penalty=None,  #'l1',
-            solver="lbfgs",
-            # C=0.01,
-            tol=1e-6,
-            max_iter=1000,
-            fit_intercept=False,
-        )
-        self.variance_map: Dict[int, List[float]] = {6: 0.002445, 7: 0.014285, 8: 0.014436, 9: 0.011349, 10: 0.010371, 11: 0.010615, 12: 0.008433, 13: 0.010228, 14: 0.009963, 15: 0.009253, 16: 0.011674, 17: 0.013015, 18: 0.010897, 19: 0.011841, 20: 0.013081, 21: 0.010585, 22: 0.014255, 23: 0.012058, 24: 0.013002, 25: 0.011715, 26: 0.00839, 27: 0.008839, 28: 0.010628, 29: 0.009899, 30: 0.008033, 31: 0.00457, 32: 0.007335, 33: 0.008932, 34: 0.00729, 35: 0.007445, 36: 0.00761, 37: 0.011423, 38: 0.011233, 39: 0.006783, 40: 0.005233, 41: 0.00872, 42: 0.010005, 43: 0.01199, 44: 0.00977, 45: 0.01891, 46: 0.01513, 47: 0.02109, 48: 0.01531}
+        self.variance_map: Dict[int, List[float]] = {
+            6: 0.002445,
+            7: 0.014285,
+            8: 0.014436,
+            9: 0.011349,
+            10: 0.010371,
+            11: 0.010615,
+            12: 0.008433,
+            13: 0.010228,
+            14: 0.009963,
+            15: 0.009253,
+            16: 0.011674,
+            17: 0.013015,
+            18: 0.010897,
+            19: 0.011841,
+            20: 0.013081,
+            21: 0.010585,
+            22: 0.014255,
+            23: 0.012058,
+            24: 0.013002,
+            25: 0.011715,
+            26: 0.00839,
+            27: 0.008839,
+            28: 0.010628,
+            29: 0.009899,
+            30: 0.008033,
+            31: 0.00457,
+            32: 0.007335,
+            33: 0.008932,
+            34: 0.00729,
+            35: 0.007445,
+            36: 0.00761,
+            37: 0.011423,
+            38: 0.011233,
+            39: 0.006783,
+            40: 0.005233,
+            41: 0.00872,
+            42: 0.010005,
+            43: 0.01199,
+            44: 0.00977,
+            45: 0.01891,
+            46: 0.01513,
+            47: 0.02109,
+            48: 0.01531,
+        }
 
     def update_policy(
         self, similarity_score: float, is_correct: bool, metadata: EmbeddingMetadataObj
@@ -74,7 +109,9 @@ class VectorQBayesianPolicy(VectorQPolicy):
         )
         end_time_parameter_estimation = time.time()
         sorted_observations = sorted(metadata.observations, key=lambda x: x[0])
-        logging.info(f"Embedding {metadata.embedding_id} | similarity: {similarity_score} | Observations: {sorted_observations}")
+        logging.info(
+            f"Embedding {metadata.embedding_id} | similarity: {similarity_score} | Observations: {sorted_observations}"
+        )
         if t_hat == -1:
             return Action.EXPLORE
         metadata.gamma = gamma
@@ -85,7 +122,9 @@ class VectorQBayesianPolicy(VectorQPolicy):
             var_t=var_t, s=similarity_score, t_hat=t_hat, metadata=metadata
         )
         logging.info(f"t_hat: {t_hat}, gamma: {gamma}, tau: {tau}")
-        logging.info(f"Parameter estimation: {(end_time_parameter_estimation - start_time):.4f} sec, Tau estimation: {(time.time() - end_time_parameter_estimation):.4f} sec\n")
+        logging.info(
+            f"Parameter estimation: {(end_time_parameter_estimation - start_time):.4f} sec, Tau estimation: {(time.time() - end_time_parameter_estimation):.4f} sec\n"
+        )
 
         u: float = random.uniform(0, 1)
         if u <= tau:
@@ -108,39 +147,60 @@ class VectorQBayesianPolicy(VectorQPolicy):
             var_t: float - The estimated variance of t
         """
 
-        # similarities = sm.add_constant(similarities)
-
-        # try:
-        #     self.logistic_regression.fit(similarities, labels)
-        #     intercept, gamma = self.logistic_regression.coef_[0]
-        #     t_hat = -intercept / (gamma + 1e-6)
-        #     t_hat = max(0.0, min(1.0, t_hat))
-        #     gamma = max(10, gamma)
-        
-        #X = np.vstack([np.ones_like(similarities), similarities]).T
         similarities = sm.add_constant(similarities)
 
         try:
-            if (len(similarities) != len(labels)):
+            if len(similarities) != len(labels):
                 print(f"len does not match: {len(similarities)} != {len(labels)}")
             self.logistic_regression.fit(similarities, labels)
             intercept, gamma = self.logistic_regression.coef_[0]
-            
+
             t_hat = -intercept / (gamma + 1e-6)
             t_hat = float(np.clip(t_hat, 0.0, 1.0))
             gamma = float(max(10.0, gamma))
 
-            similarities_col = similarities[:, 1] if similarities.shape[1] > 1 else similarities[:, 0]
-            perfect_seperation = np.min(similarities_col[labels == 1]) > np.max(similarities_col[labels == 0])
-            var_t = self._get_var_t(perfect_seperation=perfect_seperation, n_observations=len(similarities), X=similarities, gamma=gamma, intercept=intercept)
-            
+            similarities_col = (
+                similarities[:, 1] if similarities.shape[1] > 1 else similarities[:, 0]
+            )
+            perfect_seperation = np.min(similarities_col[labels == 1]) > np.max(
+                similarities_col[labels == 0]
+            )
+            var_t = self._get_var_t(
+                perfect_seperation=perfect_seperation,
+                n_observations=len(similarities),
+                X=similarities,
+                gamma=gamma,
+                intercept=intercept,
+            )
+
             return round(t_hat, 3), round(gamma, 3), round(var_t, 4)
 
         except Exception as e:
             print(f"Logistic regression failed: {e}")
             return -1.0, -1.0, -1.0
-        
-    def _get_var_t(self, perfect_seperation: bool, n_observations: int, X: np.ndarray, gamma: float, intercept: float) -> float:
+
+    def _get_var_t(
+        self,
+        perfect_seperation: bool,
+        n_observations: int,
+        X: np.ndarray,
+        gamma: float,
+        intercept: float,
+    ) -> float:
+        """
+        Compute the variance of t using the delta method
+        Args
+            perfect_seperation: bool - Whether the data is perfectly separable
+            n_observations: int - The number of observations
+            X: np.ndarray - The design matrix
+            gamma: float - The gamma parameter
+            intercept: float - The intercept parameter
+        Returns
+            float - The variance of t
+        Note:
+            If the data is perfectly separable, we use the variance map to estimate the variance of t
+            Otherwise, we use the delta method to estimate the variance of t
+        """
         if perfect_seperation:
             if n_observations in self.variance_map:
                 var_t = self.variance_map[n_observations]
@@ -150,26 +210,18 @@ class VectorQBayesianPolicy(VectorQPolicy):
             logging.info(f"var_t (map): {round(var_t, 4)}")
             return var_t
         else:
-        
-            # Compute Variance of t_hat with Delta Method
             p = self.logistic_regression.predict_proba(X)[:, 1]
-            W = p * (1 - p)                         # shape (n_samples,)
-            H = X.T @ (W[:, None] * X)            # shape (2,2)
-            
-            #ridge = 1e-6 * np.eye(2)
-            #cov_beta = np.linalg.inv(H + ridge)   # shape (2,2)
+            W = p * (1 - p)
+            H = X.T @ (W[:, None] * X)
+
             cov_beta = np.linalg.inv(H)
 
-            grad = np.array([
-                -1.0 / gamma,
-                intercept / (gamma**2)
-            ])                                     # shape (2,)
+            grad = np.array([-1.0 / gamma, intercept / (gamma**2)])
 
             var_t_hat = float(grad @ cov_beta @ grad)
             var_t_hat = max(0.0, var_t_hat)
             logging.info(f"var_t_hat (delta method): {round(var_t_hat, 4)}")
             return var_t_hat
-        
 
     def _get_tau(
         self,
@@ -189,9 +241,7 @@ class VectorQBayesianPolicy(VectorQPolicy):
             float - The minimum tau value
         """
 
-        t_primes: List[float] = self._get_t_primes(
-            t_hat=t_hat, var_t=var_t
-        )
+        t_primes: List[float] = self._get_t_primes(t_hat=t_hat, var_t=var_t)
         likelihoods = self._likelihood(s=s, t=t_primes, gamma=metadata.gamma)
         alpha_lower_bounds = (1 - self.epsilon_grid) * likelihoods
         logging.info(f"alpha_lower_bounds: {alpha_lower_bounds}")
@@ -207,24 +257,6 @@ class VectorQBayesianPolicy(VectorQPolicy):
         Returns
             List[float] - The t_prime values
         """
-        #similarities = similarities.reshape(-1, 1)
-        #similarities = sm.add_constant(similarities)
-        #var_t = self.__bootstrap_variance(similarities, labels)
-        # var_t = 0.01
-        
-        #########################################################
-        # Variance Map
-        # n_observations = len(similarities)
-        # if n_observations not in self.variance_map:
-        #     self.variance_map[n_observations] = []
-        # entry = self.variance_map[n_observations]
-        # entry.append(round(var_t, 6))
-        # # Log average variances across all observation counts
-        # variance_averages = {n_obs: round(sum(variances)/len(variances), 6) for n_obs, variances in self.variance_map.items()}
-        # logging.info(f"Average variances by observation count: {variance_averages}")
-        
-        #########################################################
-        
         t_primes: List[float] = np.array(
             [
                 self._confidence_interval(
@@ -235,44 +267,6 @@ class VectorQBayesianPolicy(VectorQPolicy):
         )
         logging.info(f"t_primes: {t_primes}")
         return t_primes
-
-    def __bootstrap_variance(
-        self, similarities: np.ndarray, labels: np.ndarray, n_bootstraps: int = 128
-    ):
-        """
-        Compute the variance of t with bootstrapping
-        Args
-            similarities: np.ndarray - The similarities observed for the nearest neighbor
-            labels: np.ndarray - The labels of the embeddings
-            n_bootstraps: int - The number of bootstraps (Default: 256)
-        Returns
-            float - The variance of t
-        """
-        t_boots = np.array(
-            [self.__one_bootstrap(similarities, labels) for _ in range(n_bootstraps)]
-        )
-        t_boots = t_boots[(t_boots > 0) & (t_boots < 1)]
-        if t_boots.size == 0:
-            return 0.01
-        var_t = round(max(0.0, min(1.0, np.nanvar(t_boots))), 5)
-        return var_t
-
-    def __one_bootstrap(self, similarities: np.ndarray, labels: np.ndarray):
-        """
-        Compute the t value with one bootstrap
-        Args
-            similarities: np.ndarray - The similarities observed for the nearest neighbor
-            labels: np.ndarray - The labels of the embeddings
-        Returns
-            float - The t value
-        """
-        similaritiesb, labelsb = resample(similarities, labels, replace=True)
-        if labelsb.min() == labelsb.max():
-            return np.nan
-        self.logistic_regression_regularized.fit(similaritiesb, labelsb)
-        intercept, gamma = self.logistic_regression_regularized.coef_[0]
-        t = -intercept / (gamma + 1e-6)
-        return t
 
     def _confidence_interval(
         self, t_hat: float, var_t: float, quantile: float
@@ -292,5 +286,14 @@ class VectorQBayesianPolicy(VectorQPolicy):
         return round(float(np.clip(t_prime, 0.0, 1.0)), 3)
 
     def _likelihood(self, s: float, t: float, gamma: float) -> float:
+        """
+        Compute the likelihood of the given similarity score and threshold
+        Args
+            s: float - The similarity score between the query and the nearest neighbor
+            t: float - The threshold
+            gamma: float - The gamma parameter
+        Returns
+            float - The likelihood of the given similarity score and threshold
+        """
         z = gamma * (s - t)
         return expit(z)

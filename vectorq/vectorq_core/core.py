@@ -1,4 +1,3 @@
-import time
 from typing import TYPE_CHECKING, List, Optional
 
 from vectorq.inference_engine.inference_engine import InferenceEngine

@@ -28,14 +28,20 @@ if TYPE_CHECKING:
     from benchmarks.benchmark import Benchmark
 
 
-def generate_individual_plots(benchmark: "Benchmark", font_size: int, is_static: bool, parameter: float):
+def generate_individual_plots(
+    benchmark: "Benchmark", font_size: int, is_static: bool, parameter: float
+):
     df, _ = convert_to_dataframe_from_benchmark(benchmark)
 
     __plot_accuracy_precision_recall_f1_score(
         benchmark=benchmark, df=df, font_size=font_size
     )
     __plot_error_rate_cache_hit_rate_duration_avg_latency(
-        benchmark=benchmark, df=df, font_size=font_size, is_static=is_static, parameter=parameter
+        benchmark=benchmark,
+        df=df,
+        font_size=font_size,
+        is_static=is_static,
+        parameter=parameter,
     )
     __plot_avg_latency_cache_hit_rate_cache_miss_rate(benchmark=benchmark, df=df)
 
@@ -109,7 +115,11 @@ def __plot_accuracy_precision_recall_f1_score(
 
 
 def __plot_error_rate_cache_hit_rate_duration_avg_latency(
-    benchmark: "Benchmark", df: pd.DataFrame, font_size: int, is_static: bool, parameter: float
+    benchmark: "Benchmark",
+    df: pd.DataFrame,
+    font_size: int,
+    is_static: bool,
+    parameter: float,
 ):
     error_rate_acc_list = compute_error_rate_cumulative_list(fp=df["fp_list"])
     error_rate_acc_list = [rate * 100 for rate in error_rate_acc_list]
