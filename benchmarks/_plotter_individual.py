@@ -109,7 +109,7 @@ def __plot_accuracy_precision_recall_f1_score(
 
 
 def __plot_error_rate_cache_hit_rate_duration_avg_latency(
-    benchmark: "Benchmark", df: pd.DataFrame, font_size: int
+    benchmark: "Benchmark", df: pd.DataFrame, font_size: int, is_static: bool, parameter: float
 ):
     error_rate_acc_list = compute_error_rate_cumulative_list(fp=df["fp_list"])
     error_rate_acc_list = [rate * 100 for rate in error_rate_acc_list]
@@ -131,7 +131,10 @@ def __plot_error_rate_cache_hit_rate_duration_avg_latency(
 
     # Plot Error Rate
     axes[0, 0].plot(sample_index, error_rate_acc_list, "r-", linewidth=2)
-    axes[0, 0].set_title("Error Rate", fontsize=font_size)
+    if is_static:
+        axes[0, 0].set_title(f"Error Rate (T = {parameter})", fontsize=font_size)
+    else:
+        axes[0, 0].set_title(f"Error Rate (δ = {parameter})", fontsize=font_size)
     axes[0, 0].set_xlabel("Samples", fontsize=font_size)
     axes[0, 0].set_ylabel("Error Rate (%)", fontsize=font_size)
     axes[0, 0].grid(True)
@@ -139,7 +142,10 @@ def __plot_error_rate_cache_hit_rate_duration_avg_latency(
 
     # Plot Cache Hit Rate
     axes[0, 1].plot(sample_index, cache_hit_rate_acc_list, "g-", linewidth=2)
-    axes[0, 1].set_title("Cache Hit Rate", fontsize=font_size)
+    if is_static:
+        axes[0, 1].set_title(f"Cache Hit Rate (T = {parameter})", fontsize=font_size)
+    else:
+        axes[0, 1].set_title(f"Cache Hit Rate (δ = {parameter})", fontsize=font_size)
     axes[0, 1].set_xlabel("Samples", fontsize=font_size)
     axes[0, 1].set_ylabel("Hit Rate (%)", fontsize=font_size)
     axes[0, 1].grid(True)

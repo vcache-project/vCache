@@ -1,7 +1,7 @@
 import logging
 import random
 import time
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
 import numpy as np
 import statsmodels.api as sm
@@ -33,6 +33,7 @@ class VectorQBayesianPolicy(VectorQPolicy):
             max_iter=1000,
             fit_intercept=False,
         )
+        self.variance_map: Dict[int, List[float]] = {6: 0.002445, 7: 0.014285, 8: 0.014436, 9: 0.011349, 10: 0.010371, 11: 0.010615, 12: 0.008433, 13: 0.010228, 14: 0.009963, 15: 0.009253, 16: 0.011674, 17: 0.013015, 18: 0.010897, 19: 0.011841, 20: 0.013081, 21: 0.010585, 22: 0.014255, 23: 0.012058, 24: 0.013002, 25: 0.011715, 26: 0.00839, 27: 0.008839, 28: 0.010628, 29: 0.009899, 30: 0.008033, 31: 0.00457, 32: 0.007335, 33: 0.008932, 34: 0.00729, 35: 0.007445, 36: 0.00761, 37: 0.011423, 38: 0.011233, 39: 0.006783, 40: 0.005233, 41: 0.00872, 42: 0.010005, 43: 0.01199, 44: 0.00977, 45: 0.01891, 46: 0.01513, 47: 0.02109, 48: 0.01531}
 
     def update_policy(
         self, similarity_score: float, is_correct: bool, metadata: EmbeddingMetadataObj
@@ -67,7 +68,7 @@ class VectorQBayesianPolicy(VectorQPolicy):
             return Action.EXPLORE
 
         start_time = time.time()
-        t_hat, gamma = self._estimate_parameters(
+        t_hat, gamma, var_t = self._estimate_parameters(
             similarities=similarities, labels=labels
         )
         end_time_parameter_estimation = time.time()
@@ -81,7 +82,7 @@ class VectorQBayesianPolicy(VectorQPolicy):
 
         start_time = time.time()
         tau: float = self._get_tau(
-            similarities, labels, similarity_score, t_hat, metadata
+            var_t=var_t, s=similarity_score, t_hat=t_hat, metadata=metadata
         )
         logging.info(f"t_hat: {t_hat}, gamma: {gamma}, tau: {tau}")
         logging.info(f"Parameter estimation: {(end_time_parameter_estimation - start_time):.4f} sec, Tau estimation: {(time.time() - end_time_parameter_estimation):.4f} sec\n")
@@ -94,7 +95,7 @@ class VectorQBayesianPolicy(VectorQPolicy):
 
     def _estimate_parameters(
         self, similarities: np.ndarray, labels: np.ndarray
-    ) -> Tuple[float, float]:
+    ) -> Tuple[float, float, float]:
         """
         Optimize parameters with logistic regression
         Args
@@ -104,6 +105,7 @@ class VectorQBayesianPolicy(VectorQPolicy):
         Returns
             t_hat: float - The estimated threshold
             gamma: float - The estimated gamma
+            var_t: float - The estimated variance of t
         """
 
         # similarities = sm.add_constant(similarities)
@@ -115,16 +117,39 @@ class VectorQBayesianPolicy(VectorQPolicy):
         #     t_hat = max(0.0, min(1.0, t_hat))
         #     gamma = max(10, gamma)
         
-        X = np.vstack([np.ones_like(similarities), similarities]).T
+        #X = np.vstack([np.ones_like(similarities), similarities]).T
+        similarities = sm.add_constant(similarities)
 
         try:
-            self.logistic_regression.fit(X, labels)
+            if (len(similarities) != len(labels)):
+                print(f"len does not match: {len(similarities)} != {len(labels)}")
+            self.logistic_regression.fit(similarities, labels)
             intercept, gamma = self.logistic_regression.coef_[0]
             
             t_hat = -intercept / (gamma + 1e-6)
             t_hat = float(np.clip(t_hat, 0.0, 1.0))
             gamma = float(max(10.0, gamma))
 
+            similarities_col = similarities[:, 1] if similarities.shape[1] > 1 else similarities[:, 0]
+            perfect_seperation = np.min(similarities_col[labels == 1]) > np.max(similarities_col[labels == 0])
+            var_t = self._get_var_t(perfect_seperation=perfect_seperation, n_observations=len(similarities), X=similarities, gamma=gamma, intercept=intercept)
+            
+            return round(t_hat, 3), round(gamma, 3), round(var_t, 3)
+
+        except Exception as e:
+            print(f"Logistic regression failed: {e}")
+            return -1.0, -1.0, -1.0
+        
+    def _get_var_t(self, perfect_seperation: bool, n_observations: int, X: np.ndarray, gamma: float, intercept: float) -> float:
+        if perfect_seperation:
+            if n_observations in self.variance_map:
+                var_t = self.variance_map[n_observations]
+            else:
+                max_observations = max(self.variance_map.keys())
+                var_t = self.variance_map[max_observations]
+            return var_t
+        else:
+        
             # Compute Variance of t_hat with Delta Method
             p = self.logistic_regression.predict_proba(X)[:, 1]
             W = p * (1 - p)                         # shape (n_samples,)
@@ -141,17 +166,12 @@ class VectorQBayesianPolicy(VectorQPolicy):
             var_t_hat = float(grad @ cov_beta @ grad)
             var_t_hat = max(0.0, var_t_hat)
             logging.info(f"var_t_hat (delta method): {var_t_hat}")
-            
-            return round(t_hat, 3), round(gamma, 3)
-
-        except Exception as e:
-            print(f"Logistic regression failed: {e}")
-            return -1.0, -1.0
+            return var_t_hat
+        
 
     def _get_tau(
         self,
-        similarities: np.ndarray,
-        labels: np.ndarray,
+        var_t: float,
         s: float,
         t_hat: float,
         metadata: EmbeddingMetadataObj,
@@ -159,8 +179,7 @@ class VectorQBayesianPolicy(VectorQPolicy):
         """
         Find the minimum tau value for the given similarity score
         Args
-            similarities: np.ndarray - The similarities observed for the nearest neighbor
-            labels: np.ndarray - The labels in respect to the similarities
+            var_t: float - The variance of t
             s: float - The similarity score between the query and the nearest neighbor
             t_hat: float - The estimated threshold
             metadata: EmbeddingMetadataObj - The metadata of the nearest neighbor
@@ -169,7 +188,7 @@ class VectorQBayesianPolicy(VectorQPolicy):
         """
 
         t_primes: List[float] = self._get_t_primes(
-            t_hat=t_hat, similarities=similarities, labels=labels
+            t_hat=t_hat, var_t=var_t
         )
         likelihoods = self._likelihood(s=s, t=t_primes, gamma=metadata.gamma)
         alpha_lower_bounds = (1 - self.epsilon_grid) * likelihoods
@@ -177,22 +196,33 @@ class VectorQBayesianPolicy(VectorQPolicy):
         taus = 1 - (1 - self.P_c) / (1 - alpha_lower_bounds)
         return round(np.min(taus), 3)
 
-    def _get_t_primes(
-        self, t_hat: float, similarities: np.ndarray, labels: np.ndarray
-    ) -> List[float]:
+    def _get_t_primes(self, t_hat: float, var_t: float) -> List[float]:
         """
         Compute all possible t_prime values
         Args
             t_hat: float - The estimated threshold
-            similarities: np.ndarray - The similarities observed for the nearest neighbor
-            labels: np.ndarray - The labels in respect to the similarities
+            var_t: float - The variance of t
         Returns
             List[float] - The t_prime values
         """
-        similarities = similarities.reshape(-1, 1)
-        similarities = sm.add_constant(similarities)
-        var_t = self.__bootstrap_variance(similarities, labels)
+        #similarities = similarities.reshape(-1, 1)
+        #similarities = sm.add_constant(similarities)
+        #var_t = self.__bootstrap_variance(similarities, labels)
         # var_t = 0.01
+        
+        #########################################################
+        # Variance Map
+        # n_observations = len(similarities)
+        # if n_observations not in self.variance_map:
+        #     self.variance_map[n_observations] = []
+        # entry = self.variance_map[n_observations]
+        # entry.append(round(var_t, 6))
+        # # Log average variances across all observation counts
+        # variance_averages = {n_obs: round(sum(variances)/len(variances), 6) for n_obs, variances in self.variance_map.items()}
+        # logging.info(f"Average variances by observation count: {variance_averages}")
+        
+        #########################################################
+        
         t_primes: List[float] = np.array(
             [
                 self._confidence_interval(
