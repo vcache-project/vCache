@@ -1,3 +1,4 @@
+import time
 from typing import TYPE_CHECKING, List, Optional
 
 from vectorq.inference_engine.inference_engine import InferenceEngine
@@ -67,8 +68,8 @@ class VectorQCore:
             )
             sim, embedding_id = knn[0]
             metadata_obj: EmbeddingMetadataObj = self.cache.get_metadata(
-                    embedding_id=embedding_id
-                )
+                embedding_id=embedding_id
+            )
             if sim >= self.vectorq_config.static_threshold:
                 return True, metadata_obj.response, metadata_obj.response
             else:
@@ -98,8 +99,15 @@ class VectorQCore:
             metadata_obj: EmbeddingMetadataObj = self.cache.get_metadata(
                 embedding_id=embedding_id
             )
+            start_time = time.time()
             selected_action: Action = self.vectorq_policy.select_action(
                 similarity_score=similarity_score, metadata=metadata_obj
+            )
+            end_time = time.time()
+            print(
+                f"\rTime taken to select action: {end_time - start_time:.4f} seconds",
+                end="",
+                flush=True,
             )
 
             if selected_action == Action.EXPLORE:

@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING, Any
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 if TYPE_CHECKING:
     from benchmarks.benchmark import Benchmark
@@ -68,11 +68,12 @@ def __cumulative_average_stats(data: pd.DataFrame) -> pd.DataFrame:
     """
     return data.cumsum() / np.arange(1, len(data) + 1)
 
+
 def compute_accuracy_cumulative_list(
     tp: pd.DataFrame, fp: pd.DataFrame, tn: pd.DataFrame, fn: pd.DataFrame
 ) -> pd.DataFrame:
     """
-    Compute the entry-wise accuracy. The function accumulates the values of the true positives, 
+    Compute the entry-wise accuracy. The function accumulates the values of the true positives,
     true negatives, false positives, and false negatives. Afterwards, it computes the accuracy.
     Args:
         tp: pd.DataFrame - True Positives  [0, 1, 0, 0, ...]
@@ -91,11 +92,12 @@ def compute_accuracy_cumulative_list(
     accuracy = numerator / denominator
     return accuracy
 
+
 def compute_accuracy_score(
     tp: pd.DataFrame, fp: pd.DataFrame, tn: pd.DataFrame, fn: pd.DataFrame
 ) -> float:
     """
-    Compute the final accuracy score. The function accumulates the values of the true positives, 
+    Compute the final accuracy score. The function accumulates the values of the true positives,
     true negatives, false positives, and false negatives. Afterwards, it computes the accuracy and
     returns the last value of the accuracy.
     Args:
@@ -109,7 +111,10 @@ def compute_accuracy_score(
     accuracy = compute_accuracy_cumulative_list(tp=tp, fp=fp, tn=tn, fn=fn)
     return accuracy.iloc[-1]
 
-def compute_precision_cumulative_list(tp: pd.DataFrame, fp: pd.DataFrame) -> pd.DataFrame:
+
+def compute_precision_cumulative_list(
+    tp: pd.DataFrame, fp: pd.DataFrame
+) -> pd.DataFrame:
     """
     Compute the entry-wise precision. The function accumulates the values of the true positives and
     false positives. Afterwards, it computes the precision.
@@ -125,6 +130,7 @@ def compute_precision_cumulative_list(tp: pd.DataFrame, fp: pd.DataFrame) -> pd.
     precision = tp / denominator
     return precision
 
+
 def compute_precision_score(tp: pd.DataFrame, fp: pd.DataFrame) -> float:
     """
     Compute the final precision score. The function accumulates the values of the true positives and
@@ -137,6 +143,7 @@ def compute_precision_score(tp: pd.DataFrame, fp: pd.DataFrame) -> float:
     """
     precision = compute_precision_cumulative_list(tp=tp, fp=fp)
     return precision.iloc[-1]
+
 
 def compute_recall_cumulative_list(tp: pd.DataFrame, fn: pd.DataFrame) -> pd.DataFrame:
     """
@@ -154,6 +161,7 @@ def compute_recall_cumulative_list(tp: pd.DataFrame, fn: pd.DataFrame) -> pd.Dat
     recall = tp / denominator
     return recall
 
+
 def compute_recall_score(tp: pd.DataFrame, fn: pd.DataFrame) -> float:
     """
     Compute the final recall score. The function accumulates the values of the true positives and
@@ -167,7 +175,10 @@ def compute_recall_score(tp: pd.DataFrame, fn: pd.DataFrame) -> float:
     recall = compute_recall_cumulative_list(tp=tp, fn=fn)
     return recall.iloc[-1]
 
-def compute_false_positive_rate_cumulative_list(fp: pd.DataFrame, tn: pd.DataFrame) -> pd.DataFrame:
+
+def compute_false_positive_rate_cumulative_list(
+    fp: pd.DataFrame, tn: pd.DataFrame
+) -> pd.DataFrame:
     """
     Compute the entry-wise false positive rate. The function accumulates the values of the false positives and
     true negatives. Afterwards, it computes the false positive rate.
@@ -183,6 +194,7 @@ def compute_false_positive_rate_cumulative_list(fp: pd.DataFrame, tn: pd.DataFra
     false_positive_rate = fp / denominator
     return false_positive_rate
 
+
 def compute_false_positive_rate_score(fp: pd.DataFrame, tn: pd.DataFrame) -> float:
     """
     Compute the final false positive rate score. The function accumulates the values of the false positives and
@@ -196,11 +208,12 @@ def compute_false_positive_rate_score(fp: pd.DataFrame, tn: pd.DataFrame) -> flo
     false_positive_rate = compute_false_positive_rate_cumulative_list(fp=fp, tn=tn)
     return false_positive_rate.iloc[-1]
 
+
 def compute_f1_score_cumulative_list(
     tp: pd.DataFrame, fp: pd.DataFrame, fn: pd.DataFrame
 ) -> pd.DataFrame:
     """
-    Compute the entry-wise F1 score. The function accumulates the values of the true positives, 
+    Compute the entry-wise F1 score. The function accumulates the values of the true positives,
     false positives, and false negatives. Afterwards, it computes the F1 score.
     Args:
         tp: pd.DataFrame - True Positives  [0, 1, 1, 0, ...]
@@ -217,11 +230,12 @@ def compute_f1_score_cumulative_list(
     f1_score = numerator / denominator
     return f1_score
 
+
 def compute_f1_score_score(
     tp: pd.DataFrame, fp: pd.DataFrame, fn: pd.DataFrame
 ) -> float:
     """
-    Compute the final F1 score. The function accumulates the values of the true positives, 
+    Compute the final F1 score. The function accumulates the values of the true positives,
     false positives, and false negatives. Afterwards, it computes the F1 score and returns the last value of the F1 score.
     Args:
         tp: pd.DataFrame - True Positives  [0, 1, 1, 0, ...]
@@ -232,6 +246,7 @@ def compute_f1_score_score(
     """
     f1_score = compute_f1_score_cumulative_list(tp=tp, fp=fp, fn=fn)
     return f1_score.iloc[-1]
+
 
 def compute_error_rate_cumulative_list(fp: pd.DataFrame) -> pd.DataFrame:
     """
@@ -244,9 +259,8 @@ def compute_error_rate_cumulative_list(fp: pd.DataFrame) -> pd.DataFrame:
     error_rate = __cumulative_average_stats(data=fp)
     return error_rate
 
-def compute_error_rate_score(
-    fp: pd.DataFrame
-) -> float:
+
+def compute_error_rate_score(fp: pd.DataFrame) -> float:
     """
     Compute the final error rate score.
     Args:
@@ -257,7 +271,10 @@ def compute_error_rate_score(
     error_rate = compute_error_rate_cumulative_list(fp=fp)
     return error_rate.iloc[-1]
 
-def compute_cache_hit_rate_cumulative_list(cache_hit_list: pd.DataFrame) -> pd.DataFrame:
+
+def compute_cache_hit_rate_cumulative_list(
+    cache_hit_list: pd.DataFrame,
+) -> pd.DataFrame:
     """
     Compute the cumulative cache hit rate.
     Args:
@@ -268,9 +285,8 @@ def compute_cache_hit_rate_cumulative_list(cache_hit_list: pd.DataFrame) -> pd.D
     cache_hit_rate = __cumulative_average_stats(data=cache_hit_list)
     return cache_hit_rate
 
-def compute_cache_hit_rate_score(
-    cache_hit_list: pd.DataFrame
-) -> float:
+
+def compute_cache_hit_rate_score(cache_hit_list: pd.DataFrame) -> float:
     """
     Compute the final cache hit rate score.
     Args:
@@ -278,8 +294,11 @@ def compute_cache_hit_rate_score(
     Returns:
         cache_hit_rate: float - Cache Hit Rate 0.xx
     """
-    cache_hit_rate = compute_cache_hit_rate_cumulative_list(cache_hit_list=cache_hit_list)
+    cache_hit_rate = compute_cache_hit_rate_cumulative_list(
+        cache_hit_list=cache_hit_list
+    )
     return cache_hit_rate.iloc[-1]
+
 
 def compute_duration_cumulative_list(latency_list: pd.DataFrame) -> pd.DataFrame:
     """
@@ -291,6 +310,7 @@ def compute_duration_cumulative_list(latency_list: pd.DataFrame) -> pd.DataFrame
     """
     return latency_list.cumsum()
 
+
 def compute_duration_score(latency_list: pd.DataFrame) -> float:
     """
     Compute the final duration score.
@@ -300,6 +320,7 @@ def compute_duration_score(latency_list: pd.DataFrame) -> float:
         duration: float - Duration 0.xx
     """
     return latency_list.sum()
+
 
 def compute_avg_latency_score(latency_list: pd.DataFrame) -> float:
     """

@@ -174,15 +174,21 @@ class Benchmark(unittest.TestCase):
                     latency_direct: float = llm_generation_latency
 
                     # 2.2) VectorQ Inference (With Cache)
-                    candidate_embedding: List[float] = data_entry[self.embedding_model[0]]
-                    is_cache_hit, cache_response, nn_response, latency_vectorq_logic = self.get_vectorQ_answer(
-                        task=task,
-                        review_text=review_text,
-                        candidate_embedding=candidate_embedding,
-                        label_response=label_response,
-                        output_format=output_format,
+                    candidate_embedding: List[float] = data_entry[
+                        self.embedding_model[0]
+                    ]
+                    is_cache_hit, cache_response, nn_response, latency_vectorq_logic = (
+                        self.get_vectorQ_answer(
+                            task=task,
+                            review_text=review_text,
+                            candidate_embedding=candidate_embedding,
+                            label_response=label_response,
+                            output_format=output_format,
+                        )
                     )
-                    latency_vectorq: float = latency_vectorq_logic + emb_generation_latency
+                    latency_vectorq: float = (
+                        latency_vectorq_logic + emb_generation_latency
+                    )
                     if not is_cache_hit:
                         latency_vectorq += llm_generation_latency
 
@@ -210,12 +216,21 @@ class Benchmark(unittest.TestCase):
     ########################################################################################################################
     ### Class Helper Functions #############################################################################################
     ########################################################################################################################
-    def update_stats(self, is_cache_hit: bool, label_response: str, cache_response: str, nn_response: str, latency_direct: float, latency_vectorq: float):
-        
-        if is_cache_hit: # If cache hit, the actual response is the nearest neighbor response (cache_response == nn_response)
+    def update_stats(
+        self,
+        is_cache_hit: bool,
+        label_response: str,
+        cache_response: str,
+        nn_response: str,
+        latency_direct: float,
+        latency_vectorq: float,
+    ):
+        if is_cache_hit:  # If cache hit, the actual response is the nearest neighbor response (cache_response == nn_response)
             self.cache_hit_list.append(1)
             self.cache_miss_list.append(0)
-            cache_response_correct: bool = answers_have_same_meaning_static(label_response, cache_response)
+            cache_response_correct: bool = answers_have_same_meaning_static(
+                label_response, cache_response
+            )
             if cache_response_correct:
                 self.tp_list.append(1)
                 self.fp_list.append(0)
@@ -224,10 +239,12 @@ class Benchmark(unittest.TestCase):
                 self.tp_list.append(0)
             self.fn_list.append(0)
             self.tn_list.append(0)
-        else: # If cache miss, the actual response is the label response 
+        else:  # If cache miss, the actual response is the label response
             self.cache_miss_list.append(1)
             self.cache_hit_list.append(0)
-            nn_response_correct: bool = answers_have_same_meaning_static(label_response, nn_response)
+            nn_response_correct: bool = answers_have_same_meaning_static(
+                label_response, nn_response
+            )
             if nn_response_correct:
                 self.fn_list.append(1)
                 self.tn_list.append(0)
@@ -236,7 +253,7 @@ class Benchmark(unittest.TestCase):
                 self.fn_list.append(0)
             self.tp_list.append(0)
             self.fp_list.append(0)
-        
+
         self.latency_direct_list.append(latency_direct)
         self.latency_vectorq_list.append(latency_vectorq)
 
@@ -368,7 +385,7 @@ def main():
                     f"Running benchmark for dataset: {dataset}, embedding model: {embedding_model[1]}, LLM model: {llm_model[1]}\n"
                 )
                 start_time_llm_model = time.time()
-                
+
                 # Dynamic thresholds (VectorQ)
                 if THRESHOLD_TYPE in ["dynamic", "both"]:
                     for delta in deltas:

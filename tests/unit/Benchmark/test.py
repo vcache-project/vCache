@@ -24,7 +24,6 @@ from benchmarks._plotter_helper import (
 
 
 class TestVectorQBenchmark(unittest.TestCase):
-
     def setUp(self):
         self.tp = pd.Series([1, 0, 1, 0, 1])  # True Positives
         self.fp = pd.Series([0, 1, 0, 1, 0])  # False Positives

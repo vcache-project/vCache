@@ -133,13 +133,9 @@ def __plot_roc(
     for threshold in static_thresholds:
         df = static_data_frames[threshold]
 
-        tpr = compute_recall_score(
-            tp=df["tp_list"], fn=df["fn_list"]
-        )
+        tpr = compute_recall_score(tp=df["tp_list"], fn=df["fn_list"])
 
-        fpr = compute_false_positive_rate_score(
-            fp=df["fp_list"], tn=df["tn_list"]
-        )
+        fpr = compute_false_positive_rate_score(fp=df["fp_list"], tn=df["tn_list"])
 
         static_tpr_values.append(tpr)
         static_fpr_values.append(fpr)
@@ -176,13 +172,9 @@ def __plot_roc(
     for delta in dynamic_deltas:
         df = dynamic_data_frames[delta]
 
-        tpr = compute_recall_score(
-            tp=df["tp_list"], fn=df["fn_list"]
-        )
+        tpr = compute_recall_score(tp=df["tp_list"], fn=df["fn_list"])
 
-        fpr = compute_false_positive_rate_score(
-            fp=df["fp_list"], tn=df["tn_list"]
-        )
+        fpr = compute_false_positive_rate_score(fp=df["fp_list"], tn=df["tn_list"])
 
         dynamic_tpr_values.append(tpr)
         dynamic_fpr_values.append(fpr)
@@ -438,7 +430,9 @@ def __plot_cache_hit_vs_error_rate(
     for threshold in static_thresholds:
         df = static_data_frames[threshold]
 
-        cache_hit_rate = compute_cache_hit_rate_score(cache_hit_list=df["cache_hit_list"])
+        cache_hit_rate = compute_cache_hit_rate_score(
+            cache_hit_list=df["cache_hit_list"]
+        )
 
         error_rate = compute_error_rate_score(fp=df["fp_list"])
 
@@ -477,7 +471,9 @@ def __plot_cache_hit_vs_error_rate(
     for delta in dynamic_deltas:
         df = dynamic_data_frames[delta]
 
-        cache_hit_rate = compute_cache_hit_rate_score(cache_hit_list=df["cache_hit_list"])
+        cache_hit_rate = compute_cache_hit_rate_score(
+            cache_hit_list=df["cache_hit_list"]
+        )
 
         error_rate = compute_error_rate_score(fp=df["fp_list"])
 

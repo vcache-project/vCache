@@ -1,4 +1,4 @@
-from typing import List, Tuple, Dict
+from typing import List, Tuple
 
 from vectorq.config import VectorQConfig
 from vectorq.inference_engine.inference_engine import InferenceEngine
