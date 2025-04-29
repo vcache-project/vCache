@@ -45,9 +45,9 @@ class VectorQBayesianPolicy(VectorQPolicy):
             metadata: EmbeddingMetadataObj - The metadata of the embedding
         """
         if is_correct:
-            metadata.observations.append((similarity_score, 1))
+            metadata.observations.append((round(similarity_score, 3), 1))
         else:
-            metadata.observations.append((similarity_score, 0))
+            metadata.observations.append((round(similarity_score, 3), 0))
 
     def select_action(
         self, similarity_score: float, metadata: EmbeddingMetadataObj
@@ -70,7 +70,10 @@ class VectorQBayesianPolicy(VectorQPolicy):
         t_hat, gamma = self._estimate_parameters(
             similarities=similarities, labels=labels
         )
-        logging.info(f"Duration para est.: {(time.time() - start_time):.4f} sec")
+        end_time_parameter_estimation = time.time()
+        sorted_observations = sorted(metadata.observations, key=lambda x: x[0])
+        logging.info(f"Embedding {metadata.embedding_id} | Observations: {sorted_observations}")
+        logging.info(f"Duration para estimation: {(time.time() - start_time):.4f} sec")
         if t_hat == -1:
             return Action.EXPLORE
         metadata.gamma = gamma
@@ -80,8 +83,8 @@ class VectorQBayesianPolicy(VectorQPolicy):
         tau: float = self._get_tau(
             similarities, labels, similarity_score, t_hat, metadata
         )
-        logging.info(f"t_hat: {t_hat:.4f}, gamma: {gamma:.4f}, tau: {tau:.4f}")
-        logging.info(f"Duration tau est.: {(time.time() - start_time):.4f} sec\n")
+        logging.info(f"t_hat: {t_hat}, gamma: {gamma}, tau: {tau}")
+        logging.info(f"Parameter estimation: {(end_time_parameter_estimation - start_time):.4f} sec, Tau estimation: {(time.time() - end_time_parameter_estimation):.4f} sec\n")
 
         u: float = random.uniform(0, 1)
         if u <= tau:
@@ -103,15 +106,43 @@ class VectorQBayesianPolicy(VectorQPolicy):
             gamma: float - The estimated gamma
         """
 
-        similarities = sm.add_constant(similarities)
+        # similarities = sm.add_constant(similarities)
+
+        # try:
+        #     self.logistic_regression.fit(similarities, labels)
+        #     intercept, gamma = self.logistic_regression.coef_[0]
+        #     t_hat = -intercept / (gamma + 1e-6)
+        #     t_hat = max(0.0, min(1.0, t_hat))
+        #     gamma = max(10, gamma)
+        
+        X = np.vstack([np.ones_like(similarities), similarities]).T
 
         try:
-            self.logistic_regression.fit(similarities, labels)
+            self.logistic_regression.fit(X, labels)
             intercept, gamma = self.logistic_regression.coef_[0]
+            
             t_hat = -intercept / (gamma + 1e-6)
-            t_hat = max(0.0, min(1.0, t_hat))
-            gamma = max(10, gamma)
-            return t_hat, gamma
+            t_hat = float(np.clip(t_hat, 0.0, 1.0))
+            gamma = float(max(10.0, gamma))
+
+            # Compute Variance of t_hat with Delta Method
+            p = self.logistic_regression.predict_proba(X)[:, 1]
+            W = p * (1 - p)                         # shape (n_samples,)
+            H = X.T @ (W[:, None] * X)            # shape (2,2)
+            
+            ridge = 1e-6 * np.eye(2)
+            cov_beta = np.linalg.inv(H + ridge)   # shape (2,2)
+
+            grad = np.array([
+                -1.0 / gamma,
+                intercept / (gamma**2)
+            ])                                     # shape (2,)
+
+            var_t_hat = float(grad @ cov_beta @ grad)
+            var_t_hat = max(0.0, var_t_hat)
+            logging.info(f"var_t_hat (delta method): {var_t_hat}")
+            
+            return round(t_hat, 3), round(gamma, 3)
 
         except Exception as e:
             print(f"Logistic regression failed: {e}")
@@ -136,19 +167,17 @@ class VectorQBayesianPolicy(VectorQPolicy):
         Returns
             float - The minimum tau value
         """
-        # Currently: 0.10330510139465332 seconds
-        # start_time = time.time()
-        t_primes: List[float] = self._get_t_prime(
+
+        t_primes: List[float] = self._get_t_primes(
             t_hat=t_hat, similarities=similarities, labels=labels
         )
-        # end_time = time.time()
-        # print(f"Time taken to get t_primes: {end_time - start_time} seconds")
         likelihoods = self._likelihood(s=s, t=t_primes, gamma=metadata.gamma)
         alpha_lower_bounds = (1 - self.epsilon_grid) * likelihoods
+        logging.info(f"alpha_lower_bounds: {alpha_lower_bounds}")
         taus = 1 - (1 - self.P_c) / (1 - alpha_lower_bounds)
-        return np.min(taus)
+        return round(np.min(taus), 3)
 
-    def _get_t_prime(
+    def _get_t_primes(
         self, t_hat: float, similarities: np.ndarray, labels: np.ndarray
     ) -> List[float]:
         """
@@ -157,7 +186,6 @@ class VectorQBayesianPolicy(VectorQPolicy):
             t_hat: float - The estimated threshold
             similarities: np.ndarray - The similarities observed for the nearest neighbor
             labels: np.ndarray - The labels in respect to the similarities
-            gamma: float - The estimated gamma
         Returns
             List[float] - The t_prime values
         """
@@ -194,7 +222,7 @@ class VectorQBayesianPolicy(VectorQPolicy):
         t_boots = t_boots[(t_boots > 0) & (t_boots < 1)]
         if t_boots.size == 0:
             return 0.01
-        var_t = max(0.0, min(1.0, np.nanvar(t_boots)))
+        var_t = round(max(0.0, min(1.0, np.nanvar(t_boots))), 5)
         return var_t
 
     def __one_bootstrap(self, similarities: np.ndarray, labels: np.ndarray):
@@ -229,7 +257,7 @@ class VectorQBayesianPolicy(VectorQPolicy):
         """
         z = norm.ppf(quantile)
         t_prime = t_hat + z * np.sqrt(var_t)
-        return float(np.clip(t_prime, 0.0, 1.0))
+        return round(float(np.clip(t_prime, 0.0, 1.0)), 3)
 
     def _likelihood(self, s: float, t: float, gamma: float) -> float:
         z = gamma * (s - t)
