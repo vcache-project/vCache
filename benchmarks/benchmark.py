@@ -364,7 +364,6 @@ class Benchmark(unittest.TestCase):
             json.dump(data, json_file, indent=4)
         print(f"Results successfully dumped to {filepath}")
 
-
 ########################################################################################################################
 ### Main ###############################################################################################################
 ########################################################################################################################
@@ -404,10 +403,20 @@ def main():
                 )
                 start_time_llm_model = time.time()
 
-                # Dynamic thresholds (VectorQ, Local)
+                # Baseline 1) Dynamic thresholds (VectorQ, Local)
                 if SYSTEM_TYPE in ["dynamic_local", "all"]:
                     for delta in deltas:
                         for i in range(0, CONFIDENCE_INTERVALS_ITERATIONS):
+                            path = os.path.join(
+                                results_dir,
+                                dataset,
+                                embedding_model[1],
+                                llm_model[1],
+                                f"vectorq_local_{delta}_run_{i + 1}",
+                            )
+                            if os.path.exists(path):
+                                continue
+
                             logging.info(
                                 f"Using dynamic threshold with delta: {delta}. Run {i + 1} of {CONFIDENCE_INTERVALS_ITERATIONS}"
                             )
@@ -426,7 +435,6 @@ def main():
                             vectorQ: VectorQ = VectorQ(config)
 
                             benchmark = Benchmark(vectorQ)
-                            # Set required parameters
                             benchmark.filepath = dataset_file
                             benchmark.embedding_model = embedding_model
                             benchmark.llm_model = llm_model
@@ -434,22 +442,25 @@ def main():
                             benchmark.threshold = -1
                             benchmark.delta = delta
                             benchmark.is_static_threshold = False
-                            benchmark.output_folder_path = os.path.join(
+                            benchmark.output_folder_path = path
+
+                            benchmark.stats_set_up()
+                            benchmark.test_run_benchmark()
+                            
+                # Baseline 2) Dynamic thresholds (VectorQ, Global)
+                if SYSTEM_TYPE in ["dynamic_global", "all"]:
+                    for delta in deltas:
+                        for i in range(0, CONFIDENCE_INTERVALS_ITERATIONS):
+                            path = os.path.join(
                                 results_dir,
                                 dataset,
                                 embedding_model[1],
                                 llm_model[1],
-                                f"vectorq_local_{delta}_run_{i + 1}",
+                                f"vectorq_global_{delta}_run_{i + 1}",
                             )
+                            if os.path.exists(path):
+                                continue
 
-                            # Run the benchmark
-                            benchmark.stats_set_up()
-                            benchmark.test_run_benchmark()
-                            
-                # Dynamic thresholds (VectorQ, Global)
-                if SYSTEM_TYPE in ["dynamic_global", "all"]:
-                    for delta in deltas:
-                        for i in range(0, CONFIDENCE_INTERVALS_ITERATIONS):
                             logging.info(
                                 f"Using dynamic threshold with delta: {delta}. Run {i + 1} of {CONFIDENCE_INTERVALS_ITERATIONS}"
                             )
@@ -468,7 +479,6 @@ def main():
                             vectorQ: VectorQ = VectorQ(config)
 
                             benchmark = Benchmark(vectorQ)
-                            # Set required parameters
                             benchmark.filepath = dataset_file
                             benchmark.embedding_model = embedding_model
                             benchmark.llm_model = llm_model
@@ -476,21 +486,24 @@ def main():
                             benchmark.threshold = -1
                             benchmark.delta = delta
                             benchmark.is_static_threshold = False
-                            benchmark.output_folder_path = os.path.join(
-                                results_dir,
-                                dataset,
-                                embedding_model[1],
-                                llm_model[1],
-                                f"vectorq_global_{delta}_run_{i + 1}",
-                            )
+                            benchmark.output_folder_path = path
 
-                            # Run the benchmark
                             benchmark.stats_set_up()
                             benchmark.test_run_benchmark()
 
-                # Static thresholds
+                # Baseline 3) Static thresholds
                 if SYSTEM_TYPE in ["static", "all"]:
                     for threshold in static_thresholds:
+                        path = os.path.join(
+                            results_dir,
+                            dataset,
+                            embedding_model[1],
+                            llm_model[1],
+                            f"static_{threshold}",
+                        )
+                        if os.path.exists(path):
+                            continue
+
                         logging.info(f"Using static threshold: {threshold}")
 
                         config = VectorQConfig(
@@ -507,7 +520,6 @@ def main():
                         vectorQ: VectorQ = VectorQ(config)
 
                         benchmark = Benchmark(vectorQ)
-                        # Set required parameters
                         benchmark.filepath = dataset_file
                         benchmark.embedding_model = embedding_model
                         benchmark.llm_model = llm_model
@@ -515,15 +527,8 @@ def main():
                         benchmark.threshold = threshold
                         benchmark.delta = -1
                         benchmark.is_static_threshold = True
-                        benchmark.output_folder_path = os.path.join(
-                            results_dir,
-                            dataset,
-                            embedding_model[1],
-                            llm_model[1],
-                            f"static_{threshold}",
-                        )
+                        benchmark.output_folder_path = path
 
-                        # Run the benchmark
                         benchmark.stats_set_up()
                         benchmark.test_run_benchmark()
 
