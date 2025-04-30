@@ -48,7 +48,7 @@ logging.basicConfig(
 ########################################################################################################################
 
 # Benchmark Config
-MAX_SAMPLES: int = 200
+MAX_SAMPLES: int = 45000
 CONFIDENCE_INTERVALS_ITERATIONS: int = 1
 EMBEDDING_MODEL_1 = (
     "embedding_1",
@@ -86,7 +86,7 @@ DATASETS: List[str] = [
     "ecommerce_dataset.json",
     "semantic_prompt_cache_benchmark.json",
 ]
-DATASETS_TO_EXCLUDE: List[str] = [DATASETS[1], DATASETS[2]]
+DATASETS_TO_EXCLUDE: List[str] = [DATASETS[0], DATASETS[1], DATASETS[2]]
 
 embedding_models: List[Tuple[str, str, str, int]] = [
     EMBEDDING_MODEL_1,
@@ -98,11 +98,10 @@ llm_models: List[Tuple[str, str, str, int]] = [
 ]
 candidate_strategy: str = SIMILARITY_STRATEGY[0]
 
-# static_thresholds = np.array(
-#     [0.76, 0.78, 0.80, 0.82, 0.84, 0.86, 0.88, 0.90, 0.92, 0.94, 0.96]
-# )
-static_thresholds = np.array([0.76, 0.78])
-deltas = np.array([0.01, 0.02]) #np.array([0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.11, 0.12])
+static_thresholds = np.array(
+    [0.76, 0.78, 0.80, 0.82, 0.84, 0.86, 0.88, 0.90, 0.92, 0.94, 0.96]
+)
+deltas = np.array([0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1])
 
 # VectorQ Config
 MAX_VECTOR_DB_CAPACITY: int = 100000
@@ -310,7 +309,7 @@ class Benchmark(unittest.TestCase):
         observations_dict = {}
         gammas_dict = {}
         t_hats_dict = {}
-        
+
         metadata_objects: List[EmbeddingMetadataObj] = (
             self.vectorq.core.cache.get_all_embedding_metadata_objects()
         )
@@ -325,12 +324,14 @@ class Benchmark(unittest.TestCase):
         self.observations_dict = observations_dict
         self.gammas_dict = gammas_dict
         self.t_hats_dict = t_hats_dict
-        
+
         try:
-            global_observations_dict = self.vectorq.core.vectorq_policy.global_observations
+            global_observations_dict = (
+                self.vectorq.core.vectorq_policy.global_observations
+            )
             global_gamma = self.vectorq.core.vectorq_policy.global_gamma
             global_t_hat = self.vectorq.core.vectorq_policy.global_t_hat
-        except Exception as e:
+        except Exception:
             global_observations_dict = {}
             global_gamma = None
             global_t_hat = None
@@ -363,6 +364,7 @@ class Benchmark(unittest.TestCase):
         with open(filepath, "w") as json_file:
             json.dump(data, json_file, indent=4)
         print(f"Results successfully dumped to {filepath}")
+
 
 ########################################################################################################################
 ### Main ###############################################################################################################
@@ -414,7 +416,7 @@ def main():
                                 llm_model[1],
                                 f"vectorq_local_{delta}_run_{i + 1}",
                             )
-                            if os.path.exists(path):
+                            if os.path.exists(path) and os.listdir(path):
                                 continue
 
                             logging.info(
@@ -430,7 +432,9 @@ def main():
                                 ),
                                 embedding_metadata_storage=InMemoryEmbeddingMetadataStorage(),
                                 similarity_evaluator=StringComparisonSimilarityEvaluator(),
-                                vectorq_policy=VectorQBayesianPolicy(delta=delta, is_global=False),
+                                vectorq_policy=VectorQBayesianPolicy(
+                                    delta=delta, is_global=False
+                                ),
                             )
                             vectorQ: VectorQ = VectorQ(config)
 
@@ -446,7 +450,7 @@ def main():
 
                             benchmark.stats_set_up()
                             benchmark.test_run_benchmark()
-                            
+
                 # Baseline 2) Dynamic thresholds (VectorQ, Global)
                 if SYSTEM_TYPE in ["dynamic_global", "all"]:
                     for delta in deltas:
@@ -458,7 +462,7 @@ def main():
                                 llm_model[1],
                                 f"vectorq_global_{delta}_run_{i + 1}",
                             )
-                            if os.path.exists(path):
+                            if os.path.exists(path) and os.listdir(path):
                                 continue
 
                             logging.info(
@@ -474,7 +478,9 @@ def main():
                                 ),
                                 embedding_metadata_storage=InMemoryEmbeddingMetadataStorage(),
                                 similarity_evaluator=StringComparisonSimilarityEvaluator(),
-                                vectorq_policy=VectorQBayesianPolicy(delta=delta, is_global=True),
+                                vectorq_policy=VectorQBayesianPolicy(
+                                    delta=delta, is_global=True
+                                ),
                             )
                             vectorQ: VectorQ = VectorQ(config)
 
@@ -501,7 +507,7 @@ def main():
                             llm_model[1],
                             f"static_{threshold}",
                         )
-                        if os.path.exists(path):
+                        if os.path.exists(path) and os.listdir(path):
                             continue
 
                         logging.info(f"Using static threshold: {threshold}")

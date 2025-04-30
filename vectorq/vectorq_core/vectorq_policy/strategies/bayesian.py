@@ -24,14 +24,14 @@ class VectorQBayesianPolicy(VectorQPolicy):
         self.logistic_regression: LogisticRegression = LogisticRegression(
             penalty=None, solver="lbfgs", tol=1e-8, max_iter=1000, fit_intercept=False
         )
-        
+
         self.is_global: bool = is_global
         self.global_observations: List[Tuple[float, int]] = []
         self.global_observations.append((0.0, 0))
         self.global_observations.append((1.0, 1))
         self.global_gamma: float = None
         self.global_t_hat: float = None
-        
+
         self.variance_map: Dict[int, List[float]] = {
             6: 0.002445,
             7: 0.014285,
@@ -112,10 +112,14 @@ class VectorQBayesianPolicy(VectorQPolicy):
         """
         similarity_score = round(similarity_score, 3)
         if self.is_global:
-            similarities: np.ndarray = np.array([obs[0] for obs in self.global_observations])
+            similarities: np.ndarray = np.array(
+                [obs[0] for obs in self.global_observations]
+            )
             labels: np.ndarray = np.array([obs[1] for obs in self.global_observations])
         else:
-            similarities: np.ndarray = np.array([obs[0] for obs in metadata.observations])
+            similarities: np.ndarray = np.array(
+                [obs[0] for obs in metadata.observations]
+            )
             labels: np.ndarray = np.array([obs[1] for obs in metadata.observations])
 
         if len(similarities) < 6 or len(labels) < 6:
@@ -182,7 +186,7 @@ class VectorQBayesianPolicy(VectorQPolicy):
 
             t_hat = -intercept / (gamma + 1e-6)
             t_hat = float(np.clip(t_hat, 0.0, 1.0))
-            #gamma = float(max(12.0, gamma))
+            # gamma = float(max(12.0, gamma))
 
             similarities_col = (
                 similarities[:, 1] if similarities.shape[1] > 1 else similarities[:, 0]

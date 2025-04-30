@@ -9,7 +9,9 @@ from matplotlib.lines import Line2D
 
 from benchmarks._plotter_helper import (
     compute_avg_latency_score,
+    compute_cache_hit_rate_cumulative_list,
     compute_cache_hit_rate_score,
+    compute_error_rate_cumulative_list,
     compute_error_rate_score,
     compute_false_positive_rate_score,
     compute_precision_score,
@@ -24,7 +26,8 @@ def __get_result_files(results_dir: str):
         return [], []
 
     static_files: List[str] = []
-    dynamic_files: List[str] = []
+    vectorq_local_files: List[str] = []
+    vectorq_global_files: List[str] = []
 
     for d in os.listdir(results_dir):
         # Process static threshold directories
@@ -34,14 +37,25 @@ def __get_result_files(results_dir: str):
                 if file.startswith("results_") and file.endswith(".json"):
                     static_files.append(os.path.join(dir_path, file))
 
-        # Process vectorq (dynamic threshold) directories
-        elif d.startswith("vectorq_") and os.path.isdir(os.path.join(results_dir, d)):
+        # Process vectorq (embedding specific threshold) directories
+        elif d.startswith("vectorq_local") and os.path.isdir(
+            os.path.join(results_dir, d)
+        ):
             dir_path: str = os.path.join(results_dir, d)
             for file in os.listdir(dir_path):
                 if file.startswith("results_") and file.endswith(".json"):
-                    dynamic_files.append(os.path.join(dir_path, file))
+                    vectorq_local_files.append(os.path.join(dir_path, file))
 
-    return static_files, dynamic_files
+        # Process vectorq (global threshold) directories
+        elif d.startswith("vectorq_global") and os.path.isdir(
+            os.path.join(results_dir, d)
+        ):
+            dir_path: str = os.path.join(results_dir, d)
+            for file in os.listdir(dir_path):
+                if file.startswith("results_") and file.endswith(".json"):
+                    vectorq_global_files.append(os.path.join(dir_path, file))
+
+    return static_files, vectorq_local_files, vectorq_global_files
 
 
 def generate_combined_plots(
@@ -56,9 +70,11 @@ def generate_combined_plots(
         f"{results_dir}/{dataset}/{embedding_model_name}/{llm_model_name}/"
     )
 
-    static_files, dynamic_files = __get_result_files(results_dir)
+    static_files, vectorq_local_files, vectorq_global_files = __get_result_files(
+        results_dir
+    )
 
-    if not static_files and not dynamic_files:
+    if not static_files and not vectorq_local_files and not vectorq_global_files:
         print(
             f"No folders found for {dataset}, {embedding_model_name}, {llm_model_name}\n"
             f"in {results_dir}"
@@ -73,44 +89,65 @@ def generate_combined_plots(
             threshold: float = data["config"]["threshold"]
             static_data_frames[threshold] = dataframe
 
-    dynamic_data_frames: Dict[float, pd.DataFrame] = {}
-    for dynamic_file_path in dynamic_files:
+    vectorq_local_data_frames: Dict[float, pd.DataFrame] = {}
+    for dynamic_file_path in vectorq_local_files:
         with open(dynamic_file_path, "r") as f:
             data: Any = json.load(f)
             dataframe, _ = convert_to_dataframe_from_json_file(data)
             delta: float = data["config"]["delta"]
-            dynamic_data_frames[delta] = dataframe
+            vectorq_local_data_frames[delta] = dataframe
+
+    vectorq_global_data_frames: Dict[float, pd.DataFrame] = {}
+    for global_file_path in vectorq_global_files:
+        with open(global_file_path, "r") as f:
+            data: Any = json.load(f)
+            dataframe, _ = convert_to_dataframe_from_json_file(data)
+            delta: float = data["config"]["delta"]
+            vectorq_global_data_frames[delta] = dataframe
 
     __plot_roc(
         static_data_frames=static_data_frames,
-        dynamic_data_frames=dynamic_data_frames,
+        vectorq_local_data_frames=vectorq_local_data_frames,
+        vectorq_global_data_frames=vectorq_global_data_frames,
         results_dir=results_dir,
         timestamp=timestamp,
         font_size=font_size,
     )
     __plot_precision_vs_recall(
         static_data_frames=static_data_frames,
-        dynamic_data_frames=dynamic_data_frames,
+        vectorq_local_data_frames=vectorq_local_data_frames,
+        vectorq_global_data_frames=vectorq_global_data_frames,
         results_dir=results_dir,
         timestamp=timestamp,
         font_size=font_size,
     )
     __plot_avg_latency_vs_error_rate(
         static_data_frames=static_data_frames,
-        dynamic_data_frames=dynamic_data_frames,
+        vectorq_local_data_frames=vectorq_local_data_frames,
+        vectorq_global_data_frames=vectorq_global_data_frames,
         results_dir=results_dir,
         timestamp=timestamp,
         font_size=font_size,
     )
     __plot_cache_hit_vs_error_rate(
         static_data_frames=static_data_frames,
-        dynamic_data_frames=dynamic_data_frames,
+        vectorq_local_data_frames=vectorq_local_data_frames,
+        vectorq_global_data_frames=vectorq_global_data_frames,
+        results_dir=results_dir,
+        timestamp=timestamp,
+        font_size=font_size,
+    )
+    __plot_cache_hit_vs_error_rate_vs_sample_size(
+        static_data_frames=static_data_frames,
+        vectorq_local_data_frames=vectorq_local_data_frames,
+        vectorq_global_data_frames=vectorq_global_data_frames,
         results_dir=results_dir,
         timestamp=timestamp,
         font_size=font_size,
     )
     __plot_delta_accuracy(
-        dynamic_data_frames=dynamic_data_frames,
+        vectorq_local_data_frames=vectorq_local_data_frames,
+        vectorq_global_data_frames=vectorq_global_data_frames,
         results_dir=results_dir,
         timestamp=timestamp,
         font_size=font_size,
@@ -119,7 +156,8 @@ def generate_combined_plots(
 
 def __plot_roc(
     static_data_frames: Dict[float, pd.DataFrame],
-    dynamic_data_frames: Dict[float, pd.DataFrame],
+    vectorq_local_data_frames: Dict[float, pd.DataFrame],
+    vectorq_global_data_frames: Dict[float, pd.DataFrame],
     results_dir: str,
     timestamp: str,
     font_size: int,
@@ -147,7 +185,7 @@ def __plot_roc(
             "o-",
             color="blue",
             linewidth=2,
-            label="Static thresholds",
+            label="GPTCache",
             markersize=8,
         )
 
@@ -165,39 +203,78 @@ def __plot_roc(
                 fontsize=font_size - 4,
             )
 
-    dynamic_deltas = sorted(dynamic_data_frames.keys())
-    dynamic_tpr_values = []
-    dynamic_fpr_values = []
+    vectorq_local_deltas = sorted(vectorq_local_data_frames.keys())
+    vectorq_local_tpr_values = []
+    vectorq_local_fpr_values = []
 
-    for delta in dynamic_deltas:
-        df = dynamic_data_frames[delta]
+    for delta in vectorq_local_deltas:
+        df = vectorq_local_data_frames[delta]
 
         tpr = compute_recall_score(tp=df["tp_list"], fn=df["fn_list"])
 
         fpr = compute_false_positive_rate_score(fp=df["fp_list"], tn=df["tn_list"])
 
-        dynamic_tpr_values.append(tpr)
-        dynamic_fpr_values.append(fpr)
+        vectorq_local_tpr_values.append(tpr)
+        vectorq_local_fpr_values.append(fpr)
 
-    if dynamic_deltas:
+    if vectorq_local_deltas:
         plt.plot(
-            dynamic_fpr_values,
-            dynamic_tpr_values,
+            vectorq_local_fpr_values,
+            vectorq_local_tpr_values,
             "o-",
             color="green",
             linewidth=2,
-            label="Deltas",
+            label="VectorQ (Local)",
             markersize=8,
         )
 
-        for i, delta in enumerate(dynamic_deltas):
-            if i == 0 or i == len(dynamic_deltas) - 1:
+        for i, delta in enumerate(vectorq_local_deltas):
+            if i == 0 or i == len(vectorq_local_deltas) - 1:
                 label = f"{delta:.2f}"
             else:
                 label = None
             plt.annotate(
                 label,
-                (dynamic_fpr_values[i], dynamic_tpr_values[i]),
+                (vectorq_local_fpr_values[i], vectorq_local_tpr_values[i]),
+                textcoords="offset points",
+                xytext=(0, 10),
+                ha="center",
+                fontsize=font_size - 4,
+            )
+
+    vectorq_global_deltas = sorted(vectorq_global_data_frames.keys())
+    vectorq_global_tpr_values = []
+    vectorq_global_fpr_values = []
+
+    for delta in vectorq_global_deltas:
+        df = vectorq_global_data_frames[delta]
+
+        tpr = compute_recall_score(tp=df["tp_list"], fn=df["fn_list"])
+
+        fpr = compute_false_positive_rate_score(fp=df["fp_list"], tn=df["tn_list"])
+
+        vectorq_global_tpr_values.append(tpr)
+        vectorq_global_fpr_values.append(fpr)
+
+    if vectorq_global_deltas:
+        plt.plot(
+            vectorq_global_fpr_values,
+            vectorq_global_tpr_values,
+            "o-",
+            color="red",
+            linewidth=2,
+            label="VectorQ (Global)",
+            markersize=8,
+        )
+
+        for i, delta in enumerate(vectorq_global_deltas):
+            if i == 0 or i == len(vectorq_global_deltas) - 1:
+                label = f"{delta:.2f}"
+            else:
+                label = None
+            plt.annotate(
+                label,
+                (vectorq_global_fpr_values[i], vectorq_global_tpr_values[i]),
                 textcoords="offset points",
                 xytext=(0, 10),
                 ha="center",
@@ -222,7 +299,8 @@ def __plot_roc(
 
 def __plot_precision_vs_recall(
     static_data_frames: Dict[float, pd.DataFrame],
-    dynamic_data_frames: Dict[float, pd.DataFrame],
+    vectorq_local_data_frames: Dict[float, pd.DataFrame],
+    vectorq_global_data_frames: Dict[float, pd.DataFrame],
     results_dir: str,
     timestamp: str,
     font_size: int,
@@ -248,7 +326,7 @@ def __plot_precision_vs_recall(
             "o-",
             color="blue",
             linewidth=2,
-            label="Static thresholds",
+            label="GPTCache",
             markersize=8,
         )
 
@@ -266,37 +344,74 @@ def __plot_precision_vs_recall(
                 fontsize=font_size - 4,
             )
 
-    dynamic_deltas = sorted(dynamic_data_frames.keys())
-    dynamic_precision_values = []
-    dynamic_recall_values = []
+    vectorq_local_deltas = sorted(vectorq_local_data_frames.keys())
+    vectorq_local_precision_values = []
+    vectorq_local_recall_values = []
 
-    for delta in dynamic_deltas:
-        df = dynamic_data_frames[delta]
+    for delta in vectorq_local_deltas:
+        df = vectorq_local_data_frames[delta]
         precision = compute_precision_score(tp=df["tp_list"], fp=df["fp_list"])
         recall = compute_recall_score(tp=df["tp_list"], fn=df["fn_list"])
 
-        dynamic_precision_values.append(precision)
-        dynamic_recall_values.append(recall)
+        vectorq_local_precision_values.append(precision)
+        vectorq_local_recall_values.append(recall)
 
-    if dynamic_deltas:
+    if vectorq_local_deltas:
         plt.plot(
-            dynamic_recall_values,
-            dynamic_precision_values,
+            vectorq_local_recall_values,
+            vectorq_local_precision_values,
             "o-",
             color="green",
             linewidth=2,
-            label="Deltas",
+            label="VectorQ (Local)",
             markersize=8,
         )
 
-        for i, delta in enumerate(dynamic_deltas):
-            if i == 0 or i == len(dynamic_deltas) - 1:
+        for i, delta in enumerate(vectorq_local_deltas):
+            if i == 0 or i == len(vectorq_local_deltas) - 1:
                 label = f"{delta:.2f}"
             else:
                 label = None
             plt.annotate(
                 label,
-                (dynamic_recall_values[i], dynamic_precision_values[i]),
+                (vectorq_local_recall_values[i], vectorq_local_precision_values[i]),
+                textcoords="offset points",
+                xytext=(0, 10),
+                ha="center",
+                fontsize=font_size - 4,
+            )
+
+    vectorq_global_deltas = sorted(vectorq_global_data_frames.keys())
+    vectorq_global_precision_values = []
+    vectorq_global_recall_values = []
+
+    for delta in vectorq_global_deltas:
+        df = vectorq_global_data_frames[delta]
+        precision = compute_precision_score(tp=df["tp_list"], fp=df["fp_list"])
+        recall = compute_recall_score(tp=df["tp_list"], fn=df["fn_list"])
+
+        vectorq_global_precision_values.append(precision)
+        vectorq_global_recall_values.append(recall)
+
+    if vectorq_global_deltas:
+        plt.plot(
+            vectorq_global_recall_values,
+            vectorq_global_precision_values,
+            "o-",
+            color="red",
+            linewidth=2,
+            label="VectorQ (Global)",
+            markersize=8,
+        )
+
+        for i, delta in enumerate(vectorq_global_deltas):
+            if i == 0 or i == len(vectorq_global_deltas) - 1:
+                label = f"{delta:.2f}"
+            else:
+                label = None
+            plt.annotate(
+                label,
+                (vectorq_global_recall_values[i], vectorq_global_precision_values[i]),
                 textcoords="offset points",
                 xytext=(0, 10),
                 ha="center",
@@ -318,7 +433,8 @@ def __plot_precision_vs_recall(
 
 def __plot_avg_latency_vs_error_rate(
     static_data_frames: Dict[float, pd.DataFrame],
-    dynamic_data_frames: Dict[float, pd.DataFrame],
+    vectorq_local_data_frames: Dict[float, pd.DataFrame],
+    vectorq_global_data_frames: Dict[float, pd.DataFrame],
     results_dir: str,
     timestamp: str,
     font_size: int,
@@ -340,21 +456,6 @@ def __plot_avg_latency_vs_error_rate(
         static_error_rates.append(error_rate)
         static_latencies.append(avg_latency)
 
-    dynamic_deltas = sorted(dynamic_data_frames.keys())
-    dynamic_error_rates = []
-    dynamic_latencies = []
-
-    for delta in dynamic_deltas:
-        df = dynamic_data_frames[delta]
-
-        error_rate = compute_error_rate_score(fp=df["fp_list"])
-
-        avg_latency = compute_avg_latency_score(latency_list=df["latency_vectorq_list"])
-        avg_latency = avg_latency / 60.0
-
-        dynamic_error_rates.append(error_rate)
-        dynamic_latencies.append(avg_latency)
-
     if static_thresholds:
         plt.plot(
             static_error_rates,
@@ -362,7 +463,7 @@ def __plot_avg_latency_vs_error_rate(
             "o-",
             color="blue",
             linewidth=2,
-            label="Static thresholds",
+            label="GPTCache",
             markersize=8,
         )
 
@@ -378,31 +479,82 @@ def __plot_avg_latency_vs_error_rate(
                     fontsize=font_size - 4,
                 )
 
-    if dynamic_deltas:
+    vectorq_local_deltas = sorted(vectorq_local_data_frames.keys())
+    vectorq_local_error_rates = []
+    vectorq_local_latencies = []
+
+    for delta in vectorq_local_deltas:
+        df = vectorq_local_data_frames[delta]
+
+        error_rate = compute_error_rate_score(fp=df["fp_list"])
+
+        avg_latency = compute_avg_latency_score(latency_list=df["latency_vectorq_list"])
+
+        vectorq_local_error_rates.append(error_rate)
+        vectorq_local_latencies.append(avg_latency)
+
+    if vectorq_local_deltas:
         plt.plot(
-            dynamic_error_rates,
-            dynamic_latencies,
+            vectorq_local_latencies,
+            vectorq_local_error_rates,
             "o-",
             color="green",
             linewidth=2,
-            label="Deltas",
+            label="VectorQ (Local)",
             markersize=8,
         )
 
-        for i, delta in enumerate(dynamic_deltas):
-            if i == 0 or i == len(dynamic_deltas) - 1:
+        for i, delta in enumerate(vectorq_local_deltas):
+            if i == 0 or i == len(vectorq_local_deltas) - 1:
                 label = f"{delta:.2f}"
                 plt.annotate(
                     label,
-                    (dynamic_error_rates[i], dynamic_latencies[i]),
+                    (vectorq_local_error_rates[i], vectorq_local_latencies[i]),
                     textcoords="offset points",
                     xytext=(0, 10),
                     ha="center",
                     fontsize=font_size - 4,
                 )
 
-    plt.xlabel("Error Rate", fontsize=font_size)
-    plt.ylabel("Average Latency (min)", fontsize=font_size)
+    vectorq_global_deltas = sorted(vectorq_global_data_frames.keys())
+    vectorq_global_error_rates = []
+    vectorq_global_latencies = []
+
+    for delta in vectorq_global_deltas:
+        df = vectorq_global_data_frames[delta]
+
+        error_rate = compute_error_rate_score(fp=df["fp_list"])
+
+        avg_latency = compute_avg_latency_score(latency_list=df["latency_vectorq_list"])
+
+        vectorq_global_error_rates.append(error_rate)
+        vectorq_global_latencies.append(avg_latency)
+
+    if vectorq_global_deltas:
+        plt.plot(
+            vectorq_global_latencies,
+            vectorq_global_error_rates,
+            "o-",
+            color="red",
+            linewidth=2,
+            label="VectorQ (Global)",
+            markersize=8,
+        )
+
+        for i, delta in enumerate(vectorq_global_deltas):
+            if i == 0 or i == len(vectorq_global_deltas) - 1:
+                label = f"{delta:.2f}"
+                plt.annotate(
+                    label,
+                    (vectorq_global_error_rates[i], vectorq_global_latencies[i]),
+                    textcoords="offset points",
+                    xytext=(0, 10),
+                    ha="center",
+                    fontsize=font_size - 4,
+                )
+
+    plt.xlabel("Average Latency (sec)", fontsize=font_size)
+    plt.ylabel("Error Rate", fontsize=font_size)
     plt.xlim(left=0.0)
     plt.ylim(bottom=0.0)
     plt.grid(True, linestyle="--", alpha=0.7)
@@ -416,7 +568,8 @@ def __plot_avg_latency_vs_error_rate(
 
 def __plot_cache_hit_vs_error_rate(
     static_data_frames: Dict[float, pd.DataFrame],
-    dynamic_data_frames: Dict[float, pd.DataFrame],
+    vectorq_local_data_frames: Dict[float, pd.DataFrame],
+    vectorq_global_data_frames: Dict[float, pd.DataFrame],
     results_dir: str,
     timestamp: str,
     font_size: int,
@@ -446,7 +599,7 @@ def __plot_cache_hit_vs_error_rate(
             "o-",
             color="blue",
             linewidth=2,
-            label="Static thresholds",
+            label="GPTCache",
             markersize=8,
         )
 
@@ -464,12 +617,12 @@ def __plot_cache_hit_vs_error_rate(
                 fontsize=font_size - 4,
             )
 
-    dynamic_deltas = sorted(dynamic_data_frames.keys())
-    dynamic_cache_hit_rates = []
-    dynamic_error_rates = []
+    vectorq_local_deltas = sorted(vectorq_local_data_frames.keys())
+    vectorq_local_cache_hit_rates = []
+    vectorq_local_error_rates = []
 
-    for delta in dynamic_deltas:
-        df = dynamic_data_frames[delta]
+    for delta in vectorq_local_deltas:
+        df = vectorq_local_data_frames[delta]
 
         cache_hit_rate = compute_cache_hit_rate_score(
             cache_hit_list=df["cache_hit_list"]
@@ -477,28 +630,69 @@ def __plot_cache_hit_vs_error_rate(
 
         error_rate = compute_error_rate_score(fp=df["fp_list"])
 
-        dynamic_cache_hit_rates.append(cache_hit_rate)
-        dynamic_error_rates.append(error_rate)
+        vectorq_local_cache_hit_rates.append(cache_hit_rate)
+        vectorq_local_error_rates.append(error_rate)
 
-    if dynamic_deltas:
+    if vectorq_local_deltas:
         plt.plot(
-            dynamic_error_rates,
-            dynamic_cache_hit_rates,
+            vectorq_local_error_rates,
+            vectorq_local_cache_hit_rates,
             "o-",
             color="green",
             linewidth=2,
-            label="Deltas",
+            label="VectorQ (Local)",
             markersize=8,
         )
 
-        for i, delta in enumerate(dynamic_deltas):
-            if i == 0 or i == len(dynamic_deltas) - 1:
+        for i, delta in enumerate(vectorq_local_deltas):
+            if i == 0 or i == len(vectorq_local_deltas) - 1:
                 label = f"{delta:.2f}"
             else:
                 label = None
             plt.annotate(
                 label,
-                (dynamic_error_rates[i], dynamic_cache_hit_rates[i]),
+                (vectorq_local_error_rates[i], vectorq_local_cache_hit_rates[i]),
+                textcoords="offset points",
+                xytext=(0, 10),
+                ha="center",
+                fontsize=font_size - 4,
+            )
+
+    vectorq_global_deltas = sorted(vectorq_global_data_frames.keys())
+    vectorq_global_cache_hit_rates = []
+    vectorq_global_error_rates = []
+
+    for delta in vectorq_global_deltas:
+        df = vectorq_global_data_frames[delta]
+
+        cache_hit_rate = compute_cache_hit_rate_score(
+            cache_hit_list=df["cache_hit_list"]
+        )
+
+        error_rate = compute_error_rate_score(fp=df["fp_list"])
+
+        vectorq_global_cache_hit_rates.append(cache_hit_rate)
+        vectorq_global_error_rates.append(error_rate)
+
+    if vectorq_global_deltas:
+        plt.plot(
+            vectorq_global_error_rates,
+            vectorq_global_cache_hit_rates,
+            "o-",
+            color="red",
+            linewidth=2,
+            label="VectorQ (Global)",
+            markersize=8,
+        )
+
+        for i, delta in enumerate(vectorq_global_deltas):
+            if i == 0 or i == len(vectorq_global_deltas) - 1:
+                label = f"{delta:.2f}"
+            else:
+                label = None
+            plt.annotate(
+                label,
+                (vectorq_global_error_rates[i], vectorq_global_cache_hit_rates[i]),
                 textcoords="offset points",
                 xytext=(0, 10),
                 ha="center",
@@ -518,36 +712,182 @@ def __plot_cache_hit_vs_error_rate(
     plt.close()
 
 
+def __plot_cache_hit_vs_error_rate_vs_sample_size(
+    static_data_frames: Dict[float, pd.DataFrame],
+    vectorq_local_data_frames: Dict[float, pd.DataFrame],
+    vectorq_global_data_frames: Dict[float, pd.DataFrame],
+    results_dir: str,
+    timestamp: str,
+    font_size: int,
+):
+    target_deltas = [0.01, 0.02]
+
+    # Baseline 1) VectorQ (Local)
+    vectorq_local_error_rates = []
+
+    for delta in target_deltas:
+        df = vectorq_local_data_frames[delta]
+        error_rate = compute_error_rate_score(fp=df["fp_list"])
+        vectorq_local_error_rates.append(error_rate)
+
+    # Baseline 3) Static thresholds
+    # Find the static thresholds that match the VectorQ (Local) error rates
+    static_thresholds = sorted(static_data_frames.keys())
+    static_error_rates = []
+
+    for threshold in static_thresholds:
+        df = static_data_frames[threshold]
+        error_rate = compute_error_rate_score(fp=df["fp_list"])
+        static_error_rates.append(error_rate)
+
+    matched_static_thresholds = []
+
+    for _, target_error_rate in enumerate(vectorq_local_error_rates):
+        closest_idx = min(
+            range(len(static_error_rates)),
+            key=lambda j: abs(static_error_rates[j] - target_error_rate),
+        )
+
+        matched_static_thresholds.append(static_thresholds[closest_idx])
+
+    # Plot the results
+    for i, delta in enumerate(target_deltas):
+        df_vectorq_local = vectorq_local_data_frames[delta]
+        df_vectorq_global = vectorq_global_data_frames[delta]
+        static_threshold = matched_static_thresholds[i]
+        df_static = static_data_frames[static_threshold]
+
+        vectorq_local_error_rates = compute_error_rate_cumulative_list(
+            fp=df_vectorq_local["fp_list"]
+        )
+        vectorq_global_error_rates = compute_error_rate_cumulative_list(
+            fp=df_vectorq_global["fp_list"]
+        )
+        static_error_rates = compute_error_rate_cumulative_list(fp=df_static["fp_list"])
+
+        vectorq_local_cache_hit_rates = compute_cache_hit_rate_cumulative_list(
+            cache_hit_list=df_vectorq_local["cache_hit_list"]
+        )
+        vectorq_global_cache_hit_rates = compute_cache_hit_rate_cumulative_list(
+            cache_hit_list=df_vectorq_global["cache_hit_list"]
+        )
+        static_cache_hit_rates = compute_cache_hit_rate_cumulative_list(
+            cache_hit_list=df_static["cache_hit_list"]
+        )
+
+        sample_sizes = np.arange(1, len(vectorq_local_error_rates) + 1)
+
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 8))
+
+        # Plot 1: Error Rate vs Sample Size
+        ax1.plot(
+            sample_sizes,
+            vectorq_local_error_rates,
+            "-",
+            color="green",
+            linewidth=2,
+            label=f"VectorQ Local (δ={delta:.2f})",
+        )
+
+        ax1.plot(
+            sample_sizes,
+            vectorq_global_error_rates,
+            "-",
+            color="red",
+            linewidth=2,
+            label=f"VectorQ Global (δ={delta:.2f})",
+        )
+
+        ax1.plot(
+            sample_sizes,
+            static_error_rates,
+            "-",
+            color="blue",
+            linewidth=2,
+            label=f"GPTCache (t={static_threshold:.2f})",
+        )
+
+        ax1.set_xlabel("Sample Size", fontsize=font_size)
+        ax1.set_ylabel("Cumulative Error Rate (%)", fontsize=font_size)
+        ax1.grid(True, linestyle="--", alpha=0.7)
+        ax1.legend(fontsize=font_size - 2)
+        ax1.tick_params(axis="both", labelsize=font_size - 2)
+
+        # Plot 2: Cache Hit Rate vs Sample Size
+        ax2.plot(
+            sample_sizes,
+            vectorq_local_cache_hit_rates,
+            "-",
+            color="green",
+            linewidth=2,
+            label=f"VectorQ Local (δ={delta:.2f})",
+        )
+
+        ax2.plot(
+            sample_sizes,
+            vectorq_global_cache_hit_rates,
+            "-",
+            color="red",
+            linewidth=2,
+            label=f"VectorQ Global (δ={delta:.2f})",
+        )
+
+        ax2.plot(
+            sample_sizes,
+            static_cache_hit_rates,
+            "-",
+            color="blue",
+            linewidth=2,
+            label=f"GPTCache (t={static_threshold:.2f})",
+        )
+
+        ax2.set_xlabel("Sample Size", fontsize=font_size)
+        ax2.set_ylabel("Cumulative Cache Hit Rate (%)", fontsize=font_size)
+        ax2.grid(True, linestyle="--", alpha=0.7)
+        ax2.legend(fontsize=font_size - 2)
+        ax2.tick_params(axis="both", labelsize=font_size - 2)
+
+        # Adjust layout and save
+        plt.tight_layout()
+        filename = (
+            results_dir
+            + f"/cache_hit_vs_error_rate_vs_sample_size_delta_{delta:.2f}_{timestamp}.pdf"
+        )
+        plt.savefig(filename, format="pdf", bbox_inches="tight")
+        plt.close()
+
+
 def __plot_delta_accuracy(
-    dynamic_data_frames: Dict[float, pd.DataFrame],
+    vectorq_local_data_frames: Dict[float, pd.DataFrame],
+    vectorq_global_data_frames: Dict[float, pd.DataFrame],
     results_dir: str,
     timestamp: str,
     font_size: int,
 ):
     plt.figure(figsize=(16, 10))
 
-    deltas = sorted(dynamic_data_frames.keys())
+    vectorq_local_deltas = sorted(vectorq_local_data_frames.keys())
 
-    if deltas:
+    if vectorq_local_deltas:
         error_rates = []
         delta_labels = []
 
-        for delta in deltas:
-            df = dynamic_data_frames[delta]
+        for delta in vectorq_local_deltas:
+            df = vectorq_local_data_frames[delta]
 
             error_rate = compute_error_rate_score(fp=df["fp_list"])
 
             error_rates.append(error_rate)
             delta_labels.append(f"{delta:.3f}")
 
-        x_pos = np.arange(len(deltas))
+        x_pos = np.arange(len(vectorq_local_deltas))
         bar_width = 0.8
 
         plt.bar(
             x_pos, error_rates, bar_width, color="skyblue", label="Achieved Error Rate"
         )
 
-        for i, delta in enumerate(deltas):
+        for i, delta in enumerate(vectorq_local_deltas):
             plt.hlines(
                 y=delta,
                 xmin=i - bar_width / 2,
@@ -584,7 +924,7 @@ def __plot_delta_accuracy(
 
             plt.text(
                 x_pos[i],
-                deltas[i] + 0.002,
+                vectorq_local_deltas[i] + 0.002,
                 "",
                 ha="center",
                 va="bottom",
@@ -592,7 +932,7 @@ def __plot_delta_accuracy(
                 color="red",
             )
 
-        all_values = error_rates + deltas
+        all_values = error_rates + vectorq_local_deltas
         if all_values:
             y_min = 0
             y_max = max(all_values) * 1.15
