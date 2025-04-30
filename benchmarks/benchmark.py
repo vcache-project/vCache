@@ -48,7 +48,7 @@ logging.basicConfig(
 ########################################################################################################################
 
 # Benchmark Config
-MAX_SAMPLES: int = 20000
+MAX_SAMPLES: int = 200
 CONFIDENCE_INTERVALS_ITERATIONS: int = 1
 EMBEDDING_MODEL_1 = (
     "embedding_1",
@@ -98,17 +98,18 @@ llm_models: List[Tuple[str, str, str, int]] = [
 ]
 candidate_strategy: str = SIMILARITY_STRATEGY[0]
 
-static_thresholds = np.array(
-    [0.76, 0.78, 0.80, 0.82, 0.84, 0.86, 0.88, 0.90, 0.92, 0.94, 0.96]
-)
-deltas = np.array([0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.11, 0.12])
+# static_thresholds = np.array(
+#     [0.76, 0.78, 0.80, 0.82, 0.84, 0.86, 0.88, 0.90, 0.92, 0.94, 0.96]
+# )
+static_thresholds = np.array([0.76, 0.78])
+deltas = np.array([0.01, 0.02]) #np.array([0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.11, 0.12])
 
 # VectorQ Config
 MAX_VECTOR_DB_CAPACITY: int = 100000
 PLOT_FONT_SIZE: int = 24
 
-THRESHOLD_TYPES: List[str] = ["static", "dynamic", "both"]
-THRESHOLD_TYPE: str = THRESHOLD_TYPES[1]
+SYSTEM_TYPES: List[str] = ["static", "dynamic_local", "dynamic_global", "all"]
+SYSTEM_TYPE: str = SYSTEM_TYPES[3]
 
 
 ########################################################################################################################
@@ -309,7 +310,7 @@ class Benchmark(unittest.TestCase):
         observations_dict = {}
         gammas_dict = {}
         t_hats_dict = {}
-
+        
         metadata_objects: List[EmbeddingMetadataObj] = (
             self.vectorq.core.cache.get_all_embedding_metadata_objects()
         )
@@ -324,6 +325,15 @@ class Benchmark(unittest.TestCase):
         self.observations_dict = observations_dict
         self.gammas_dict = gammas_dict
         self.t_hats_dict = t_hats_dict
+        
+        try:
+            global_observations_dict = self.vectorq.core.vectorq_policy.global_observations
+            global_gamma = self.vectorq.core.vectorq_policy.global_gamma
+            global_t_hat = self.vectorq.core.vectorq_policy.global_t_hat
+        except Exception as e:
+            global_observations_dict = {}
+            global_gamma = None
+            global_t_hat = None
 
         data = {
             "config": {
@@ -344,6 +354,9 @@ class Benchmark(unittest.TestCase):
             "observations_dict": self.observations_dict,
             "gammas_dict": self.gammas_dict,
             "t_hats_dict": self.t_hats_dict,
+            "global_observations_dict": global_observations_dict,
+            "global_gamma": global_gamma,
+            "global_t_hat": global_t_hat,
         }
 
         filepath = self.output_folder_path + f"/results_{self.timestamp}.json"
@@ -391,8 +404,8 @@ def main():
                 )
                 start_time_llm_model = time.time()
 
-                # Dynamic thresholds (VectorQ)
-                if THRESHOLD_TYPE in ["dynamic", "both"]:
+                # Dynamic thresholds (VectorQ, Local)
+                if SYSTEM_TYPE in ["dynamic_local", "all"]:
                     for delta in deltas:
                         for i in range(0, CONFIDENCE_INTERVALS_ITERATIONS):
                             logging.info(
@@ -408,7 +421,7 @@ def main():
                                 ),
                                 embedding_metadata_storage=InMemoryEmbeddingMetadataStorage(),
                                 similarity_evaluator=StringComparisonSimilarityEvaluator(),
-                                vectorq_policy=VectorQBayesianPolicy(delta=delta),
+                                vectorq_policy=VectorQBayesianPolicy(delta=delta, is_global=False),
                             )
                             vectorQ: VectorQ = VectorQ(config)
 
@@ -426,7 +439,49 @@ def main():
                                 dataset,
                                 embedding_model[1],
                                 llm_model[1],
-                                f"vectorq_{delta}_run_{i + 1}",
+                                f"vectorq_local_{delta}_run_{i + 1}",
+                            )
+
+                            # Run the benchmark
+                            benchmark.stats_set_up()
+                            benchmark.test_run_benchmark()
+                            
+                # Dynamic thresholds (VectorQ, Global)
+                if SYSTEM_TYPE in ["dynamic_global", "all"]:
+                    for delta in deltas:
+                        for i in range(0, CONFIDENCE_INTERVALS_ITERATIONS):
+                            logging.info(
+                                f"Using dynamic threshold with delta: {delta}. Run {i + 1} of {CONFIDENCE_INTERVALS_ITERATIONS}"
+                            )
+
+                            config = VectorQConfig(
+                                enable_cache=True,
+                                is_static_threshold=False,
+                                vector_db=HNSWLibVectorDB(
+                                    similarity_metric_type=SimilarityMetricType.COSINE,
+                                    max_capacity=MAX_VECTOR_DB_CAPACITY,
+                                ),
+                                embedding_metadata_storage=InMemoryEmbeddingMetadataStorage(),
+                                similarity_evaluator=StringComparisonSimilarityEvaluator(),
+                                vectorq_policy=VectorQBayesianPolicy(delta=delta, is_global=True),
+                            )
+                            vectorQ: VectorQ = VectorQ(config)
+
+                            benchmark = Benchmark(vectorQ)
+                            # Set required parameters
+                            benchmark.filepath = dataset_file
+                            benchmark.embedding_model = embedding_model
+                            benchmark.llm_model = llm_model
+                            benchmark.timestamp = timestamp
+                            benchmark.threshold = -1
+                            benchmark.delta = delta
+                            benchmark.is_static_threshold = False
+                            benchmark.output_folder_path = os.path.join(
+                                results_dir,
+                                dataset,
+                                embedding_model[1],
+                                llm_model[1],
+                                f"vectorq_global_{delta}_run_{i + 1}",
                             )
 
                             # Run the benchmark
@@ -434,7 +489,7 @@ def main():
                             benchmark.test_run_benchmark()
 
                 # Static thresholds
-                if THRESHOLD_TYPE in ["static", "both"]:
+                if SYSTEM_TYPE in ["static", "all"]:
                     for threshold in static_thresholds:
                         logging.info(f"Using static threshold: {threshold}")
 
@@ -472,7 +527,7 @@ def main():
                         benchmark.stats_set_up()
                         benchmark.test_run_benchmark()
 
-                if THRESHOLD_TYPE == "both":
+                if SYSTEM_TYPE == "all":
                     generate_combined_plots(
                         dataset=dataset,
                         embedding_model_name=embedding_model[1],

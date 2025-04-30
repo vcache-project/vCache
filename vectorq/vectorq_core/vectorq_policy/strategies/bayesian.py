@@ -17,13 +17,21 @@ from vectorq.vectorq_core.vectorq_policy.vectorq_policy import VectorQPolicy
 
 
 class VectorQBayesianPolicy(VectorQPolicy):
-    def __init__(self, delta: float):
+    def __init__(self, delta: float, is_global: bool = False):
         self.delta: float = delta
         self.P_c: float = 1.0 - self.delta
-        self.epsilon_grid: np.ndarray = np.array([k / 100 for k in range(1, 50, 5)])
+        self.epsilon_grid: np.ndarray = np.linspace(0.01, 0.5, 50)
         self.logistic_regression: LogisticRegression = LogisticRegression(
             penalty=None, solver="lbfgs", tol=1e-8, max_iter=1000, fit_intercept=False
         )
+        
+        self.is_global: bool = is_global
+        self.global_observations: List[Tuple[float, int]] = []
+        self.global_observations.append((0.0, 0))
+        self.global_observations.append((1.0, 1))
+        self.global_gamma: float = None
+        self.global_t_hat: float = None
+        
         self.variance_map: Dict[int, List[float]] = {
             6: 0.002445,
             7: 0.014285,
@@ -80,10 +88,16 @@ class VectorQBayesianPolicy(VectorQPolicy):
             is_correct: bool - Whether the query was correct
             metadata: EmbeddingMetadataObj - The metadata of the embedding
         """
-        if is_correct:
-            metadata.observations.append((round(similarity_score, 3), 1))
+        if self.is_global:
+            if is_correct:
+                self.global_observations.append((round(similarity_score, 3), 1))
+            else:
+                self.global_observations.append((round(similarity_score, 3), 0))
         else:
-            metadata.observations.append((round(similarity_score, 3), 0))
+            if is_correct:
+                metadata.observations.append((round(similarity_score, 3), 1))
+            else:
+                metadata.observations.append((round(similarity_score, 3), 0))
 
     def select_action(
         self, similarity_score: float, metadata: EmbeddingMetadataObj
@@ -97,8 +111,12 @@ class VectorQBayesianPolicy(VectorQPolicy):
             Action - Explore or Exploit
         """
         similarity_score = round(similarity_score, 3)
-        similarities: np.ndarray = np.array([obs[0] for obs in metadata.observations])
-        labels: np.ndarray = np.array([obs[1] for obs in metadata.observations])
+        if self.is_global:
+            similarities: np.ndarray = np.array([obs[0] for obs in self.global_observations])
+            labels: np.ndarray = np.array([obs[1] for obs in self.global_observations])
+        else:
+            similarities: np.ndarray = np.array([obs[0] for obs in metadata.observations])
+            labels: np.ndarray = np.array([obs[1] for obs in metadata.observations])
 
         if len(similarities) < 6 or len(labels) < 6:
             return Action.EXPLORE
@@ -108,14 +126,21 @@ class VectorQBayesianPolicy(VectorQPolicy):
             similarities=similarities, labels=labels
         )
         end_time_parameter_estimation = time.time()
-        sorted_observations = sorted(metadata.observations, key=lambda x: x[0])
+        if self.is_global:
+            sorted_observations = sorted(self.global_observations, key=lambda x: x[0])
+        else:
+            sorted_observations = sorted(metadata.observations, key=lambda x: x[0])
         logging.info(
             f"Embedding {metadata.embedding_id} | similarity: {similarity_score} | Observations: {sorted_observations}"
         )
         if t_hat == -1:
             return Action.EXPLORE
-        metadata.gamma = gamma
-        metadata.t_hat = t_hat
+        if self.is_global:
+            self.global_gamma = gamma
+            self.global_t_hat = t_hat
+        else:
+            metadata.gamma = gamma
+            metadata.t_hat = t_hat
 
         start_time = time.time()
         tau: float = self._get_tau(
@@ -157,7 +182,7 @@ class VectorQBayesianPolicy(VectorQPolicy):
 
             t_hat = -intercept / (gamma + 1e-6)
             t_hat = float(np.clip(t_hat, 0.0, 1.0))
-            gamma = float(max(10.0, gamma))
+            #gamma = float(max(12.0, gamma))
 
             similarities_col = (
                 similarities[:, 1] if similarities.shape[1] > 1 else similarities[:, 0]
@@ -173,7 +198,7 @@ class VectorQBayesianPolicy(VectorQPolicy):
                 intercept=intercept,
             )
 
-            return round(t_hat, 3), round(gamma, 3), round(var_t, 4)
+            return round(t_hat, 3), round(gamma, 3), round(var_t, 5)
 
         except Exception as e:
             print(f"Logistic regression failed: {e}")
@@ -207,7 +232,7 @@ class VectorQBayesianPolicy(VectorQPolicy):
             else:
                 max_observations = max(self.variance_map.keys())
                 var_t = self.variance_map[max_observations]
-            logging.info(f"var_t (map): {round(var_t, 4)}")
+            logging.info(f"var_t (map): {round(var_t, 5)}")
             return var_t
         else:
             p = self.logistic_regression.predict_proba(X)[:, 1]
@@ -220,7 +245,7 @@ class VectorQBayesianPolicy(VectorQPolicy):
 
             var_t_hat = float(grad @ cov_beta @ grad)
             var_t_hat = max(0.0, var_t_hat)
-            logging.info(f"var_t_hat (delta method): {round(var_t_hat, 4)}")
+            logging.info(f"var_t_hat (delta method): {round(var_t_hat, 5)}")
             return var_t_hat
 
     def _get_tau(
@@ -240,9 +265,11 @@ class VectorQBayesianPolicy(VectorQPolicy):
         Returns
             float - The minimum tau value
         """
-
         t_primes: List[float] = self._get_t_primes(t_hat=t_hat, var_t=var_t)
-        likelihoods = self._likelihood(s=s, t=t_primes, gamma=metadata.gamma)
+        if self.is_global:
+            likelihoods = self._likelihood(s=s, t=t_primes, gamma=self.global_gamma)
+        else:
+            likelihoods = self._likelihood(s=s, t=t_primes, gamma=metadata.gamma)
         alpha_lower_bounds = (1 - self.epsilon_grid) * likelihoods
         logging.info(f"alpha_lower_bounds: {alpha_lower_bounds}")
         taus = 1 - (1 - self.P_c) / (1 - alpha_lower_bounds)

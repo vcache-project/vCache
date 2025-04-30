@@ -22,9 +22,6 @@ class EmbeddingMetadataObj:
         self.observations: List[Tuple[float, int]] = []  # (similarity, label)
         self.observations.append((0.0, 0))
         self.observations.append((1.0, 1))
-        self.estimation_history: List[
-            Tuple[float, float, float, float]
-        ] = []  # (gamma, t_hat, variance, t')
         self.gamma: float = None
         self.t_hat: float = None
         ##################################################
