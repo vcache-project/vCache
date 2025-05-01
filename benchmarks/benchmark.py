@@ -48,7 +48,7 @@ logging.basicConfig(
 ########################################################################################################################
 
 # Benchmark Config
-MAX_SAMPLES: int = 10000
+MAX_SAMPLES: int = 45000
 CONFIDENCE_INTERVALS_ITERATIONS: int = 1
 EMBEDDING_MODEL_1 = (
     "embedding_1",
@@ -86,7 +86,7 @@ DATASETS: List[str] = [
     "ecommerce_dataset.json",
     "semantic_prompt_cache_benchmark.json",
 ]
-DATASETS_TO_EXCLUDE: List[str] = [DATASETS[0], DATASETS[1], DATASETS[2]]
+DATASETS_TO_EXCLUDE: List[str] = [DATASETS[1], DATASETS[2]]
 
 embedding_models: List[Tuple[str, str, str, int]] = [
     EMBEDDING_MODEL_1,
