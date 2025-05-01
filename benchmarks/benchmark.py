@@ -138,6 +138,9 @@ class Benchmark(unittest.TestCase):
         self.latency_vectorq_list: List[float] = []
         self.observations_dict: Dict[str, Dict[str, float]] = {}
         self.gammas_dict: Dict[str, float] = {}
+        self.t_hats_dict: Dict[str, float] = {}
+        self.t_primes_dict: Dict[str, float] = {}
+        self.var_ts_dict: Dict[str, float] = {}
 
         if self.output_folder_path and not os.path.exists(self.output_folder_path):
             os.makedirs(self.output_folder_path)
@@ -309,6 +312,8 @@ class Benchmark(unittest.TestCase):
         observations_dict = {}
         gammas_dict = {}
         t_hats_dict = {}
+        t_primes_dict = {}
+        var_ts_dict = {}
 
         metadata_objects: List[EmbeddingMetadataObj] = (
             self.vectorq.core.cache.get_all_embedding_metadata_objects()
@@ -320,10 +325,14 @@ class Benchmark(unittest.TestCase):
             )
             gammas_dict[metadata_object.embedding_id] = metadata_object.gamma
             t_hats_dict[metadata_object.embedding_id] = metadata_object.t_hat
+            t_primes_dict[metadata_object.embedding_id] = metadata_object.t_prime
+            var_ts_dict[metadata_object.embedding_id] = metadata_object.var_t
 
         self.observations_dict = observations_dict
         self.gammas_dict = gammas_dict
         self.t_hats_dict = t_hats_dict
+        self.t_primes_dict = t_primes_dict
+        self.var_ts_dict = var_ts_dict
 
         try:
             global_observations_dict = (
@@ -331,10 +340,14 @@ class Benchmark(unittest.TestCase):
             )
             global_gamma = self.vectorq.core.vectorq_policy.global_gamma
             global_t_hat = self.vectorq.core.vectorq_policy.global_t_hat
+            global_t_prime = self.vectorq.core.vectorq_policy.global_t_prime
+            global_var_t = self.vectorq.core.vectorq_policy.global_var_t
         except Exception:
             global_observations_dict = {}
             global_gamma = None
             global_t_hat = None
+            global_t_prime = None
+            global_var_t = None
 
         data = {
             "config": {
@@ -355,9 +368,13 @@ class Benchmark(unittest.TestCase):
             "observations_dict": self.observations_dict,
             "gammas_dict": self.gammas_dict,
             "t_hats_dict": self.t_hats_dict,
+            "t_primes_dict": self.t_primes_dict,
+            "var_ts_dict": self.var_ts_dict,
             "global_observations_dict": global_observations_dict,
             "global_gamma": global_gamma,
             "global_t_hat": global_t_hat,
+            "global_t_prime": global_t_prime,
+            "global_var_t": global_var_t,
         }
 
         filepath = self.output_folder_path + f"/results_{self.timestamp}.json"

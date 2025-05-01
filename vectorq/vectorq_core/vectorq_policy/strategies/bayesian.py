@@ -1,6 +1,4 @@
-import logging
 import random
-import time
 from typing import Dict, List, Tuple
 
 import numpy as np
@@ -20,7 +18,7 @@ class VectorQBayesianPolicy(VectorQPolicy):
     def __init__(self, delta: float, is_global: bool = False):
         self.delta: float = delta
         self.P_c: float = 1.0 - self.delta
-        self.epsilon_grid: np.ndarray = np.linspace(1e-6, 1-1e-6, 50)
+        self.epsilon_grid: np.ndarray = np.linspace(1e-6, 1 - 1e-6, 50)
         self.logistic_regression: LogisticRegression = LogisticRegression(
             penalty=None, solver="lbfgs", tol=1e-8, max_iter=1000, fit_intercept=False
         )
@@ -31,6 +29,8 @@ class VectorQBayesianPolicy(VectorQPolicy):
         self.global_observations.append((1.0, 1))
         self.global_gamma: float = None
         self.global_t_hat: float = None
+        self.global_t_prime: float = None
+        self.global_var_t: float = None
 
         self.variance_map: Dict[int, List[float]] = {
             6: 0.012445,
@@ -125,35 +125,24 @@ class VectorQBayesianPolicy(VectorQPolicy):
         if len(similarities) < 6 or len(labels) < 6:
             return Action.EXPLORE
 
-        #start_time = time.time()
         t_hat, gamma, var_t = self._estimate_parameters(
             similarities=similarities, labels=labels
         )
-        #end_time_parameter_estimation = time.time()
-        #if self.is_global:
-        #    sorted_observations = sorted(self.global_observations, key=lambda x: x[0])
-        #else:
-        #    sorted_observations = sorted(metadata.observations, key=lambda x: x[0])
-        #logging.info(
-        #    f"Embedding {metadata.embedding_id} | similarity: {similarity_score} | Observations: {sorted_observations}"
-        #)
+
         if t_hat == -1:
             return Action.EXPLORE
         if self.is_global:
             self.global_gamma = gamma
             self.global_t_hat = t_hat
+            self.global_var_t = var_t
         else:
             metadata.gamma = gamma
             metadata.t_hat = t_hat
+            metadata.var_t = var_t
 
-        #start_time = time.time()
         tau: float = self._get_tau(
             var_t=var_t, s=similarity_score, t_hat=t_hat, metadata=metadata
         )
-        #logging.info(f"t_hat: {t_hat}, gamma: {gamma}, tau: {tau}")
-        #logging.info(
-        #    f"Parameter estimation: {(end_time_parameter_estimation - start_time):.4f} sec, Tau estimation: {(time.time() - end_time_parameter_estimation):.4f} sec\n"
-        #)
 
         u: float = random.uniform(0, 1)
         if u <= tau:
@@ -235,7 +224,6 @@ class VectorQBayesianPolicy(VectorQPolicy):
             else:
                 max_observations = max(self.variance_map.keys())
                 var_t = self.variance_map[max_observations]
-            #logging.info(f"var_t (map): {round(var_t, 5)}")
             return var_t
         else:
             p = self.logistic_regression.predict_proba(X)[:, 1]
@@ -248,7 +236,6 @@ class VectorQBayesianPolicy(VectorQPolicy):
 
             var_t_hat = float(grad @ cov_beta @ grad)
             var_t_hat = max(0.0, var_t_hat)
-            #logging.info(f"var_t_hat (delta method): {round(var_t_hat, 5)}")
             return var_t_hat
 
     def _get_tau(
@@ -274,13 +261,17 @@ class VectorQBayesianPolicy(VectorQPolicy):
         else:
             likelihoods = self._likelihood(s=s, t=t_primes, gamma=metadata.gamma)
         alpha_lower_bounds = (1 - self.epsilon_grid) * likelihoods
-        #logging.info(f"alpha_lower_bounds: {alpha_lower_bounds}")
+
         taus = 1 - (1 - self.P_c) / (1 - alpha_lower_bounds)
+        if self.is_global:
+            self.global_t_prime = t_primes[np.argmin(taus)]
+        else:
+            metadata.t_prime = t_primes[np.argmin(taus)]
         return round(np.min(taus), 5)
 
     def _get_t_primes(self, t_hat: float, var_t: float) -> List[float]:
         """
-        Compute all possible t_prime values
+        Compute all possible t_prime values.
         Args
             t_hat: float - The estimated threshold
             var_t: float - The variance of t
@@ -295,7 +286,6 @@ class VectorQBayesianPolicy(VectorQPolicy):
                 for i in range(len(self.epsilon_grid))
             ]
         )
-        #logging.info(f"t_primes: {t_primes}")
         return t_primes
 
     def _confidence_interval(

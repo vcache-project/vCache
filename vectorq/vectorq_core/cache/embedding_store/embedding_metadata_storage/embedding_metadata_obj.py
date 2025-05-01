@@ -24,6 +24,8 @@ class EmbeddingMetadataObj:
         self.observations.append((1.0, 1))
         self.gamma: float = None
         self.t_hat: float = None
+        self.t_prime: float = None
+        self.var_t: float = None
         ##################################################
 
         # VectorQ Heuristic Policy #######################
