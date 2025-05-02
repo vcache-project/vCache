@@ -10,9 +10,11 @@ class VectorQBenchmark:
         self,
         candidate_embedding: List[float],
         candidate_response: str,
+        question_idx: int = None,
     ):
         self.candidate_embedding = candidate_embedding
         self.candidate_response = candidate_response
+        self.question_idx = question_idx
 
 
 class VectorQ:
@@ -39,10 +41,10 @@ class VectorQ:
         Returns: Tuple[bool, str, str] - [is_cache_hit, actual_response, nn_response] (the actual response is the one supposed to be used by the user, the nn_response is for benchmarking purposes)
         """
         if self.vectorq_config.enable_cache:
-            is_cache_hit, actual_response, nn_response = self.core.process_request(
+            is_cache_hit, actual_response, nn_response, nearest_qu_idx = self.core.process_request(
                 prompt, benchmark, output_format
             )
-            return is_cache_hit, actual_response, nn_response
+            return is_cache_hit, actual_response, nn_response, nearest_qu_idx
         else:
             response = self.inference_engine.create(prompt, output_format)
             return False, response, response
@@ -62,3 +64,6 @@ class VectorQ:
     def get_inference_engine(self) -> InferenceEngine:
         # TODO
         return self.inference_engine
+
+    def get_evicted_ids(self) -> List[int]:
+        return self.core.get_evicted_ids()

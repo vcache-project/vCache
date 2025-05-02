@@ -32,6 +32,7 @@ from vectorq.vectorq_core.similarity_evaluator.strategies.string_comparison impo
 from vectorq.vectorq_core.vectorq_policy.strategies.bayesian import (
     VectorQBayesianPolicy,
 )
+from vectorq.vectorq_core.cache.embedding_store.eviction_policy.eviction_policy import EvictionPolicyType
 
 repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 results_dir = os.path.join(repo_root, "benchmarks", "results")
@@ -48,8 +49,10 @@ logging.basicConfig(
 ########################################################################################################################
 
 # Benchmark Config
-MAX_SAMPLES: int = 45000
-CONFIDENCE_INTERVALS_ITERATIONS: int = 1
+MAX_SAMPLES: int = 20000
+EVICTION_POLICY = EvictionPolicyType.LRU
+# MAX_VECTOR_DB_CAPACITY: int = 20000
+CONFIDENCE_INTERVALS_ITERATIONS: int = 1 # num trials
 EMBEDDING_MODEL_1 = (
     "embedding_1",
     "GteLargeENv1_5",
@@ -86,8 +89,8 @@ DATASETS: List[str] = [
     "ecommerce_dataset.json",
     "semantic_prompt_cache_benchmark.json",
 ]
-DATASETS_TO_EXCLUDE: List[str] = [DATASETS[0], DATASETS[1], DATASETS[2]]
-
+# DATASETS_TO_EXCLUDE: List[str] = [DATASETS[0], DATASETS[1], DATASETS[2]] seb
+DATASETS_TO_EXCLUDE: List[str] = [DATASETS[0]]
 embedding_models: List[Tuple[str, str, str, int]] = [
     EMBEDDING_MODEL_1,
     EMBEDDING_MODEL_2,
@@ -104,18 +107,17 @@ static_thresholds = np.array(
 deltas = np.array([0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1])
 
 # VectorQ Config
-MAX_VECTOR_DB_CAPACITY: int = 100000
 PLOT_FONT_SIZE: int = 24
 
 SYSTEM_TYPES: List[str] = ["static", "dynamic_local", "dynamic_global", "all"]
-SYSTEM_TYPE: str = SYSTEM_TYPES[3]
+SYSTEM_TYPE: str = SYSTEM_TYPES[1] # only want dynamic_local
 
 
 ########################################################################################################################
 ### Benchmark Class ####################################################################################################
 ########################################################################################################################
 class Benchmark(unittest.TestCase):
-    def __init__(self, vectorq: VectorQ):
+    def __init__(self, vectorq: VectorQ, cache_size: int, eviction_policy):
         super().__init__()
         self.vectorq: VectorQ = vectorq
         self.embedding_model: Tuple[str, str, str, int] = None
@@ -126,6 +128,9 @@ class Benchmark(unittest.TestCase):
         self.threshold: float = None
         self.delta: float = None
         self.is_static_threshold: bool = None
+        self.nearest_questions = []
+        self.cache_size = cache_size
+        self.eviction_policy = eviction_policy
 
     def stats_set_up(self):
         self.cache_hit_list: List[int] = []
@@ -177,13 +182,14 @@ class Benchmark(unittest.TestCase):
                     candidate_embedding: List[float] = data_entry[
                         self.embedding_model[0]
                     ]
-                    is_cache_hit, cache_response, nn_response, latency_vectorq_logic = (
+                    is_cache_hit, cache_response, nn_response, latency_vectorq_logic, nearest_qu_idx = (
                         self.get_vectorQ_answer(
                             task=task,
                             review_text=review_text,
                             candidate_embedding=candidate_embedding,
                             label_response=label_response,
                             output_format=output_format,
+                            question_idx=idx,
                         )
                     )
                     latency_vectorq: float = (
@@ -192,12 +198,17 @@ class Benchmark(unittest.TestCase):
                     if not is_cache_hit:
                         latency_vectorq += llm_generation_latency
 
+                    self.nearest_questions.append(nearest_qu_idx)
+
+                    if idx % 500 == 0:
+                        print(f"{idx/MAX_SAMPLES*100}% completed!")
+
                     # 3) Update Stats
                     self.update_stats(
                         is_cache_hit=is_cache_hit,
                         label_response=label_response,
-                        cache_response=cache_response,
-                        nn_response=nn_response,
+                        cache_response=cache_response, # actual response if explore or nearest neighbor if exploit
+                        nn_response=nn_response, # always nearest neighbor metadata response
                         latency_direct=latency_direct,
                         latency_vectorq=latency_vectorq,
                     )
@@ -248,7 +259,7 @@ class Benchmark(unittest.TestCase):
             self.cache_miss_list.append(1)
             self.cache_hit_list.append(0)
             nn_response_correct: bool = answers_have_same_meaning_static(
-                label_response, nn_response
+                label_response, nn_response # in our case comparing true answer to nearest neighbor
             )
             if nn_response_correct:
                 self.fn_list.append(1)
@@ -269,6 +280,7 @@ class Benchmark(unittest.TestCase):
         candidate_embedding: List[float],
         label_response: str,
         output_format: str,
+        question_idx: int,
     ) -> Tuple[bool, str, str, float]:
         """
         Returns: Tuple[bool, str, str, float] - [is_cache_hit, cache_response, nn_response, latency_vectorq_logic]
@@ -285,13 +297,13 @@ class Benchmark(unittest.TestCase):
             ]
 
         vectorQ_benchmark = VectorQBenchmark(
-            candidate_embedding=candidate_embedding, candidate_response=label_response
+            candidate_embedding=candidate_embedding, candidate_response=label_response, question_idx=question_idx
         )
 
         vectorQ_prompt = f"{task} {review_text}"
         latency_vectorq_logic: float = time.time()
         try:
-            is_cache_hit, cache_response, nn_response = self.vectorq.create(
+            is_cache_hit, cache_response, nn_response, nearest_qu_idx = self.vectorq.create(
                 prompt=vectorQ_prompt,
                 output_format=output_format,
                 benchmark=vectorQ_benchmark,
@@ -303,7 +315,7 @@ class Benchmark(unittest.TestCase):
             raise e
 
         latency_vectorq_logic = time.time() - latency_vectorq_logic
-        return is_cache_hit, cache_response, nn_response, latency_vectorq_logic
+        return is_cache_hit, cache_response, nn_response, latency_vectorq_logic, nearest_qu_idx
 
     def dump_results_to_json(self):
         observations_dict = {}
@@ -358,9 +370,13 @@ class Benchmark(unittest.TestCase):
             "global_observations_dict": global_observations_dict,
             "global_gamma": global_gamma,
             "global_t_hat": global_t_hat,
+            "nearest_questions": self.nearest_questions,
+            "evicted_questions": self.vectorq.get_evicted_ids(),
+            "cache_max_capacity": self.cache_size, 
+            "eviction_policy": self.eviction_policy.value
         }
 
-        filepath = self.output_folder_path + f"/results_{self.timestamp}.json"
+        filepath = self.output_folder_path + f"/results_{self.cache_size}_{self.eviction_policy.value}.json"
         with open(filepath, "w") as json_file:
             json.dump(data, json_file, indent=4)
         print(f"Results successfully dumped to {filepath}")
@@ -388,180 +404,189 @@ def main():
 
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
 
-    for dataset in datasets:
-        dataset_file = f"{datasets_dir}{dataset}.json"
-        logging.info(f"Running benchmark for dataset: {dataset}\n\n\n")
-        start_time_dataset = time.time()
+    
+    for policy in [EvictionPolicyType.LFU, EvictionPolicyType.LRU]:
 
-        for embedding_model in embedding_models:
-            logging.info(
-                f"Running benchmark for dataset: {dataset}, embedding model: {embedding_model[1]}\n\n"
-            )
-            start_time_embedding_model = time.time()
+        for cache_size in [500, 2500, 10000, 20000]:
+        
+            for dataset in datasets:
+                dataset_file = f"{datasets_dir}{dataset}.json"
+                logging.info(f"Running benchmark for dataset: {dataset}\n\n\n")
+                start_time_dataset = time.time()
 
-            for llm_model in llm_models:
-                logging.info(
-                    f"Running benchmark for dataset: {dataset}, embedding model: {embedding_model[1]}, LLM model: {llm_model[1]}\n"
-                )
-                start_time_llm_model = time.time()
-
-                # Baseline 1) Dynamic thresholds (VectorQ, Local)
-                if SYSTEM_TYPE in ["dynamic_local", "all"]:
-                    for delta in deltas:
-                        for i in range(0, CONFIDENCE_INTERVALS_ITERATIONS):
-                            path = os.path.join(
-                                results_dir,
-                                dataset,
-                                embedding_model[1],
-                                llm_model[1],
-                                f"vectorq_local_{delta}_run_{i + 1}",
-                            )
-                            if os.path.exists(path) and os.listdir(path):
-                                continue
-
-                            logging.info(
-                                f"Using dynamic threshold with delta: {delta}. Run {i + 1} of {CONFIDENCE_INTERVALS_ITERATIONS}"
-                            )
-
-                            config = VectorQConfig(
-                                enable_cache=True,
-                                is_static_threshold=False,
-                                vector_db=HNSWLibVectorDB(
-                                    similarity_metric_type=SimilarityMetricType.COSINE,
-                                    max_capacity=MAX_VECTOR_DB_CAPACITY,
-                                ),
-                                embedding_metadata_storage=InMemoryEmbeddingMetadataStorage(),
-                                similarity_evaluator=StringComparisonSimilarityEvaluator(),
-                                vectorq_policy=VectorQBayesianPolicy(
-                                    delta=delta, is_global=False
-                                ),
-                            )
-                            vectorQ: VectorQ = VectorQ(config)
-
-                            benchmark = Benchmark(vectorQ)
-                            benchmark.filepath = dataset_file
-                            benchmark.embedding_model = embedding_model
-                            benchmark.llm_model = llm_model
-                            benchmark.timestamp = timestamp
-                            benchmark.threshold = -1
-                            benchmark.delta = delta
-                            benchmark.is_static_threshold = False
-                            benchmark.output_folder_path = path
-
-                            benchmark.stats_set_up()
-                            benchmark.test_run_benchmark()
-
-                # Baseline 2) Dynamic thresholds (VectorQ, Global)
-                if SYSTEM_TYPE in ["dynamic_global", "all"]:
-                    for delta in deltas:
-                        for i in range(0, CONFIDENCE_INTERVALS_ITERATIONS):
-                            path = os.path.join(
-                                results_dir,
-                                dataset,
-                                embedding_model[1],
-                                llm_model[1],
-                                f"vectorq_global_{delta}_run_{i + 1}",
-                            )
-                            if os.path.exists(path) and os.listdir(path):
-                                continue
-
-                            logging.info(
-                                f"Using dynamic threshold with delta: {delta}. Run {i + 1} of {CONFIDENCE_INTERVALS_ITERATIONS}"
-                            )
-
-                            config = VectorQConfig(
-                                enable_cache=True,
-                                is_static_threshold=False,
-                                vector_db=HNSWLibVectorDB(
-                                    similarity_metric_type=SimilarityMetricType.COSINE,
-                                    max_capacity=MAX_VECTOR_DB_CAPACITY,
-                                ),
-                                embedding_metadata_storage=InMemoryEmbeddingMetadataStorage(),
-                                similarity_evaluator=StringComparisonSimilarityEvaluator(),
-                                vectorq_policy=VectorQBayesianPolicy(
-                                    delta=delta, is_global=True
-                                ),
-                            )
-                            vectorQ: VectorQ = VectorQ(config)
-
-                            benchmark = Benchmark(vectorQ)
-                            benchmark.filepath = dataset_file
-                            benchmark.embedding_model = embedding_model
-                            benchmark.llm_model = llm_model
-                            benchmark.timestamp = timestamp
-                            benchmark.threshold = -1
-                            benchmark.delta = delta
-                            benchmark.is_static_threshold = False
-                            benchmark.output_folder_path = path
-
-                            benchmark.stats_set_up()
-                            benchmark.test_run_benchmark()
-
-                # Baseline 3) Static thresholds
-                if SYSTEM_TYPE in ["static", "all"]:
-                    for threshold in static_thresholds:
-                        path = os.path.join(
-                            results_dir,
-                            dataset,
-                            embedding_model[1],
-                            llm_model[1],
-                            f"static_{threshold}",
-                        )
-                        if os.path.exists(path) and os.listdir(path):
-                            continue
-
-                        logging.info(f"Using static threshold: {threshold}")
-
-                        config = VectorQConfig(
-                            enable_cache=True,
-                            is_static_threshold=True,
-                            static_threshold=threshold,
-                            vector_db=HNSWLibVectorDB(
-                                similarity_metric_type=SimilarityMetricType.COSINE,
-                                max_capacity=MAX_VECTOR_DB_CAPACITY,
-                            ),
-                            embedding_metadata_storage=InMemoryEmbeddingMetadataStorage(),
-                            similarity_evaluator=StringComparisonSimilarityEvaluator(),
-                        )
-                        vectorQ: VectorQ = VectorQ(config)
-
-                        benchmark = Benchmark(vectorQ)
-                        benchmark.filepath = dataset_file
-                        benchmark.embedding_model = embedding_model
-                        benchmark.llm_model = llm_model
-                        benchmark.timestamp = timestamp
-                        benchmark.threshold = threshold
-                        benchmark.delta = -1
-                        benchmark.is_static_threshold = True
-                        benchmark.output_folder_path = path
-
-                        benchmark.stats_set_up()
-                        benchmark.test_run_benchmark()
-
-                if SYSTEM_TYPE == "all":
-                    generate_combined_plots(
-                        dataset=dataset,
-                        embedding_model_name=embedding_model[1],
-                        llm_model_name=llm_model[1],
-                        results_dir=results_dir,
-                        timestamp=timestamp,
-                        font_size=PLOT_FONT_SIZE,
+                for embedding_model in embedding_models:
+                    logging.info(
+                        f"Running benchmark for dataset: {dataset}, embedding model: {embedding_model[1]}\n\n"
                     )
+                    start_time_embedding_model = time.time()
 
-                end_time_llm_model = time.time()
+                    for llm_model in llm_models:
+                        logging.info(
+                            f"Running benchmark for dataset: {dataset}, embedding model: {embedding_model[1]}, LLM model: {llm_model[1]}\n"
+                        )
+                        start_time_llm_model = time.time()
+
+                        # Baseline 1) Dynamic thresholds (VectorQ, Local)
+                        if SYSTEM_TYPE in ["dynamic_local", "all"]:
+                            for delta in deltas:
+                                for i in range(0, CONFIDENCE_INTERVALS_ITERATIONS):
+                                    path = os.path.join(
+                                        results_dir,
+                                        dataset,
+                                        str(cache_size),
+                                        policy.value,
+                                        embedding_model[1],
+                                        llm_model[1],
+                                        f"vectorq_local_{delta}_run_{i + 1}",
+                                    )
+                                    if os.path.exists(path) and os.listdir(path):
+                                        continue
+
+                                    logging.info(
+                                        f"Using dynamic threshold with delta: {delta}. Run {i + 1} of {CONFIDENCE_INTERVALS_ITERATIONS}"
+                                    )
+
+                                    config = VectorQConfig(
+                                        enable_cache=True,
+                                        is_static_threshold=False,
+                                        vector_db=HNSWLibVectorDB(
+                                            similarity_metric_type=SimilarityMetricType.COSINE,
+                                            max_capacity=cache_size,
+                                        ),
+                                        capacity=cache_size,
+                                        embedding_metadata_storage=InMemoryEmbeddingMetadataStorage(),
+                                        similarity_evaluator=StringComparisonSimilarityEvaluator(),
+                                        eviction_policy=policy,
+                                        vectorq_policy=VectorQBayesianPolicy(
+                                            delta=delta, is_global=False
+                                        ),
+                                    )
+                                    vectorQ: VectorQ = VectorQ(config)
+
+                                    benchmark = Benchmark(vectorQ, cache_size, policy)
+                                    benchmark.filepath = dataset_file
+                                    benchmark.embedding_model = embedding_model
+                                    benchmark.llm_model = llm_model
+                                    benchmark.timestamp = timestamp
+                                    benchmark.threshold = -1
+                                    benchmark.delta = delta
+                                    benchmark.is_static_threshold = False
+                                    benchmark.output_folder_path = path
+
+                                    benchmark.stats_set_up()
+                                    benchmark.test_run_benchmark()
+
+                        # Baseline 2) Dynamic thresholds (VectorQ, Global)
+                        if SYSTEM_TYPE in ["dynamic_global", "all"]:
+                            for delta in deltas:
+                                for i in range(0, CONFIDENCE_INTERVALS_ITERATIONS):
+                                    path = os.path.join(
+                                        results_dir,
+                                        dataset,
+                                        embedding_model[1],
+                                        llm_model[1],
+                                        f"vectorq_global_{delta}_run_{i + 1}",
+                                    )
+                                    if os.path.exists(path) and os.listdir(path):
+                                        continue
+
+                                    logging.info(
+                                        f"Using dynamic threshold with delta: {delta}. Run {i + 1} of {CONFIDENCE_INTERVALS_ITERATIONS}"
+                                    )
+
+                                    config = VectorQConfig(
+                                        enable_cache=True,
+                                        is_static_threshold=False,
+                                        vector_db=HNSWLibVectorDB(
+                                            similarity_metric_type=SimilarityMetricType.COSINE,
+                                            max_capacity=cache_size,
+                                        ),
+                                        embedding_metadata_storage=InMemoryEmbeddingMetadataStorage(),
+                                        similarity_evaluator=StringComparisonSimilarityEvaluator(),
+                                        vectorq_policy=VectorQBayesianPolicy(
+                                            delta=delta, is_global=True
+                                        ),
+                                    )
+                                    vectorQ: VectorQ = VectorQ(config)
+
+                                    benchmark = Benchmark(vectorQ)
+                                    benchmark.filepath = dataset_file
+                                    benchmark.embedding_model = embedding_model
+                                    benchmark.llm_model = llm_model
+                                    benchmark.timestamp = timestamp
+                                    benchmark.threshold = -1
+                                    benchmark.delta = delta
+                                    benchmark.is_static_threshold = False
+                                    benchmark.output_folder_path = path
+
+                                    benchmark.stats_set_up()
+                                    benchmark.test_run_benchmark()
+
+                        # Baseline 3) Static thresholds
+                        if SYSTEM_TYPE in ["static", "all"]:
+                            for threshold in static_thresholds:
+                                path = os.path.join(
+                                    results_dir,
+                                    dataset,
+                                    embedding_model[1],
+                                    llm_model[1],
+                                    f"static_{threshold}",
+                                )
+                                if os.path.exists(path) and os.listdir(path):
+                                    continue
+
+                                logging.info(f"Using static threshold: {threshold}")
+
+                                config = VectorQConfig(
+                                    enable_cache=True,
+                                    is_static_threshold=True,
+                                    static_threshold=threshold,
+                                    vector_db=HNSWLibVectorDB(
+                                        similarity_metric_type=SimilarityMetricType.COSINE,
+                                        max_capacity=cache_size,
+                                    ),
+                                    embedding_metadata_storage=InMemoryEmbeddingMetadataStorage(),
+                                    similarity_evaluator=StringComparisonSimilarityEvaluator(),
+                                )
+                                vectorQ: VectorQ = VectorQ(config)
+
+                                benchmark = Benchmark(vectorQ)
+                                benchmark.filepath = dataset_file
+                                benchmark.embedding_model = embedding_model
+                                benchmark.llm_model = llm_model
+                                benchmark.timestamp = timestamp
+                                benchmark.threshold = threshold
+                                benchmark.delta = -1
+                                benchmark.is_static_threshold = True
+                                benchmark.output_folder_path = path
+
+                                benchmark.stats_set_up()
+                                benchmark.test_run_benchmark()
+
+                        if SYSTEM_TYPE == "all":
+                            generate_combined_plots(
+                                dataset=dataset,
+                                embedding_model_name=embedding_model[1],
+                                llm_model_name=llm_model[1],
+                                results_dir=results_dir,
+                                timestamp=timestamp,
+                                font_size=PLOT_FONT_SIZE,
+                            )
+
+                        end_time_llm_model = time.time()
+                        logging.info(
+                            f"LLM Model Time: {(end_time_llm_model - start_time_llm_model) / 60:.2f} minutes, {(end_time_llm_model - start_time_llm_model) / 3600:.4f} hours"
+                        )
+                    end_time_embedding_model = time.time()
+                    logging.info(
+                        f"Embedding Model Time: {(end_time_embedding_model - start_time_embedding_model) / 60:.2f} minutes, {(end_time_embedding_model - start_time_embedding_model) / 3600:.4f} hours"
+                    )
+                end_time_dataset = time.time()
                 logging.info(
-                    f"LLM Model Time: {(end_time_llm_model - start_time_llm_model) / 60:.2f} minutes, {(end_time_llm_model - start_time_llm_model) / 3600:.4f} hours"
+                    f"Dataset Time: {(end_time_dataset - start_time_dataset) / 60:.2f} minutes, {(end_time_dataset - start_time_dataset) / 3600:.4f} hours"
                 )
-            end_time_embedding_model = time.time()
-            logging.info(
-                f"Embedding Model Time: {(end_time_embedding_model - start_time_embedding_model) / 60:.2f} minutes, {(end_time_embedding_model - start_time_embedding_model) / 3600:.4f} hours"
-            )
-        end_time_dataset = time.time()
-        logging.info(
-            f"Dataset Time: {(end_time_dataset - start_time_dataset) / 60:.2f} minutes, {(end_time_dataset - start_time_dataset) / 3600:.4f} hours"
-        )
 
-    print("All benchmarks completed!")
+        print("All benchmarks completed!")
 
 
 if __name__ == "__main__":

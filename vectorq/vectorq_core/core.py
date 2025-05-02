@@ -28,7 +28,7 @@ class VectorQCore:
         self.cache: Cache = Cache(
             embedding_store=EmbeddingStore(vectorq_config=self.vectorq_config),
             embedding_engine=self.vectorq_config.embedding_engine,
-            eviction_policy=self.vectorq_config.eviction_policy,
+            # eviction_policy=self.vectorq_config.eviction_policy,
         )
         self.vectorq_policy: VectorQPolicy = self.vectorq_config.vectorq_policy
 
@@ -89,18 +89,20 @@ class VectorQCore:
                 prompt=prompt, benchmark=benchmark, output_format=output_format
             )
             self.__add(prompt=prompt, response=response, benchmark=benchmark)
-            return False, response, ""
+            return False, response, "", -1
         else:
             knn: List[tuple[float, int]] = self.cache.get_knn(
                 prompt=prompt, k=1, benchmark=benchmark
             )
-            similarity_score, embedding_id = knn[0]
+            similarity_score, embedding_id, nearest_qu_idx = knn[0]
             metadata_obj: EmbeddingMetadataObj = self.cache.get_metadata(
                 embedding_id=embedding_id
             )
             selected_action: Action = self.vectorq_policy.select_action(
                 similarity_score=similarity_score, metadata=metadata_obj
             )
+
+            self.cache.promote(embedding_id=embedding_id) ######## experiment should consist of moving this around and seeing results
 
             if selected_action == Action.EXPLORE:
                 response: str = self.__create(
@@ -127,9 +129,9 @@ class VectorQCore:
                 self.cache.update_metadata(
                     embedding_id=embedding_id, embedding_metadata=metadata_obj
                 )
-                return False, response, metadata_obj.response
+                return False, response, metadata_obj.response, nearest_qu_idx
             else:
-                return True, metadata_obj.response, metadata_obj.response
+                return True, metadata_obj.response, metadata_obj.response, nearest_qu_idx
 
     def __create(
         self,
@@ -149,10 +151,18 @@ class VectorQCore:
     ) -> int:
         if benchmark is not None:
             return self.cache.add_embedding(
-                embedding=benchmark.candidate_embedding, response=response
+                embedding=benchmark.candidate_embedding, response=response, question_idx=benchmark.question_idx
             )
         else:
             return self.cache.add(prompt=prompt, response=response)
+
+
+    def get_evicted_ids(self) -> List[int]:
+        '''
+        Returns the list of evicted ids from the cache.
+        '''
+        return self.cache.get_evicted_ids()
+
 
     def get_statistics(self) -> str:
         # TODO

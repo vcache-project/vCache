@@ -5,7 +5,7 @@ from vectorq.vectorq_core.cache.embedding_store.embedding_metadata_storage.embed
     EmbeddingMetadataObj,
 )
 from vectorq.vectorq_core.cache.embedding_store.embedding_store import EmbeddingStore
-from vectorq.vectorq_core.cache.eviction_policy.eviction_policy import EvictionPolicy
+# from vectorq.vectorq_core.cache.eviction_policy.eviction_policy import EvictionPolicy
 
 if TYPE_CHECKING:
     from vectorq.main import VectorQBenchmark
@@ -16,11 +16,11 @@ class Cache:
         self,
         embedding_store: EmbeddingStore,
         embedding_engine: EmbeddingEngine,
-        eviction_policy: EvictionPolicy,
+        # eviction_policy: EvictionPolicy,
     ):
         self.embedding_store = embedding_store
         self.embedding_engine = embedding_engine
-        self.eviction_policy = eviction_policy
+        # self.eviction_policy = eviction_policy
 
     def add(self, prompt: str, response: str) -> int:
         """
@@ -31,13 +31,13 @@ class Cache:
         embedding = self.embedding_engine.get_embedding(prompt)
         self.embedding_store.add_embedding(embedding, response)
 
-    def add_embedding(self, embedding: List[float], response: str) -> int:
+    def add_embedding(self, embedding: List[float], response: str, question_idx: int) -> int:
         """
         embedding: List[float] - The embedding to add to the cache
         response: str - The response to add to the cache
         returns: int - The id of the embedding
         """
-        self.embedding_store.add_embedding(embedding, response)
+        self.embedding_store.add_embedding(embedding, response, question_idx)
 
     def remove(self, embedding_id: int) -> int:
         """
@@ -45,6 +45,12 @@ class Cache:
         returns: int - The id of the embedding
         """
         self.embedding_store.remove(embedding_id)
+
+    def promote(self, embedding_id: int) -> None:
+        '''
+        embedding_id: int - The id of the embedding to promote
+        '''
+        self.embedding_store.promote(embedding_id)
 
     def get_knn(
         self, prompt: str, k: int, benchmark: Optional["VectorQBenchmark"]
@@ -65,6 +71,14 @@ class Cache:
         Flushes the cache
         """
         self.embedding_store.reset()
+
+    def get_evicted_ids(self) -> List[int]:
+        '''
+        returns: List[int] - A list of the evicted ids
+        '''
+        return self.embedding_store.get_evicted_ids()
+
+    
 
     def get_metadata(self, embedding_id: int) -> "EmbeddingMetadataObj":
         """

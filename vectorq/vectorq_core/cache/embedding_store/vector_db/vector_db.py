@@ -64,9 +64,3 @@ class VectorDB(ABC):
         """
         pass
 
-    @abstractmethod
-    def is_empty(self) -> bool:
-        """
-        Returns: bool - Whether the vector db is empty
-        """
-        pass

@@ -37,10 +37,10 @@ from vectorq.vectorq_core.cache.embedding_store.vector_db import (
 )
 
 # Eviction policies
-from vectorq.vectorq_core.cache.eviction_policy import (
-    EvictionPolicy,
-    LRUEvictionPolicy,
-)
+# from vectorq.vectorq_core.cache.embedding_store.eviction_policy.eviction_policy import (
+#     EvictionPolicy,
+#     LRUEvictionPolicy,
+# )
 
 # Similarity evaluators
 from vectorq.vectorq_core.similarity_evaluator import (

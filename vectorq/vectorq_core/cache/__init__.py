@@ -7,8 +7,8 @@ from vectorq.vectorq_core.cache.embedding_store.embedding_metadata_storage.embed
 from vectorq.vectorq_core.cache.embedding_store.embedding_metadata_storage.embedding_metadata_storage import (
     EmbeddingMetadataStorage,
 )
-from vectorq.vectorq_core.cache.eviction_policy.eviction_policy import EvictionPolicy
-from vectorq.vectorq_core.cache.eviction_policy.system_monitor import SystemMonitor
+from vectorq.vectorq_core.cache.embedding_store.eviction_policy.eviction_policy import EvictionPolicy
+from vectorq.vectorq_core.cache.embedding_store.eviction_policy.system_monitor import SystemMonitor
 
 __all__ = [
     "Cache",

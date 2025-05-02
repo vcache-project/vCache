@@ -6,7 +6,7 @@ from vectorq.vectorq_core.cache.embedding_store.embedding_metadata_storage.embed
     EmbeddingMetadataStorage,
 )
 from vectorq.vectorq_core.cache.embedding_store.vector_db import VectorDB
-from vectorq.vectorq_core.cache.eviction_policy.eviction_policy import EvictionPolicy
+from vectorq.vectorq_core.cache.embedding_store.eviction_policy.eviction_policy import EvictionPolicyType
 from vectorq.vectorq_core.similarity_evaluator.similarity_evaluator import (
     SimilarityEvaluator,
 )
@@ -29,11 +29,12 @@ class VectorQConfig:
         rnd_num_ub: float = 1.0,
         is_static_threshold: bool = False,
         static_threshold: float = 0.0,
+        capacity: int = 100000,
         inference_engine: Optional[InferenceEngine] = None,
         embedding_engine: Optional[EmbeddingEngine] = None,
         vector_db: Optional[VectorDB] = None,
         similarity_evaluator: SimilarityEvaluator = StringComparisonSimilarityEvaluator(),
-        eviction_policy: Optional[EvictionPolicy] = None,
+        eviction_policy: Optional[EvictionPolicyType] = None,
         embedding_metadata_storage: Optional[EmbeddingMetadataStorage] = None,
         vectorq_policy: Optional[VectorQPolicy] = None,
     ):
@@ -46,6 +47,7 @@ class VectorQConfig:
         self.inference_engine = inference_engine
         self.embedding_engine = embedding_engine
         self.vector_db = vector_db
+        self.capacity = capacity
         self.similarity_evaluator = similarity_evaluator
         self.eviction_policy = eviction_policy
         self.embedding_metadata_storage = embedding_metadata_storage
