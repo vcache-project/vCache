@@ -48,6 +48,13 @@ from vectorq.vectorq_core.similarity_evaluator import (
     StringComparisonSimilarityEvaluator,
 )
 
+# VectorQ Policies
+from vectorq.vectorq_core.vectorq_policy import (
+    StaticThresholdPolicy,
+    VectorQBayesianPolicy,
+    VectorQPolicy,
+)
+
 __all__ = [
     # Main classes
     "VectorQ",
@@ -74,8 +81,11 @@ __all__ = [
     # Eviction policies
     "EvictionPolicy",
     "LRUEvictionPolicy",
-    "NoEvictionPolicy",
     # Embedding metadata storage
     "EmbeddingMetadataStorage",
     "InMemoryEmbeddingMetadataStorage",
+    # VectorQ Policies
+    "VectorQPolicy",
+    "VectorQBayesianPolicy",
+    "StaticThresholdPolicy",
 ]

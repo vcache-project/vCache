@@ -37,53 +37,13 @@ class VectorQCore:
         prompt: str,
         benchmark: Optional["VectorQBenchmark"],
         output_format: Optional[str],
-    ) -> tuple[bool, str]:
+    ) -> tuple[bool, str, str]:
         """
         prompt: str - The prompt to check for cache hit
         benchmark: "VectorQBenchmark" - The optional benchmark object containing the pre-computed embedding and response
         output_format: str - The optional output format to use for the response
         Returns: tuple[bool, str, str] - [is_cache_hit, actual_response, nn_response]
         """
-        if self.vectorq_config.is_static_threshold:
-            return self.__naive(prompt, benchmark, output_format)
-        else:
-            return self.__vectorQ(prompt, benchmark, output_format)
-
-    def __naive(
-        self,
-        prompt: str,
-        benchmark: Optional["VectorQBenchmark"],
-        output_format: Optional[str],
-    ) -> tuple[bool, str]:
-        if self.cache.is_empty():
-            response: str = self.__create(
-                prompt=prompt, benchmark=benchmark, output_format=output_format
-            )
-            self.__add(prompt=prompt, response=response, benchmark=benchmark)
-            return False, response, ""
-        else:
-            knn: List[tuple[float, int]] = self.cache.get_knn(
-                prompt=prompt, k=1, benchmark=benchmark
-            )
-            sim, embedding_id = knn[0]
-            metadata_obj: EmbeddingMetadataObj = self.cache.get_metadata(
-                embedding_id=embedding_id
-            )
-            if sim >= self.vectorq_config.static_threshold:
-                return True, metadata_obj.response, metadata_obj.response
-            else:
-                response: str = self.__create(
-                    prompt=prompt, benchmark=benchmark, output_format=output_format
-                )
-                self.__add(prompt=prompt, response=response, benchmark=benchmark)
-                return False, response, metadata_obj.response
-
-    def __vectorQ(
-        self,
-        prompt: str,
-        benchmark: Optional["VectorQBenchmark"],
-        output_format: Optional[str],
-    ) -> tuple[bool, str, str]:
         if self.cache.is_empty():
             response: str = self.__create(
                 prompt=prompt, benchmark=benchmark, output_format=output_format
@@ -102,34 +62,44 @@ class VectorQCore:
                 similarity_score=similarity_score, metadata=metadata_obj
             )
 
-            if selected_action == Action.EXPLORE:
-                response: str = self.__create(
-                    prompt=prompt, benchmark=benchmark, output_format=output_format
-                )
-                should_have_exploited: bool = self.similarity_evaluator.answers_similar(
-                    a=response, b=metadata_obj.response
-                )
-                if should_have_exploited:
-                    # TODO: Update policy directly in metadata object
-                    self.vectorq_policy.update_policy(
-                        similarity_score=similarity_score,
-                        is_correct=True,
-                        metadata=metadata_obj,
+            match selected_action:
+                case Action.REJECT:
+                    response: str = self.__create(
+                        prompt=prompt, benchmark=benchmark, output_format=output_format
                     )
-                else:
-                    # TODO: Update policy directly in metadata object
-                    self.vectorq_policy.update_policy(
-                        similarity_score=similarity_score,
-                        is_correct=False,
-                        metadata=metadata_obj,
+                    return False, response, ""
+                case Action.EXPLORE:
+                    response: str = self.__create(
+                        prompt=prompt, benchmark=benchmark, output_format=output_format
                     )
-                    self.__add(prompt=prompt, response=response, benchmark=benchmark)
-                self.cache.update_metadata(
-                    embedding_id=embedding_id, embedding_metadata=metadata_obj
-                )
-                return False, response, metadata_obj.response
-            else:
-                return True, metadata_obj.response, metadata_obj.response
+                    should_have_exploited: bool = (
+                        self.similarity_evaluator.answers_similar(
+                            a=response, b=metadata_obj.response
+                        )
+                    )
+                    if should_have_exploited:
+                        # TODO: Update policy directly in metadata object
+                        self.vectorq_policy.update_policy(
+                            similarity_score=similarity_score,
+                            is_correct=True,
+                            metadata=metadata_obj,
+                        )
+                    else:
+                        # TODO: Update policy directly in metadata object
+                        self.vectorq_policy.update_policy(
+                            similarity_score=similarity_score,
+                            is_correct=False,
+                            metadata=metadata_obj,
+                        )
+                        self.__add(
+                            prompt=prompt, response=response, benchmark=benchmark
+                        )
+                    self.cache.update_metadata(
+                        embedding_id=embedding_id, embedding_metadata=metadata_obj
+                    )
+                    return False, response, metadata_obj.response
+                case Action.EXPLOIT:
+                    return True, metadata_obj.response, metadata_obj.response
 
     def __create(
         self,

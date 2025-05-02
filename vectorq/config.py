@@ -24,11 +24,7 @@ class VectorQConfig:
 
     def __init__(
         self,
-        accuracy_target: float = 0.8,
         enable_cache: bool = True,
-        rnd_num_ub: float = 1.0,
-        is_static_threshold: bool = False,
-        static_threshold: float = 0.0,
         inference_engine: Optional[InferenceEngine] = None,
         embedding_engine: Optional[EmbeddingEngine] = None,
         vector_db: Optional[VectorDB] = None,
@@ -37,12 +33,7 @@ class VectorQConfig:
         embedding_metadata_storage: Optional[EmbeddingMetadataStorage] = None,
         vectorq_policy: Optional[VectorQPolicy] = None,
     ):
-        self.accuracy_target: float = accuracy_target
-        self.enable_cache: bool = enable_cache
-        self.rnd_num_ub: float = rnd_num_ub
-        self.is_static_threshold: bool = is_static_threshold
-        self.static_threshold: float = static_threshold
-
+        self.enable_cache = enable_cache
         self.inference_engine = inference_engine
         self.embedding_engine = embedding_engine
         self.vector_db = vector_db
