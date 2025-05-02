@@ -5,16 +5,6 @@ from vectorq.inference_engine.inference_engine import InferenceEngine
 from vectorq.vectorq_core.core import VectorQCore
 
 
-class VectorQBenchmark:
-    def __init__(
-        self,
-        candidate_embedding: List[float],
-        candidate_response: str,
-    ):
-        self.candidate_embedding = candidate_embedding
-        self.candidate_response = candidate_response
-
-
 class VectorQ:
     """
     VectorQ is a main class that contains the VectorQ semantic prompt caching system.
@@ -34,21 +24,18 @@ class VectorQ:
         self,
         prompt: str,
         system_prompt: Optional[str] = None,
-        benchmark: Optional[VectorQBenchmark] = None,
     ) -> Tuple[bool, str, str]:
         """
         prompt: str - The prompt to create a response for.
-        system_prompt: str - The optional system prompt to use for the response. It will override the system prompt in the VectorQConfig if provided.
-        benchmark: VectorQBenchmark - The optional benchmark object containing the pre-computed embedding and response.
+        system_prompt: Optional[str] - The optional system prompt to use for the response. It will override the system prompt in the VectorQConfig if provided.
         Returns: Tuple[bool, str, str] - [is_cache_hit, actual_response, nn_response] (the actual response is the one supposed to be used by the user, the nn_response is for benchmarking purposes)
         """
+        # Override system prompt if provided
         if system_prompt is None:
             system_prompt = self.vectorq_config.system_prompt
+
         if self.vectorq_config.enable_cache:
-            is_cache_hit, actual_response, nn_response = self.core.process_request(
-                prompt, benchmark, system_prompt
-            )
-            return is_cache_hit, actual_response, nn_response
+            return self.core.process_request(prompt, system_prompt)
         else:
             response = self.inference_engine.create(prompt, system_prompt)
             return False, response, response

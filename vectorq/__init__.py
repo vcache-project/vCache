@@ -12,7 +12,7 @@ from vectorq.inference_engine import (
     LangChainInferenceEngine,
     OpenAIInferenceEngine,
 )
-from vectorq.main import VectorQ, VectorQBenchmark
+from vectorq.main import VectorQ
 
 # Embedding engines
 from vectorq.vectorq_core.cache.embedding_engine import (
@@ -58,7 +58,6 @@ from vectorq.vectorq_core.vectorq_policy import (
 __all__ = [
     # Main classes
     "VectorQ",
-    "VectorQBenchmark",
     "VectorQConfig",
     # Inference engines
     "InferenceEngine",
