@@ -46,7 +46,7 @@ class VectorQCore:
         """
         if self.cache.is_empty():
             response: str = self.__create(
-                prompt=prompt, benchmark=benchmark, output_format=output_format
+                prompt=prompt, benchmark=benchmark, system_prompt=output_format
             )
             self.__add(prompt=prompt, response=response, benchmark=benchmark)
             return False, response, ""
@@ -65,12 +65,12 @@ class VectorQCore:
             match selected_action:
                 case Action.REJECT:
                     response: str = self.__create(
-                        prompt=prompt, benchmark=benchmark, output_format=output_format
+                        prompt=prompt, benchmark=benchmark, system_prompt=output_format
                     )
                     return False, response, ""
                 case Action.EXPLORE:
                     response: str = self.__create(
-                        prompt=prompt, benchmark=benchmark, output_format=output_format
+                        prompt=prompt, benchmark=benchmark, system_prompt=output_format
                     )
                     should_have_exploited: bool = (
                         self.similarity_evaluator.answers_similar(
@@ -105,13 +105,13 @@ class VectorQCore:
         self,
         prompt: str,
         benchmark: Optional["VectorQBenchmark"],
-        output_format: Optional[str],
+        system_prompt: Optional[str],
     ) -> str:
         if benchmark is not None:
             return benchmark.candidate_response
         else:
             return self.inference_engine.create(
-                prompt=prompt, output_format=output_format
+                prompt=prompt, system_prompt=system_prompt
             )
 
     def __add(

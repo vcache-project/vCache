@@ -293,7 +293,7 @@ class Benchmark(unittest.TestCase):
         try:
             is_cache_hit, cache_response, nn_response = self.vectorq.create(
                 prompt=vectorQ_prompt,
-                output_format=output_format,
+                system_prompt=output_format,
                 benchmark=vectorQ_benchmark,
             )
         except Exception as e:

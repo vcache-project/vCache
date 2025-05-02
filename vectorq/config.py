@@ -32,6 +32,7 @@ class VectorQConfig:
         eviction_policy: Optional[EvictionPolicy] = None,
         embedding_metadata_storage: Optional[EmbeddingMetadataStorage] = None,
         vectorq_policy: Optional[VectorQPolicy] = None,
+        system_prompt: Optional[str] = None,
     ):
         self.enable_cache = enable_cache
         self.inference_engine = inference_engine
@@ -41,3 +42,4 @@ class VectorQConfig:
         self.eviction_policy = eviction_policy
         self.embedding_metadata_storage = embedding_metadata_storage
         self.vectorq_policy = vectorq_policy
+        self.system_prompt = system_prompt

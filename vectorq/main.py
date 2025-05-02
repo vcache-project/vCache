@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 from vectorq.config import VectorQConfig
 from vectorq.inference_engine.inference_engine import InferenceEngine
@@ -31,20 +31,26 @@ class VectorQ:
             raise Exception(f"Error initializing VectorQ: {e}")
 
     def create(
-        self, prompt: str, output_format: str = None, benchmark: VectorQBenchmark = None
+        self,
+        prompt: str,
+        system_prompt: Optional[str] = None,
+        benchmark: Optional[VectorQBenchmark] = None,
     ) -> Tuple[bool, str, str]:
         """
         prompt: str - The prompt to create a response for.
+        system_prompt: str - The optional system prompt to use for the response. It will override the system prompt in the VectorQConfig if provided.
         benchmark: VectorQBenchmark - The optional benchmark object containing the pre-computed embedding and response.
         Returns: Tuple[bool, str, str] - [is_cache_hit, actual_response, nn_response] (the actual response is the one supposed to be used by the user, the nn_response is for benchmarking purposes)
         """
+        if system_prompt is None:
+            system_prompt = self.vectorq_config.system_prompt
         if self.vectorq_config.enable_cache:
             is_cache_hit, actual_response, nn_response = self.core.process_request(
-                prompt, benchmark, output_format
+                prompt, benchmark, system_prompt
             )
             return is_cache_hit, actual_response, nn_response
         else:
-            response = self.inference_engine.create(prompt, output_format)
+            response = self.inference_engine.create(prompt, system_prompt)
             return False, response, response
 
     def import_data(self, data: List[str]) -> bool:

@@ -10,11 +10,11 @@ class OpenAIInferenceEngine(InferenceEngine):
         self.temperature = temperature
         self.client = OpenAIClient()
 
-    def create(self, prompt: str, output_format: str = None) -> str:
+    def create(self, prompt: str, system_prompt: str = None) -> str:
         try:
             messages = []
-            if output_format:
-                messages.append({"role": "system", "content": output_format})
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt})
             messages.append({"role": "user", "content": prompt})
             completion = self.client.chat.completions.create(
                 model=self.model_name,
