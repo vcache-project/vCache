@@ -43,14 +43,11 @@ class VectorQ:
         Infer a response from the cache and return the cache hit status, the response, and the nearest neighbor response.
         Args
             prompt: str - The prompt to create a response for.
-            system_prompt: Optional[str] - The optional system prompt to use for the response. It will override the system prompt in the VectorQConfig if provided.
+            system_prompt: Optional[str] - The optional system prompt to use for the response. It will override the system prompt set in the InferenceEngine if provided.
             inference_engine_kwargs: Any - Additional arguments to pass to the underlying inference engine (e.g., max_tokens, temperature, etc).
         Returns
             Tuple[bool, str, str] - [is_cache_hit, response, nn_response] (the response is the one supposed to be used by the user, the nn_response is for benchmarking purposes)
         """
-        if system_prompt is None:
-            system_prompt = self.vectorq_config.system_prompt
-
         return self.vectorq_policy.process_request(
             prompt=prompt,
             system_prompt=system_prompt,
@@ -67,7 +64,7 @@ class VectorQ:
         Infer a response from the cache and return the response.
         Args
             prompt: str - The prompt to create a response for.
-            system_prompt: Optional[str] - The optional system prompt to use for the response. It will override the system prompt in the VectorQConfig if provided.
+            system_prompt: Optional[str] - The optional system prompt to use for the response. It will override the system prompt in the InferenceEngine if provided.
             inference_engine_kwargs: Any - Additional arguments to pass to the underlying inference engine (e.g., max_tokens, temperature, etc).
         Returns
             str - The response to be used by the user

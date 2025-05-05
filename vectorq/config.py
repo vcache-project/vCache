@@ -1,5 +1,3 @@
-from typing import Optional
-
 from vectorq.inference_engine.inference_engine import InferenceEngine
 from vectorq.inference_engine.strategies.openai import OpenAIInferenceEngine
 from vectorq.vectorq_core.cache.embedding_engine import OpenAIEmbeddingEngine
@@ -31,11 +29,9 @@ class VectorQConfig:
         vector_db: VectorDB = HNSWLibVectorDB(),
         embedding_metadata_storage: EmbeddingMetadataStorage = InMemoryEmbeddingMetadataStorage(),
         eviction_policy: EvictionPolicy = LRUEvictionPolicy(),
-        system_prompt: Optional[str] = None,
     ):
         self.inference_engine = inference_engine
         self.embedding_engine = embedding_engine
         self.vector_db = vector_db
         self.eviction_policy = eviction_policy
         self.embedding_metadata_storage = embedding_metadata_storage
-        self.system_prompt = system_prompt
