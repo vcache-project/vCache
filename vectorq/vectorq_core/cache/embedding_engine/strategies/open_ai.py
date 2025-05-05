@@ -11,7 +11,9 @@ class OpenAIEmbeddingEngine(EmbeddingEngine):
     """
 
     def __init__(
-        self, model_name: str = "text-embedding-ada-002", api_key: Optional[str] = None
+        self,
+        model_name: str = "text-embedding-ada-002",
+        api_key: Optional[str] = None,
     ):
         """
         Initialize an OpenAI embedding engine

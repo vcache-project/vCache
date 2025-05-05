@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, List, Optional
+from typing import List
 
 from vectorq.vectorq_core.cache.embedding_engine.embedding_engine import EmbeddingEngine
 from vectorq.vectorq_core.cache.embedding_store.embedding_metadata_storage.embedding_metadata_obj import (
@@ -6,9 +6,6 @@ from vectorq.vectorq_core.cache.embedding_store.embedding_metadata_storage.embed
 )
 from vectorq.vectorq_core.cache.embedding_store.embedding_store import EmbeddingStore
 from vectorq.vectorq_core.cache.eviction_policy.eviction_policy import EvictionPolicy
-
-if TYPE_CHECKING:
-    from vectorq.main import VectorQBenchmark
 
 
 class Cache:
@@ -31,14 +28,6 @@ class Cache:
         embedding = self.embedding_engine.get_embedding(prompt)
         self.embedding_store.add_embedding(embedding, response)
 
-    def add_embedding(self, embedding: List[float], response: str) -> int:
-        """
-        embedding: List[float] - The embedding to add to the cache
-        response: str - The response to add to the cache
-        returns: int - The id of the embedding
-        """
-        self.embedding_store.add_embedding(embedding, response)
-
     def remove(self, embedding_id: int) -> int:
         """
         embedding_id: int - The id of the embedding to remove
@@ -46,18 +35,13 @@ class Cache:
         """
         self.embedding_store.remove(embedding_id)
 
-    def get_knn(
-        self, prompt: str, k: int, benchmark: Optional["VectorQBenchmark"]
-    ) -> List[tuple[float, int]]:
+    def get_knn(self, prompt: str, k: int) -> List[tuple[float, int]]:
         """
         prompt: str - The prompt to get the k-nearest neighbors for
         k: int - The number of nearest neighbors to get
         returns: List[tuple[float, int]] - A list of tuples, each containing a similarity score and an embedding id
         """
-        if benchmark is not None:
-            embedding: List[float] = benchmark.candidate_embedding
-        else:
-            embedding: List[float] = self.embedding_engine.get_embedding(prompt)
+        embedding = self.embedding_engine.get_embedding(prompt)
         return self.embedding_store.get_knn(embedding, k)
 
     def flush(self) -> None:
@@ -66,7 +50,7 @@ class Cache:
         """
         self.embedding_store.reset()
 
-    def get_metadata(self, embedding_id: int) -> "EmbeddingMetadataObj":
+    def get_metadata(self, embedding_id: int) -> EmbeddingMetadataObj:
         """
         embedding_id: int - The id of the embedding to get the metadata for
         returns: EmbeddingMetadataObj - The metadata of the embedding
@@ -74,8 +58,8 @@ class Cache:
         return self.embedding_store.get_metadata(embedding_id)
 
     def update_metadata(
-        self, embedding_id: int, embedding_metadata: "EmbeddingMetadataObj"
-    ) -> "EmbeddingMetadataObj":
+        self, embedding_id: int, embedding_metadata: EmbeddingMetadataObj
+    ) -> EmbeddingMetadataObj:
         """
         embedding_id: int - The id of the embedding to update
         embedding_metadata: EmbeddingMetadataObj - The metadata to update the embedding with
@@ -96,7 +80,7 @@ class Cache:
         """
         return self.embedding_store.is_empty()
 
-    def get_all_embedding_metadata_objects(self) -> List["EmbeddingMetadataObj"]:
+    def get_all_embedding_metadata_objects(self) -> List[EmbeddingMetadataObj]:
         """
         returns: List["EmbeddingMetadataObj"] - A list of all the embedding metadata objects in the cache
         """

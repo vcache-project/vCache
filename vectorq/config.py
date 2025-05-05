@@ -1,19 +1,21 @@
 from typing import Optional
 
 from vectorq.inference_engine.inference_engine import InferenceEngine
+from vectorq.inference_engine.strategies.open_ai import OpenAIInferenceEngine
+from vectorq.vectorq_core.cache.embedding_engine import OpenAIEmbeddingEngine
 from vectorq.vectorq_core.cache.embedding_engine.embedding_engine import EmbeddingEngine
 from vectorq.vectorq_core.cache.embedding_store.embedding_metadata_storage.embedding_metadata_storage import (
     EmbeddingMetadataStorage,
 )
+from vectorq.vectorq_core.cache.embedding_store.embedding_metadata_storage.strategies.in_memory import (
+    InMemoryEmbeddingMetadataStorage,
+)
 from vectorq.vectorq_core.cache.embedding_store.vector_db import VectorDB
+from vectorq.vectorq_core.cache.embedding_store.vector_db.strategies.hnsw_lib import (
+    HNSWLibVectorDB,
+)
 from vectorq.vectorq_core.cache.eviction_policy.eviction_policy import EvictionPolicy
-from vectorq.vectorq_core.similarity_evaluator.similarity_evaluator import (
-    SimilarityEvaluator,
-)
-from vectorq.vectorq_core.similarity_evaluator.strategies.string_comparison import (
-    StringComparisonSimilarityEvaluator,
-)
-from vectorq.vectorq_core.vectorq_policy.vectorq_policy import VectorQPolicy
+from vectorq.vectorq_core.cache.eviction_policy.strategies.lru import LRUEvictionPolicy
 
 
 class VectorQConfig:
@@ -24,29 +26,16 @@ class VectorQConfig:
 
     def __init__(
         self,
-        accuracy_target: float = 0.8,
-        enable_cache: bool = True,
-        rnd_num_ub: float = 1.0,
-        is_static_threshold: bool = False,
-        static_threshold: float = 0.0,
-        inference_engine: Optional[InferenceEngine] = None,
-        embedding_engine: Optional[EmbeddingEngine] = None,
-        vector_db: Optional[VectorDB] = None,
-        similarity_evaluator: SimilarityEvaluator = StringComparisonSimilarityEvaluator(),
-        eviction_policy: Optional[EvictionPolicy] = None,
-        embedding_metadata_storage: Optional[EmbeddingMetadataStorage] = None,
-        vectorq_policy: Optional[VectorQPolicy] = None,
+        inference_engine: InferenceEngine = OpenAIInferenceEngine(),
+        embedding_engine: EmbeddingEngine = OpenAIEmbeddingEngine(),
+        vector_db: VectorDB = HNSWLibVectorDB(),
+        embedding_metadata_storage: EmbeddingMetadataStorage = InMemoryEmbeddingMetadataStorage(),
+        eviction_policy: EvictionPolicy = LRUEvictionPolicy(),
+        system_prompt: Optional[str] = None,
     ):
-        self.accuracy_target: float = accuracy_target
-        self.enable_cache: bool = enable_cache
-        self.rnd_num_ub: float = rnd_num_ub
-        self.is_static_threshold: bool = is_static_threshold
-        self.static_threshold: float = static_threshold
-
         self.inference_engine = inference_engine
         self.embedding_engine = embedding_engine
         self.vector_db = vector_db
-        self.similarity_evaluator = similarity_evaluator
         self.eviction_policy = eviction_policy
         self.embedding_metadata_storage = embedding_metadata_storage
-        self.vectorq_policy = vectorq_policy
+        self.system_prompt = system_prompt

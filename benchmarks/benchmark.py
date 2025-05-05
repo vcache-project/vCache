@@ -291,9 +291,9 @@ class Benchmark(unittest.TestCase):
         vectorQ_prompt = f"{task} {review_text}"
         latency_vectorq_logic: float = time.time()
         try:
-            is_cache_hit, cache_response, nn_response = self.vectorq.create(
+            is_cache_hit, cache_response, nn_response = self.vectorq.infer(
                 prompt=vectorQ_prompt,
-                output_format=output_format,
+                system_prompt=output_format,
                 benchmark=vectorQ_benchmark,
             )
         except Exception as e:

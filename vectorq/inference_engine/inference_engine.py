@@ -7,7 +7,7 @@ class InferenceEngine(ABC):
     """
 
     @abstractmethod
-    def create(self, prompt: str, output_format: str = None) -> str:
+    def create(self, prompt: str, system_prompt: str = None) -> str:
         """
         prompt: str - The prompt to create an answer for
         output_format: str - The optional output format to use for the response
