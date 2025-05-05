@@ -108,19 +108,17 @@ llm_models: List[Tuple[str, str, str, int]] = [
 ]
 candidate_strategy: str = SIMILARITY_STRATEGY[0]
 
-# static_thresholds = np.array(
-#     [0.76, 0.78, 0.80, 0.82, 0.84, 0.86, 0.88, 0.90, 0.92, 0.94, 0.96]
-# )
-static_thresholds = np.array([0.76, 0.78])
-# deltas = np.array([0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1])
-deltas = np.array([0.01, 0.02])
+static_thresholds = np.array(
+    [0.76, 0.78, 0.80, 0.82, 0.84, 0.86, 0.88, 0.90, 0.92, 0.94, 0.96]
+)
+deltas = np.array([0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1])
 
 # VectorQ Config
 MAX_VECTOR_DB_CAPACITY: int = 100000
 PLOT_FONT_SIZE: int = 24
 
 SYSTEM_TYPES: List[str] = ["static", "dynamic_local", "dynamic_global", "all"]
-SYSTEM_TYPE: str = SYSTEM_TYPES[2]
+SYSTEM_TYPE: str = SYSTEM_TYPES[3]
 
 
 ########################################################################################################################
