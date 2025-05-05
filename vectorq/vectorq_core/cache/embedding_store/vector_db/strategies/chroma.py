@@ -71,6 +71,7 @@ class ChromaVectorDB(VectorDB):
         self.collection = self.client.create_collection(
             name=collection_name,
             metadata={"dimension": embedding_dim, "hnsw:space": space},
+            get_or_create=True,
         )
 
     def is_empty(self) -> bool:
