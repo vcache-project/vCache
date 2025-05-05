@@ -1,16 +1,26 @@
 from abc import ABC, abstractmethod
+from typing import Any, Optional
 
 
 class InferenceEngine(ABC):
     """
-    Abstract base class for inference engines
+    Abstract base class for inference engines.
     """
 
     @abstractmethod
-    def create(self, prompt: str, system_prompt: str = None) -> str:
+    def infer(
+        self,
+        prompt: str,
+        system_prompt: Optional[str] = None,
+        **kwargs: Any,
+    ) -> str:
         """
-        prompt: str - The prompt to create an answer for
-        output_format: str - The optional output format to use for the response
-        returns: str - The answer to the prompt
+        Infer a response from the inference engine.
+        Args
+            prompt: str - The prompt to create a response for.
+            system_prompt: Optional[str] - The optional system prompt to use for the response.
+            **kwargs: Any - Additional arguments to pass to the underlying inference engine (e.g., max_tokens, temperature, etc).
+        Returns
+            str - The response of the prompt.
         """
         pass

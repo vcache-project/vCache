@@ -2,8 +2,12 @@ import os
 import unittest
 
 import pytest
+from dotenv import load_dotenv
 
 from vectorq.inference_engine import LangChainInferenceEngine, OpenAIInferenceEngine
+
+load_dotenv()
+
 
 INFERENCE_ENGINE_PARAMS = [
     pytest.param(

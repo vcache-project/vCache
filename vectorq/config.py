@@ -1,7 +1,7 @@
 from typing import Optional
 
 from vectorq.inference_engine.inference_engine import InferenceEngine
-from vectorq.inference_engine.strategies.open_ai import OpenAIInferenceEngine
+from vectorq.inference_engine.strategies.openai import OpenAIInferenceEngine
 from vectorq.vectorq_core.cache.embedding_engine import OpenAIEmbeddingEngine
 from vectorq.vectorq_core.cache.embedding_engine.embedding_engine import EmbeddingEngine
 from vectorq.vectorq_core.cache.embedding_store.embedding_metadata_storage.embedding_metadata_storage import (
