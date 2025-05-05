@@ -15,9 +15,17 @@ class OpenAIInferenceEngine(InferenceEngine):
         super().__init__()
         self.model_name = model_name
         self.temperature = temperature
-        self.client = OpenAIClient(api_key=api_key)
+        self.api_key = api_key
+        self._client = None
 
-    def create(self, prompt: str, system_prompt: str = None) -> str:
+    @property
+    def client(self) -> OpenAIClient:
+        """Lazily initialize the OpenAI client only when needed."""
+        if self._client is None:
+            self._client = OpenAIClient(api_key=self.api_key)
+        return self._client
+
+    def create(self, prompt: str, system_prompt: Optional[str] = None) -> str:
         try:
             messages = []
             if system_prompt:

@@ -2,9 +2,7 @@ import unittest
 
 from dotenv import load_dotenv
 
-load_dotenv()
-
-from vectorq import (  # noqa: E402
+from vectorq import (
     HNSWLibVectorDB,
     InMemoryEmbeddingMetadataStorage,
     LangChainEmbeddingEngine,
@@ -13,6 +11,8 @@ from vectorq import (  # noqa: E402
     VectorQ,
     VectorQConfig,
 )
+
+load_dotenv()
 
 
 def create_default_config_and_policy():
