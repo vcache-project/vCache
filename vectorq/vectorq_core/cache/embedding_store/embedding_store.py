@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, List
+from typing import List
 
 from vectorq.vectorq_core.cache.embedding_store.embedding_metadata_storage import (
     EmbeddingMetadataStorage,
@@ -8,16 +8,15 @@ from vectorq.vectorq_core.cache.embedding_store.embedding_metadata_storage.embed
 )
 from vectorq.vectorq_core.cache.embedding_store.vector_db.vector_db import VectorDB
 
-if TYPE_CHECKING:
-    from vectorq.config import VectorQConfig
-
 
 class EmbeddingStore:
-    def __init__(self, vectorq_config: "VectorQConfig"):
-        self.vector_db: "VectorDB" = vectorq_config.vector_db
-        self.embedding_metadata_storage: "EmbeddingMetadataStorage" = (
-            vectorq_config.embedding_metadata_storage
-        )
+    def __init__(
+        self,
+        vector_db: VectorDB,
+        embedding_metadata_storage: EmbeddingMetadataStorage,
+    ):
+        self.vector_db = vector_db
+        self.embedding_metadata_storage = embedding_metadata_storage
 
     def add_embedding(self, embedding: List[float], response: str) -> int:
         embedding_id = self.vector_db.add(embedding)

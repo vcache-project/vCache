@@ -17,8 +17,9 @@ from vectorq.vectorq_core.cache.embedding_store.embedding_metadata_storage.embed
     EmbeddingMetadataObj,
 )
 from vectorq.vectorq_core.cache.embedding_store.embedding_store import EmbeddingStore
-from vectorq.vectorq_core.similarity_evaluator.similarity_evaluator import (
+from vectorq.vectorq_core.similarity_evaluator import (
     SimilarityEvaluator,
+    StringComparisonSimilarityEvaluator,
 )
 from vectorq.vectorq_policy.vectorq_policy import VectorQPolicy
 
@@ -345,7 +346,7 @@ class _Bayesian:
 class DynamicThresholdPolicy(VectorQPolicy):
     def __init__(
         self,
-        similarity_evaluator: SimilarityEvaluator,
+        similarity_evaluator: SimilarityEvaluator = StringComparisonSimilarityEvaluator(),
         delta: float = 0.01,
         is_global: bool = True,
     ):
