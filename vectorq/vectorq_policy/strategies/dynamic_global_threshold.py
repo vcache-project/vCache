@@ -28,6 +28,15 @@ class DynamicGlobalThresholdPolicy(VectorQPolicy):
         similarity_evaluator: SimilarityEvaluator = StringComparisonSimilarityEvaluator(),
         delta: float = 0.01,
     ):
+        """
+        This policy uses the VectorQ algorithm to compute the optimal threshold across all embeddings.
+        Each threshold is used to determine if a response is a cache hit.
+        This is suboptimal in cases when the embeddings cannot seperate correct from incorrect responses.
+
+        Args
+            similarity_evaluator: SimilarityEvaluator - The similarity evaluator to use
+            delta: float - The delta value to use
+        """
         self.similarity_evaluator = similarity_evaluator
         self.bayesian = _Bayesian(delta=delta)
         self.inference_engine = None

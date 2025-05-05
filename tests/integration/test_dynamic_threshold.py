@@ -31,7 +31,6 @@ def create_default_config_and_policy():
     )
     policy = DynamicLocalThresholdPolicy(
         delta=0.05,
-        is_global=False,
         similarity_evaluator=StringComparisonSimilarityEvaluator(),
     )
     return config, policy
