@@ -2,7 +2,6 @@ import random
 from enum import Enum
 from typing import Dict, List, Optional, Tuple
 
-import cvxpy as cp
 import numpy as np
 import statsmodels.api as sm
 from scipy.special import expit
@@ -120,10 +119,10 @@ class _Bayesian:
         self.global_var_t: float = None
 
         self.variance_map: Dict[int, List[float]] = {
-            6:  0.035445,
-            7:  0.028285,
-            8:  0.026436,
-            9:  0.021349,
+            6: 0.035445,
+            7: 0.028285,
+            8: 0.026436,
+            9: 0.021349,
             10: 0.019371,
             11: 0.012615,
             12: 0.011433,
@@ -244,7 +243,7 @@ class _Bayesian:
                 print(f"len does not match: {len(similarities)} != {len(labels)}")
             self.logistic_regression.fit(similarities, labels)
             intercept, gamma = self.logistic_regression.coef_[0]
-            
+
             gamma = max(gamma, 1e-6)
             t_hat = -intercept / gamma
             t_hat = float(np.clip(t_hat, 0.0, 1.0))

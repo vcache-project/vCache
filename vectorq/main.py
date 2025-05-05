@@ -20,7 +20,7 @@ class VectorQ:
         self.vectorq_config = config
         self.vectorq_policy = policy
         self.vectorq_policy.setup(config)
-        
+
     def infer(
         self,
         prompt: str,
