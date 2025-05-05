@@ -44,7 +44,7 @@ class StaticThresholdPolicy(VectorQPolicy):
             raise ValueError("Policy has not been setup")
 
         knn = self.cache.get_knn(prompt=prompt, k=1)
-        
+
         if not knn:
             response = self.inference_engine.create(
                 prompt=prompt, system_prompt=system_prompt
