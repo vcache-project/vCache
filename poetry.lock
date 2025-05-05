@@ -408,7 +408,6 @@ files = [
 [[package]]
 name = "certifi"
 version = "2025.4.26"
-version = "2025.4.26"
 description = "Python package for providing Mozilla's CA Bundle."
 optional = false
 python-versions = ">=3.6"
