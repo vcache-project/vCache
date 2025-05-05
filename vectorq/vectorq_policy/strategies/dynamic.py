@@ -1,39 +1,52 @@
+import logging
 import random
-from typing import Dict, List, Tuple
+import time
+from enum import Enum
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import statsmodels.api as sm
 from scipy.special import expit
 from scipy.stats import norm
 from sklearn.linear_model import LogisticRegression
+from typing_extensions import override
 
+from vectorq.config import VectorQConfig
+from vectorq.vectorq_core.cache.cache import Cache
 from vectorq.vectorq_core.cache.embedding_store.embedding_metadata_storage.embedding_metadata_obj import (
     EmbeddingMetadataObj,
 )
-from vectorq.vectorq_core.vectorq_policy.action import Action
-from vectorq.vectorq_core.vectorq_policy.vectorq_policy import VectorQPolicy
+from vectorq.vectorq_core.cache.embedding_store.embedding_store import EmbeddingStore
+from vectorq.vectorq_core.similarity_evaluator import (
+    SimilarityEvaluator,
+    StringComparisonSimilarityEvaluator,
+)
+from vectorq.vectorq_policy.vectorq_policy import VectorQPolicy
 
 
-class VectorQBayesianPolicy(VectorQPolicy):
+class _Action(Enum):
+    EXPLORE = "explore"
+    EXPLOIT = "exploit"
+
+
+class _Bayesian:
     def __init__(self, delta: float, is_global: bool = False):
-        self.delta: float = delta
-        self.P_c: float = 1.0 - self.delta
-        self.epsilon_grid: np.ndarray = np.linspace(1e-6, 1 - 1e-6, 50)
-        self.logistic_regression: LogisticRegression = LogisticRegression(
+        self.delta = delta
+        self.P_c = 1.0 - self.delta
+        self.epsilon_grid: np.ndarray = np.linspace(0.01, 0.5, 50)
+        self.logistic_regression = LogisticRegression(
             penalty=None, solver="lbfgs", tol=1e-8, max_iter=1000, fit_intercept=False
         )
 
-        self.is_global: bool = is_global
+        self.is_global = is_global
         self.global_observations: List[Tuple[float, int]] = []
         self.global_observations.append((0.0, 0))
         self.global_observations.append((1.0, 1))
-        self.global_gamma: float = None
-        self.global_t_hat: float = None
-        self.global_t_prime: float = None
-        self.global_var_t: float = None
+        self.global_gamma: Optional[float] = None
+        self.global_t_hat: Optional[float] = None
 
         self.variance_map: Dict[int, List[float]] = {
-            6: 0.012445,
+            6: 0.002445,
             7: 0.014285,
             8: 0.014436,
             9: 0.011349,
@@ -78,7 +91,7 @@ class VectorQBayesianPolicy(VectorQPolicy):
             48: 0.01531,
         }
 
-    def update_policy(
+    def update_metadata(
         self, similarity_score: float, is_correct: bool, metadata: EmbeddingMetadataObj
     ) -> None:
         """
@@ -101,7 +114,7 @@ class VectorQBayesianPolicy(VectorQPolicy):
 
     def select_action(
         self, similarity_score: float, metadata: EmbeddingMetadataObj
-    ) -> Action:
+    ) -> _Action:
         """
         Select the action to take based on the similarity score, observations, and accuracy target
         Args
@@ -123,32 +136,43 @@ class VectorQBayesianPolicy(VectorQPolicy):
             labels: np.ndarray = np.array([obs[1] for obs in metadata.observations])
 
         if len(similarities) < 6 or len(labels) < 6:
-            return Action.EXPLORE
+            return _Action.EXPLORE
 
+        start_time = time.time()
         t_hat, gamma, var_t = self._estimate_parameters(
             similarities=similarities, labels=labels
         )
-
+        end_time_parameter_estimation = time.time()
+        if self.is_global:
+            sorted_observations = sorted(self.global_observations, key=lambda x: x[0])
+        else:
+            sorted_observations = sorted(metadata.observations, key=lambda x: x[0])
+        logging.info(
+            f"Embedding {metadata.embedding_id} | similarity: {similarity_score} | Observations: {sorted_observations}"
+        )
         if t_hat == -1:
-            return Action.EXPLORE
+            return _Action.EXPLORE
         if self.is_global:
             self.global_gamma = gamma
             self.global_t_hat = t_hat
-            self.global_var_t = var_t
         else:
             metadata.gamma = gamma
             metadata.t_hat = t_hat
-            metadata.var_t = var_t
 
+        start_time = time.time()
         tau: float = self._get_tau(
             var_t=var_t, s=similarity_score, t_hat=t_hat, metadata=metadata
+        )
+        logging.info(f"t_hat: {t_hat}, gamma: {gamma}, tau: {tau}")
+        logging.info(
+            f"Parameter estimation: {(end_time_parameter_estimation - start_time):.4f} sec, Tau estimation: {(time.time() - end_time_parameter_estimation):.4f} sec\n"
         )
 
         u: float = random.uniform(0, 1)
         if u <= tau:
-            return Action.EXPLORE
+            return _Action.EXPLORE
         else:
-            return Action.EXPLOIT
+            return _Action.EXPLOIT
 
     def _estimate_parameters(
         self, similarities: np.ndarray, labels: np.ndarray
@@ -175,6 +199,7 @@ class VectorQBayesianPolicy(VectorQPolicy):
 
             t_hat = -intercept / (gamma + 1e-6)
             t_hat = float(np.clip(t_hat, 0.0, 1.0))
+            # gamma = float(max(12.0, gamma))
 
             similarities_col = (
                 similarities[:, 1] if similarities.shape[1] > 1 else similarities[:, 0]
@@ -190,7 +215,7 @@ class VectorQBayesianPolicy(VectorQPolicy):
                 intercept=intercept,
             )
 
-            return round(t_hat, 3), round(gamma, 3), var_t
+            return round(t_hat, 3), round(gamma, 3), round(var_t, 5)
 
         except Exception as e:
             print(f"Logistic regression failed: {e}")
@@ -224,6 +249,7 @@ class VectorQBayesianPolicy(VectorQPolicy):
             else:
                 max_observations = max(self.variance_map.keys())
                 var_t = self.variance_map[max_observations]
+            logging.info(f"var_t (map): {round(var_t, 5)}")
             return var_t
         else:
             p = self.logistic_regression.predict_proba(X)[:, 1]
@@ -236,6 +262,7 @@ class VectorQBayesianPolicy(VectorQPolicy):
 
             var_t_hat = float(grad @ cov_beta @ grad)
             var_t_hat = max(0.0, var_t_hat)
+            logging.info(f"var_t_hat (delta method): {round(var_t_hat, 5)}")
             return var_t_hat
 
     def _get_tau(
@@ -261,17 +288,13 @@ class VectorQBayesianPolicy(VectorQPolicy):
         else:
             likelihoods = self._likelihood(s=s, t=t_primes, gamma=metadata.gamma)
         alpha_lower_bounds = (1 - self.epsilon_grid) * likelihoods
-
+        logging.info(f"alpha_lower_bounds: {alpha_lower_bounds}")
         taus = 1 - (1 - self.P_c) / (1 - alpha_lower_bounds)
-        if self.is_global:
-            self.global_t_prime = t_primes[np.argmin(taus)]
-        else:
-            metadata.t_prime = t_primes[np.argmin(taus)]
-        return round(np.min(taus), 5)
+        return round(np.min(taus), 3)
 
     def _get_t_primes(self, t_hat: float, var_t: float) -> List[float]:
         """
-        Compute all possible t_prime values.
+        Compute all possible t_prime values
         Args
             t_hat: float - The estimated threshold
             var_t: float - The variance of t
@@ -286,6 +309,7 @@ class VectorQBayesianPolicy(VectorQPolicy):
                 for i in range(len(self.epsilon_grid))
             ]
         )
+        logging.info(f"t_primes: {t_primes}")
         return t_primes
 
     def _confidence_interval(
@@ -303,7 +327,7 @@ class VectorQBayesianPolicy(VectorQPolicy):
         """
         z = norm.ppf(quantile)
         t_prime = t_hat + z * np.sqrt(var_t)
-        return float(np.clip(t_prime, 0.0, 1.0))
+        return round(float(np.clip(t_prime, 0.0, 1.0)), 3)
 
     def _likelihood(self, s: float, t: float, gamma: float) -> float:
         """
@@ -317,3 +341,81 @@ class VectorQBayesianPolicy(VectorQPolicy):
         """
         z = gamma * (s - t)
         return expit(z)
+
+
+class DynamicThresholdPolicy(VectorQPolicy):
+    def __init__(
+        self,
+        similarity_evaluator: SimilarityEvaluator = StringComparisonSimilarityEvaluator(),
+        delta: float = 0.01,
+        is_global: bool = True,
+    ):
+        self.similarity_evaluator = similarity_evaluator
+        self.bayesian = _Bayesian(delta=delta, is_global=is_global)
+        self.inference_engine = None
+        self.cache = None
+
+    @override
+    def setup(self, config: VectorQConfig):
+        self.inference_engine = config.inference_engine
+        self.cache = Cache(
+            embedding_engine=config.embedding_engine,
+            embedding_store=EmbeddingStore(
+                embedding_metadata_storage=config.embedding_metadata_storage,
+                vector_db=config.vector_db,
+            ),
+            eviction_policy=config.eviction_policy,
+        )
+
+    @override
+    def process_request(
+        self, prompt: str, system_prompt: Optional[str]
+    ) -> tuple[bool, str, str]:
+        """
+        Args
+            prompt: str - The prompt to check for cache hit
+            system_prompt: Optional[str] - The optional system prompt to use for the response. It will override the system prompt in the VectorQConfig if provided.
+        Returns
+            tuple[bool, str, str] - [is_cache_hit, actual_response, nn_response]
+        """
+        if self.inference_engine is None or self.cache is None:
+            raise ValueError("Policy has not been setup")
+
+        knn = self.cache.get_knn(prompt=prompt, k=1)
+        if not knn:
+            # No entries in cache, call inference engine directly
+            response = self.inference_engine.create(
+                prompt=prompt, system_prompt=system_prompt
+            )
+            self.cache.add(prompt=prompt, response=response)
+            return False, response, ""
+
+        similarity_score, embedding_id = knn[0]
+        metadata = self.cache.get_metadata(embedding_id=embedding_id)
+        action = self.bayesian.select_action(
+            similarity_score=similarity_score, metadata=metadata
+        )
+
+        match action:
+            case _Action.EXPLOIT:
+                # Cache hit, return cached response
+                return True, metadata.response, metadata.response
+            case _Action.EXPLORE:
+                # Cache miss, call inference engine and update metadata
+                response = self.inference_engine.create(
+                    prompt=prompt, system_prompt=system_prompt
+                )
+                should_have_exploited = self.similarity_evaluator.answers_similar(
+                    a=response, b=metadata.response
+                )
+                self.bayesian.update_metadata(
+                    similarity_score=similarity_score,
+                    is_correct=should_have_exploited,
+                    metadata=metadata,
+                )
+                if not should_have_exploited:
+                    self.cache.add(prompt=prompt, response=response)
+                self.cache.update_metadata(
+                    embedding_id=embedding_id, embedding_metadata=metadata
+                )
+                return False, response, metadata.response

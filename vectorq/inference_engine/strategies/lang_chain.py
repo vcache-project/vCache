@@ -49,11 +49,11 @@ class LangChainInferenceEngine(InferenceEngine):
         except Exception as e:
             raise Exception(f"Error initializing LangChain model: {e}")
 
-    def create(self, prompt: str, output_format: str = None) -> str:
+    def create(self, prompt: str, system_prompt: str = None) -> str:
         try:
             messages = []
-            if output_format:
-                messages.append(SystemMessage(content=output_format))
+            if system_prompt:
+                messages.append(SystemMessage(content=system_prompt))
             messages.append(HumanMessage(content=prompt))
 
             response = self.chat_model(messages)

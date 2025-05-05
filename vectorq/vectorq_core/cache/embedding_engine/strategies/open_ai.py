@@ -11,7 +11,9 @@ class OpenAIEmbeddingEngine(EmbeddingEngine):
     """
 
     def __init__(
-        self, model_name: str = "text-embedding-ada-002", api_key: Optional[str] = None
+        self,
+        model_name: str = "text-embedding-ada-002",
+        api_key: Optional[str] = None,
     ):
         """
         Initialize an OpenAI embedding engine
@@ -21,7 +23,17 @@ class OpenAIEmbeddingEngine(EmbeddingEngine):
             api_key: Optional API key (if not provided, will use environment variables)
         """
         self.model_name = model_name
-        self.client = OpenAIClient(api_key=api_key) if api_key else OpenAIClient()
+        self.api_key = api_key
+        self._client = None
+
+    @property
+    def client(self) -> OpenAIClient:
+        """Lazily initialize the OpenAI client only when needed."""
+        if self._client is None:
+            self._client = (
+                OpenAIClient(api_key=self.api_key) if self.api_key else OpenAIClient()
+            )
+        return self._client
 
     def get_embedding(self, text: str) -> List[float]:
         """

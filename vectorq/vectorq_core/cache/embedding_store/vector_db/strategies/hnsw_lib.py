@@ -46,7 +46,7 @@ class HNSWLibVectorDB(VectorDB):
 
     def get_knn(self, embedding: List[float], k: int) -> List[tuple[float, int]]:
         if self.index is None:
-            raise ValueError("Index is not initialized")
+            return []
         k_ = min(k, self.embedding_count)
         if k_ == 0:
             return []

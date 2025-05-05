@@ -7,12 +7,11 @@ from vectorq.config import VectorQConfig
 
 # Inference engines
 from vectorq.inference_engine import (
-    DummyInferenceEngine,
     InferenceEngine,
     LangChainInferenceEngine,
     OpenAIInferenceEngine,
 )
-from vectorq.main import VectorQ, VectorQBenchmark
+from vectorq.main import VectorQ
 
 # Embedding engines
 from vectorq.vectorq_core.cache.embedding_engine import (
@@ -48,16 +47,22 @@ from vectorq.vectorq_core.similarity_evaluator import (
     StringComparisonSimilarityEvaluator,
 )
 
+# VectorQ Policies
+from vectorq.vectorq_policy import (
+    DynamicThresholdPolicy,
+    NoCachePolicy,
+    StaticThresholdPolicy,
+    VectorQPolicy,
+)
+
 __all__ = [
     # Main classes
     "VectorQ",
-    "VectorQBenchmark",
     "VectorQConfig",
     # Inference engines
     "InferenceEngine",
     "OpenAIInferenceEngine",
     "LangChainInferenceEngine",
-    "DummyInferenceEngine",
     # Embedding engines
     "EmbeddingEngine",
     "OpenAIEmbeddingEngine",
@@ -74,8 +79,12 @@ __all__ = [
     # Eviction policies
     "EvictionPolicy",
     "LRUEvictionPolicy",
-    "NoEvictionPolicy",
     # Embedding metadata storage
     "EmbeddingMetadataStorage",
     "InMemoryEmbeddingMetadataStorage",
+    # VectorQ Policies
+    "VectorQPolicy",
+    "DynamicThresholdPolicy",
+    "StaticThresholdPolicy",
+    "NoCachePolicy",
 ]
