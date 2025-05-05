@@ -25,13 +25,13 @@ class VectorQ:
         system_prompt: Optional[str] = None,
     ) -> Tuple[bool, str, str]:
         """
+        Infer a response from the cache and return the cache hit status, the response, and the nearest neighbor response.
         Args
             prompt: str - The prompt to create a response for.
             system_prompt: Optional[str] - The optional system prompt to use for the response. It will override the system prompt in the VectorQConfig if provided.
         Returns
             Tuple[bool, str, str] - [is_cache_hit, response, nn_response] (the response is the one supposed to be used by the user, the nn_response is for benchmarking purposes)
         """
-        # Override system prompt if provided
         if system_prompt is None:
             system_prompt = self.vectorq_config.system_prompt
 
@@ -43,6 +43,7 @@ class VectorQ:
         system_prompt: Optional[str] = None,
     ) -> str:
         """
+        Infer a response from the cache and return the response.
         Args
             prompt: str - The prompt to create a response for.
             system_prompt: Optional[str] - The optional system prompt to use for the response. It will override the system prompt in the VectorQConfig if provided.

@@ -7,7 +7,6 @@ from vectorq.config import VectorQConfig
 
 # Inference engines
 from vectorq.inference_engine import (
-    DummyInferenceEngine,
     InferenceEngine,
     LangChainInferenceEngine,
     OpenAIInferenceEngine,
@@ -64,7 +63,6 @@ __all__ = [
     "InferenceEngine",
     "OpenAIInferenceEngine",
     "LangChainInferenceEngine",
-    "DummyInferenceEngine",
     # Embedding engines
     "EmbeddingEngine",
     "OpenAIEmbeddingEngine",

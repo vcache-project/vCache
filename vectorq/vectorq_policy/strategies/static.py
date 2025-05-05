@@ -44,8 +44,8 @@ class StaticThresholdPolicy(VectorQPolicy):
             raise ValueError("Policy has not been setup")
 
         knn = self.cache.get_knn(prompt=prompt, k=1)
+        
         if not knn:
-            # No entries in cache, call inference engine directly
             response = self.inference_engine.create(
                 prompt=prompt, system_prompt=system_prompt
             )
@@ -54,11 +54,10 @@ class StaticThresholdPolicy(VectorQPolicy):
 
         similarity_score, embedding_id = knn[0]
         metadata = self.cache.get_metadata(embedding_id=embedding_id)
-        if similarity_score >= self.threshold:
-            # Cache hit, return cached response
+        is_cache_hit = similarity_score >= self.threshold
+        if is_cache_hit:
             return True, metadata.response, metadata.response
         else:
-            # Cache miss, call inference engine
             response = self.inference_engine.create(
                 prompt=prompt, system_prompt=system_prompt
             )

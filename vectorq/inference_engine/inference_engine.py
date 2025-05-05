@@ -14,13 +14,3 @@ class InferenceEngine(ABC):
         returns: str - The answer to the prompt
         """
         pass
-
-
-class DummyInferenceEngine(InferenceEngine):
-    """A simple fallback strategy that doesn't require any dependencies"""
-
-    def __init__(self):
-        super().__init__()
-
-    def create(self, prompt: str, output_format: str = None) -> str:
-        return f"[DUMMY RESPONSE] This is a placeholder response for: '{prompt}'"

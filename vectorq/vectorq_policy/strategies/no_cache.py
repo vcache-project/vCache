@@ -26,7 +26,7 @@ class NoCachePolicy(VectorQPolicy):
             tuple[bool, str, str] - [is_cache_hit, actual_response, nn_response]
         """
         if self.inference_engine is None:
-            raise ValueError("Policy has not been setup")
+            raise ValueError("Inference engine has not been setup")
 
         response = self.inference_engine.create(
             prompt=prompt, system_prompt=system_prompt
