@@ -26,7 +26,7 @@ class DynamicGlobalThresholdPolicy(VectorQPolicy):
     def __init__(
         self,
         similarity_evaluator: SimilarityEvaluator = StringComparisonSimilarityEvaluator(),
-        delta: float = 0.01
+        delta: float = 0.01,
     ):
         self.similarity_evaluator = similarity_evaluator
         self.bayesian = _Bayesian(delta=delta)
@@ -206,7 +206,7 @@ class _Bayesian:
 
         if t_hat == -1:
             return _Action.EXPLORE
-        
+
         self.global_gamma = gamma
         self.global_t_hat = t_hat
         self.global_var_t = var_t

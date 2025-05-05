@@ -15,7 +15,13 @@ from benchmarks._plotter_combined import generate_combined_plots
 from benchmarks._plotter_individual import generate_individual_plots
 from benchmarks.common.comparison import answers_have_same_meaning_static
 from vectorq.config import VectorQConfig
-from vectorq.main import VectorQ, VectorQBenchmark
+from vectorq.main import VectorQ
+from vectorq.vectorq_core.cache.embedding_engine.strategies.benchmark import (
+    BenchmarkEmbeddingEngine,
+)
+from vectorq.inference_engine.strategies.benchmark import (
+    BenchmarkInferenceEngine,
+)
 from vectorq.vectorq_core.cache.embedding_store.embedding_metadata_storage import (
     InMemoryEmbeddingMetadataStorage,
 )
@@ -29,9 +35,16 @@ from vectorq.vectorq_core.cache.embedding_store.vector_db import (
 from vectorq.vectorq_core.similarity_evaluator.strategies.string_comparison import (
     StringComparisonSimilarityEvaluator,
 )
-from vectorq.vectorq_core.vectorq_policy.strategies.bayesian import (
-    VectorQBayesianPolicy,
+from vectorq.vectorq_policy.strategies.dynamic_global_threshold import (
+    DynamicGlobalThresholdPolicy,
 )
+from vectorq.vectorq_policy.strategies.dynamic_local_threshold import (
+    DynamicLocalThresholdPolicy,
+)
+from vectorq.vectorq_policy.strategies.static_global_threshold import (
+    StaticGlobalThresholdPolicy,
+)
+from vectorq.vectorq_policy.vectorq_policy import VectorQPolicy
 
 repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 results_dir = os.path.join(repo_root, "benchmarks", "results")
@@ -48,7 +61,7 @@ logging.basicConfig(
 ########################################################################################################################
 
 # Benchmark Config
-MAX_SAMPLES: int = 45000
+MAX_SAMPLES: int = 10000
 CONFIDENCE_INTERVALS_ITERATIONS: int = 1
 EMBEDDING_MODEL_1 = (
     "embedding_1",
@@ -98,10 +111,14 @@ llm_models: List[Tuple[str, str, str, int]] = [
 ]
 candidate_strategy: str = SIMILARITY_STRATEGY[0]
 
+# static_thresholds = np.array(
+#     [0.76, 0.78, 0.80, 0.82, 0.84, 0.86, 0.88, 0.90, 0.92, 0.94, 0.96]
+# )
 static_thresholds = np.array(
-    [0.76, 0.78, 0.80, 0.82, 0.84, 0.86, 0.88, 0.90, 0.92, 0.94, 0.96]
+    [0.76, 0.78]
 )
-deltas = np.array([0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1])
+#deltas = np.array([0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1])
+deltas = np.array([0.01, 0.02])
 
 # VectorQ Config
 MAX_VECTOR_DB_CAPACITY: int = 100000
@@ -162,7 +179,7 @@ class Benchmark(unittest.TestCase):
 
                     # 1) Get Data
                     task = data_entry["task"]
-                    output_format = data_entry["output_format"]
+                    system_prompt = data_entry["output_format"]
                     review_text = data_entry["text"]
 
                     emb_generation_latency: float = float(
@@ -186,7 +203,7 @@ class Benchmark(unittest.TestCase):
                             review_text=review_text,
                             candidate_embedding=candidate_embedding,
                             label_response=label_response,
-                            output_format=output_format,
+                            system_prompt=system_prompt,
                         )
                     )
                     latency_vectorq: float = (
@@ -271,7 +288,7 @@ class Benchmark(unittest.TestCase):
         review_text: str,
         candidate_embedding: List[float],
         label_response: str,
-        output_format: str,
+        system_prompt: str,
     ) -> Tuple[bool, str, str, float]:
         """
         Returns: Tuple[bool, str, str, float] - [is_cache_hit, cache_response, nn_response, latency_vectorq_logic]
@@ -287,17 +304,15 @@ class Benchmark(unittest.TestCase):
                 for val in candidate_embedding
             ]
 
-        vectorQ_benchmark = VectorQBenchmark(
-            candidate_embedding=candidate_embedding, candidate_response=label_response
-        )
+        self.vectorq.vectorq_config.embedding_engine.set_next_embedding(candidate_embedding)
+        self.vectorq.vectorq_config.inference_engine.set_next_response(label_response)
 
         vectorQ_prompt = f"{task} {review_text}"
         latency_vectorq_logic: float = time.time()
         try:
-            is_cache_hit, cache_response, nn_response = self.vectorq.create(
+            is_cache_hit, cache_response, nn_response = self.vectorq.infer_with_cache_info(
                 prompt=vectorQ_prompt,
-                output_format=output_format,
-                benchmark=vectorQ_benchmark,
+                system_prompt=system_prompt,
             )
         except Exception as e:
             logging.error(
@@ -422,6 +437,16 @@ def main():
                 )
                 start_time_llm_model = time.time()
 
+                vectorq_config: VectorQConfig = VectorQConfig(
+                    inference_engine=BenchmarkInferenceEngine(),
+                    embedding_engine=BenchmarkEmbeddingEngine(),
+                    vector_db=HNSWLibVectorDB(
+                        similarity_metric_type=SimilarityMetricType.COSINE,
+                        max_capacity=MAX_VECTOR_DB_CAPACITY,
+                    ),
+                    embedding_metadata_storage=InMemoryEmbeddingMetadataStorage()
+                )
+
                 # Baseline 1) Dynamic thresholds (VectorQ, Local)
                 if SYSTEM_TYPE in ["dynamic_local", "all"]:
                     for delta in deltas:
@@ -440,20 +465,10 @@ def main():
                                 f"Using dynamic threshold with delta: {delta}. Run {i + 1} of {CONFIDENCE_INTERVALS_ITERATIONS}"
                             )
 
-                            config = VectorQConfig(
-                                enable_cache=True,
-                                is_static_threshold=False,
-                                vector_db=HNSWLibVectorDB(
-                                    similarity_metric_type=SimilarityMetricType.COSINE,
-                                    max_capacity=MAX_VECTOR_DB_CAPACITY,
-                                ),
-                                embedding_metadata_storage=InMemoryEmbeddingMetadataStorage(),
-                                similarity_evaluator=StringComparisonSimilarityEvaluator(),
-                                vectorq_policy=VectorQBayesianPolicy(
-                                    delta=delta, is_global=False
-                                ),
+                            vectorq_policy: VectorQPolicy = DynamicLocalThresholdPolicy(
+                                delta=delta
                             )
-                            vectorQ: VectorQ = VectorQ(config)
+                            vectorQ: VectorQ = VectorQ(vectorq_config, vectorq_policy)
 
                             benchmark = Benchmark(vectorQ)
                             benchmark.filepath = dataset_file
@@ -486,20 +501,10 @@ def main():
                                 f"Using dynamic threshold with delta: {delta}. Run {i + 1} of {CONFIDENCE_INTERVALS_ITERATIONS}"
                             )
 
-                            config = VectorQConfig(
-                                enable_cache=True,
-                                is_static_threshold=False,
-                                vector_db=HNSWLibVectorDB(
-                                    similarity_metric_type=SimilarityMetricType.COSINE,
-                                    max_capacity=MAX_VECTOR_DB_CAPACITY,
-                                ),
-                                embedding_metadata_storage=InMemoryEmbeddingMetadataStorage(),
-                                similarity_evaluator=StringComparisonSimilarityEvaluator(),
-                                vectorq_policy=VectorQBayesianPolicy(
-                                    delta=delta, is_global=True
-                                ),
+                            vectorq_policy: VectorQPolicy = (
+                                DynamicGlobalThresholdPolicy(delta=delta)
                             )
-                            vectorQ: VectorQ = VectorQ(config)
+                            vectorQ: VectorQ = VectorQ(vectorq_config, vectorq_policy)
 
                             benchmark = Benchmark(vectorQ)
                             benchmark.filepath = dataset_file
@@ -529,18 +534,10 @@ def main():
 
                         logging.info(f"Using static threshold: {threshold}")
 
-                        config = VectorQConfig(
-                            enable_cache=True,
-                            is_static_threshold=True,
-                            static_threshold=threshold,
-                            vector_db=HNSWLibVectorDB(
-                                similarity_metric_type=SimilarityMetricType.COSINE,
-                                max_capacity=MAX_VECTOR_DB_CAPACITY,
-                            ),
-                            embedding_metadata_storage=InMemoryEmbeddingMetadataStorage(),
-                            similarity_evaluator=StringComparisonSimilarityEvaluator(),
+                        vectorq_policy: VectorQPolicy = StaticGlobalThresholdPolicy(
+                            threshold=threshold
                         )
-                        vectorQ: VectorQ = VectorQ(config)
+                        vectorQ: VectorQ = VectorQ(vectorq_config, vectorq_policy)
 
                         benchmark = Benchmark(vectorQ)
                         benchmark.filepath = dataset_file

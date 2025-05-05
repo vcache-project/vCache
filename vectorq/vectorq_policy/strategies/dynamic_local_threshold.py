@@ -26,7 +26,7 @@ class DynamicLocalThresholdPolicy(VectorQPolicy):
     def __init__(
         self,
         similarity_evaluator: SimilarityEvaluator = StringComparisonSimilarityEvaluator(),
-        delta: float = 0.01
+        delta: float = 0.01,
     ):
         self.similarity_evaluator = similarity_evaluator
         self.bayesian = _Bayesian(delta=delta)
@@ -183,9 +183,7 @@ class _Bayesian:
             Action - Explore or Exploit
         """
         similarity_score = round(similarity_score, 3)
-        similarities: np.ndarray = np.array(
-            [obs[0] for obs in metadata.observations]
-        )
+        similarities: np.ndarray = np.array([obs[0] for obs in metadata.observations])
         labels: np.ndarray = np.array([obs[1] for obs in metadata.observations])
 
         if len(similarities) < 6 or len(labels) < 6:

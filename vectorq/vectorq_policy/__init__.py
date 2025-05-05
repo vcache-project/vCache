@@ -1,3 +1,6 @@
+from vectorq.vectorq_policy.strategies.dynamic_global_threshold import (
+    DynamicGlobalThresholdPolicy,
+)
 from vectorq.vectorq_policy.strategies.dynamic_local_threshold import (
     DynamicLocalThresholdPolicy,
 )
@@ -11,5 +14,6 @@ __all__ = [
     "VectorQPolicy",
     "StaticGlobalThresholdPolicy",
     "DynamicLocalThresholdPolicy",
+    "DynamicGlobalThresholdPolicy",
     "NoCachePolicy",
 ]
