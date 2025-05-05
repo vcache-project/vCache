@@ -7,7 +7,7 @@ from vectorq import (
     InMemoryEmbeddingMetadataStorage,
     LangChainEmbeddingEngine,
     OpenAIInferenceEngine,
-    StaticThresholdPolicy,
+    StaticGlobalThresholdPolicy,
     VectorQ,
     VectorQConfig,
 )
@@ -27,7 +27,7 @@ def create_default_config_and_policy():
         vector_db=HNSWLibVectorDB(),
         embedding_metadata_storage=InMemoryEmbeddingMetadataStorage(),
     )
-    policy = StaticThresholdPolicy(threshold=0.8)
+    policy = StaticGlobalThresholdPolicy(threshold=0.8)
     return config, policy
 
 

@@ -49,9 +49,9 @@ from vectorq.vectorq_core.similarity_evaluator import (
 
 # VectorQ Policies
 from vectorq.vectorq_policy import (
-    DynamicThresholdPolicy,
+    DynamicLocalThresholdPolicy,
     NoCachePolicy,
-    StaticThresholdPolicy,
+    StaticGlobalThresholdPolicy,
     VectorQPolicy,
 )
 
@@ -84,7 +84,7 @@ __all__ = [
     "InMemoryEmbeddingMetadataStorage",
     # VectorQ Policies
     "VectorQPolicy",
-    "DynamicThresholdPolicy",
-    "StaticThresholdPolicy",
+    "DynamicLocalThresholdPolicy",
+    "StaticGlobalThresholdPolicy",
     "NoCachePolicy",
 ]

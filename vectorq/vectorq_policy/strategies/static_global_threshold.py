@@ -8,7 +8,7 @@ from vectorq.vectorq_core.cache.embedding_store.embedding_store import Embedding
 from vectorq.vectorq_policy.vectorq_policy import VectorQPolicy
 
 
-class StaticThresholdPolicy(VectorQPolicy):
+class StaticGlobalThresholdPolicy(VectorQPolicy):
     def __init__(
         self,
         threshold: float = 0.8,

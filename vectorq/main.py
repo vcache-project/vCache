@@ -1,8 +1,9 @@
 from typing import List, Optional, Tuple
-from typing import List, Tuple
 
 from vectorq.config import VectorQConfig
-from vectorq.vectorq_policy.strategies.static import StaticThresholdPolicy
+from vectorq.vectorq_policy.strategies.static_global_threshold import (
+    StaticGlobalThresholdPolicy,
+)
 from vectorq.vectorq_policy.vectorq_policy import VectorQPolicy
 
 
@@ -14,7 +15,7 @@ class VectorQ:
     def __init__(
         self,
         config: VectorQConfig = VectorQConfig(),
-        policy: VectorQPolicy = StaticThresholdPolicy(),
+        policy: VectorQPolicy = StaticGlobalThresholdPolicy(),
     ):
         self.vectorq_config = config
         self.vectorq_policy = policy
