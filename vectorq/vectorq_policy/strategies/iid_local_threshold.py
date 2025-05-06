@@ -144,21 +144,31 @@ class _Algorithm:
         if len(similarities) < 6 or len(labels) < 6:
             return _Action.EXPLORE
 
-        t_prime, t_hat, var_t = self._estimate_t_prime(
-            similarities=similarities, labels=labels
+
+        t_primes: List[Tuple[float, float, float]] = np.array(
+            [
+                self._estimate_parameters(
+                    similarities=similarities, labels=labels, epsilon=self.epsilon_grid[i]
+                )
+                for i in range(len(self.epsilon_grid))
+            ]
         )
 
+        t_prime_values = np.array([t[0] for t in t_primes])
+        min_index = np.argmin(t_prime_values)
+        t_prime, t_hat, var_t_hat = t_primes[min_index]
+        
         metadata.t_prime = t_prime
         metadata.t_hat = t_hat
-        metadata.var_t = var_t
+        metadata.var_t = var_t_hat
 
         if similarity_score <= t_prime:
             return _Action.EXPLORE
         else:
             return _Action.EXPLOIT
 
-    def _estimate_t_prime(
-        self, similarities: np.ndarray, labels: np.ndarray
+    def _estimate_parameters(
+        self, similarities: np.ndarray, labels: np.ndarray, epsilon: float
     ) -> Tuple[float, float, float]:
         """
         Compute the threshold under an IID assumption
@@ -168,22 +178,23 @@ class _Algorithm:
         Returns
             t_prime: float - The estimated threshold
             t_hat: float - The estimated threshold
-            var_t: float - The variance of t
+            var_t_hat: float - The variance of t
         """
 
         n = len(labels)
-        num_steps = 100
+        num_steps = 64
 
         try:
             # 1) Approximate t_hat
-            thresholds: np.ndarray = np.linspace(0.0, 1.0, num_steps)
+            thresholds: np.ndarray = np.linspace(min(similarities), max(similarities), num_steps)
             failures: np.ndarray = np.array(
                 [np.sum((labels == 0) & (similarities > t)) for t in thresholds]
             )
             failure_rates: np.ndarray = failures / n
 
-            valid: np.ndarray = np.where(failure_rates <= self.delta)[0]
-            idx: int = valid[0] if valid.size > 0 else 100 - 1
+            delta_prime: float = (1 - self.delta) / (1 - epsilon)
+            valid: np.ndarray = np.where(failure_rates <= (1 - delta_prime))[0]
+            idx: int = valid[0] if valid.size > 0 else num_steps - 1
             t_hat: float = thresholds[idx]
 
             # 2) Approximate variance of t_hat
@@ -194,15 +205,16 @@ class _Algorithm:
                 failure_rates=failure_rates,
             )
             var_F_hat: float = self.delta * (1 - self.delta) / n
-            var_t: float = var_F_hat / (f_t**2) if f_t != 0 else np.inf
+            var_t_hat: float = var_F_hat / (f_t**2) if f_t != 0 else np.inf
 
             # 3) Calculate t_prime
-            t_primes: List[float] = self._get_t_primes(t_hat=t_hat, var_t=var_t)
-            return min(t_primes), t_hat, var_t
+            z: float = norm.ppf(1 - epsilon)
+            t_prime: float = t_hat + z * np.sqrt(var_t_hat)
+            return float(np.clip(t_prime, 0.0, 1.0)), t_hat, var_t_hat
 
         except Exception as e:
             print(f"IID-based threshold estimation failed: {e}")
-            return 1.0
+            return 1.0, -1, -1
 
     def _approximate_f_t(
         self,
@@ -234,39 +246,3 @@ class _Algorithm:
                 dF: float = failure_rates[-1] - failure_rates[-2]
             f_t: float = -dF / dt
         return f_t
-
-    def _get_t_primes(self, t_hat: float, var_t: float) -> List[float]:
-        """
-        Compute all possible t_prime values.
-        Args
-            t_hat: float - The estimated threshold
-            var_t: float - The variance of t
-        Returns
-            List[float] - The t_prime values
-        """
-        t_primes: List[float] = np.array(
-            [
-                self._confidence_interval(
-                    t_hat=t_hat, var_t=var_t, quantile=(1 - self.epsilon_grid[i])
-                )
-                for i in range(len(self.epsilon_grid))
-            ]
-        )
-        return t_primes
-
-    def _confidence_interval(
-        self, t_hat: float, var_t: float, quantile: float
-    ) -> float:
-        """
-        Return the (upper) quantile-threshold t' such that
-          P_est( t > t' ) <= 1 - quantile
-        Args
-            t_hat: float - The estimated threshold
-            var_t: float - The variance of t
-            quantile: float - The quantile
-        Returns
-            float - The t_prime value
-        """
-        z: float = norm.ppf(quantile)
-        t_prime: float = t_hat + z * np.sqrt(var_t)
-        return float(np.clip(t_prime, 0.0, 1.0))
