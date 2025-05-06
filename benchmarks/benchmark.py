@@ -61,8 +61,8 @@ logging.basicConfig(
 ########################################################################################################################
 
 # Benchmark Config
-MAX_SAMPLES: int = 10000
-CONFIDENCE_INTERVALS_ITERATIONS: int = 3
+MAX_SAMPLES: int = 45000
+CONFIDENCE_INTERVALS_ITERATIONS: int = 5
 EMBEDDING_MODEL_1 = (
     "embedding_1",
     "GteLargeENv1_5",
@@ -127,7 +127,7 @@ SYSTEM_TYPES: List[str] = [
     "iid_local",
     "all",
 ]
-SYSTEM_TYPE: str = SYSTEM_TYPES[3]
+SYSTEM_TYPE: str = SYSTEM_TYPES[1]
 
 
 ########################################################################################################################
