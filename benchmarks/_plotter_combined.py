@@ -208,6 +208,9 @@ def __plot_roc(
     vectorq_local_fpr_values = []
 
     for delta in vectorq_local_deltas:
+        if delta == 0.01:
+            continue
+
         df = vectorq_local_data_frames[delta]
 
         tpr = compute_recall_score(tp=df["tp_list"], fn=df["fn_list"])
@@ -228,9 +231,9 @@ def __plot_roc(
             markersize=8,
         )
 
-        for i, delta in enumerate(vectorq_local_deltas):
+        for i, _ in enumerate(vectorq_local_tpr_values):
             if i == 0 or i == len(vectorq_local_deltas) - 1:
-                label = f"{delta:.2f}"
+                label = f"{vectorq_local_deltas[i]:.2f}"
             else:
                 label = None
             plt.annotate(
@@ -349,6 +352,9 @@ def __plot_precision_vs_recall(
     vectorq_local_recall_values = []
 
     for delta in vectorq_local_deltas:
+        if delta == 0.01:
+            continue
+
         df = vectorq_local_data_frames[delta]
         precision = compute_precision_score(tp=df["tp_list"], fp=df["fp_list"])
         recall = compute_recall_score(tp=df["tp_list"], fn=df["fn_list"])
@@ -367,9 +373,9 @@ def __plot_precision_vs_recall(
             markersize=8,
         )
 
-        for i, delta in enumerate(vectorq_local_deltas):
+        for i, _ in enumerate(vectorq_local_precision_values):
             if i == 0 or i == len(vectorq_local_deltas) - 1:
-                label = f"{delta:.2f}"
+                label = f"{vectorq_local_deltas[i]:.2f}"
             else:
                 label = None
             plt.annotate(
@@ -445,21 +451,24 @@ def __plot_avg_latency_vs_error_rate(
     static_error_rates = []
     static_latencies = []
 
+    avg_latency_no_cache = 0.0
+
     for threshold in static_thresholds:
         df = static_data_frames[threshold]
 
         error_rate = compute_error_rate_score(fp=df["fp_list"])
-
         avg_latency = compute_avg_latency_score(latency_list=df["latency_vectorq_list"])
-        avg_latency = avg_latency / 60.0
-
         static_error_rates.append(error_rate)
         static_latencies.append(avg_latency)
 
+        avg_latency_no_cache = compute_avg_latency_score(
+            latency_list=df["latency_direct_list"]
+        )
+
     if static_thresholds:
         plt.plot(
-            static_error_rates,
             static_latencies,
+            static_error_rates,
             "o-",
             color="blue",
             linewidth=2,
@@ -479,17 +488,26 @@ def __plot_avg_latency_vs_error_rate(
                     fontsize=font_size - 4,
                 )
 
+        plt.axvline(
+            x=avg_latency_no_cache,
+            color="grey",
+            linestyle="--",
+            linewidth=2,
+            label="No Cache",
+        )
+
     vectorq_local_deltas = sorted(vectorq_local_data_frames.keys())
     vectorq_local_error_rates = []
     vectorq_local_latencies = []
 
     for delta in vectorq_local_deltas:
+        if delta == 0.01:
+            continue
+
         df = vectorq_local_data_frames[delta]
 
         error_rate = compute_error_rate_score(fp=df["fp_list"])
-
         avg_latency = compute_avg_latency_score(latency_list=df["latency_vectorq_list"])
-
         vectorq_local_error_rates.append(error_rate)
         vectorq_local_latencies.append(avg_latency)
 
@@ -504,13 +522,15 @@ def __plot_avg_latency_vs_error_rate(
             markersize=8,
         )
 
-        for i, delta in enumerate(vectorq_local_deltas):
+        for i, _ in enumerate(vectorq_local_latencies):
+            if i == 0:
+                continue
+
             if i == 0 or i == len(vectorq_local_deltas) - 1:
-                label = f"{delta:.2f}"
+                label = f"{vectorq_local_deltas[i]:.2f}"
                 plt.annotate(
                     label,
                     (vectorq_local_error_rates[i], vectorq_local_latencies[i]),
-                    textcoords="offset points",
                     xytext=(0, 10),
                     ha="center",
                     fontsize=font_size - 4,
@@ -604,7 +624,7 @@ def __plot_cache_hit_vs_error_rate(
         )
 
         for i, threshold in enumerate(static_thresholds):
-            if i == 0 or i == len(static_thresholds) - 1:
+            if i == 0 or i == len(static_thresholds) - 2:
                 label = f"{threshold:.2f}"
             else:
                 label = None
@@ -622,6 +642,9 @@ def __plot_cache_hit_vs_error_rate(
     vectorq_local_error_rates = []
 
     for delta in vectorq_local_deltas:
+        if delta == 0.01:
+            continue
+
         df = vectorq_local_data_frames[delta]
 
         cache_hit_rate = compute_cache_hit_rate_score(
@@ -644,15 +667,17 @@ def __plot_cache_hit_vs_error_rate(
             markersize=8,
         )
 
-        for i, delta in enumerate(vectorq_local_deltas):
+        for i, _ in enumerate(vectorq_local_error_rates):
+            if i == 0:
+                continue
+
             if i == 0 or i == len(vectorq_local_deltas) - 1:
-                label = f"{delta:.2f}"
+                label = f"{vectorq_local_deltas[i]:.2f}"
             else:
                 label = None
             plt.annotate(
                 label,
                 (vectorq_local_error_rates[i], vectorq_local_cache_hit_rates[i]),
-                textcoords="offset points",
                 xytext=(0, 10),
                 ha="center",
                 fontsize=font_size - 4,
@@ -704,7 +729,7 @@ def __plot_cache_hit_vs_error_rate(
     plt.grid(True, linestyle="--", alpha=0.7)
     plt.legend(loc="best", fontsize=font_size - 2)
     plt.tick_params(axis="both", labelsize=font_size - 2)
-    plt.xlim(0, 1)
+    plt.xlim(0, 0.3)
     plt.ylim(0, 1)
 
     filename = results_dir + f"/cache_hit_vs_error_rate_{timestamp}.pdf"
@@ -720,7 +745,7 @@ def __plot_cache_hit_vs_error_rate_vs_sample_size(
     timestamp: str,
     font_size: int,
 ):
-    target_deltas = [0.01, 0.02]
+    target_deltas = [0.02, 0.03]
 
     # Baseline 1) VectorQ (Local)
     vectorq_local_error_rates = []

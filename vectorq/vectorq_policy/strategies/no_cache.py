@@ -8,6 +8,9 @@ from vectorq.vectorq_policy.vectorq_policy import VectorQPolicy
 
 class NoCachePolicy(VectorQPolicy):
     def __init__(self):
+        """
+        This policy does not use a cache and will always compute a response.
+        """
         self.inference_engine = None
 
     @override

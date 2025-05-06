@@ -3,7 +3,7 @@ import unittest
 from dotenv import load_dotenv
 
 from vectorq import (
-    DynamicThresholdPolicy,
+    DynamicLocalThresholdPolicy,
     HNSWLibVectorDB,
     InMemoryEmbeddingMetadataStorage,
     LangChainEmbeddingEngine,
@@ -29,9 +29,8 @@ def create_default_config_and_policy():
         embedding_metadata_storage=InMemoryEmbeddingMetadataStorage(),
         system_prompt="Please answer in a single word with the first letter capitalized. Example: London",
     )
-    policy = DynamicThresholdPolicy(
+    policy = DynamicLocalThresholdPolicy(
         delta=0.05,
-        is_global=False,
         similarity_evaluator=StringComparisonSimilarityEvaluator(),
     )
     return config, policy

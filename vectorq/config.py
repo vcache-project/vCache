@@ -15,7 +15,9 @@ from vectorq.vectorq_core.cache.embedding_store.vector_db.strategies.hnsw_lib im
     HNSWLibVectorDB,
 )
 from vectorq.vectorq_core.cache.eviction_policy.eviction_policy import EvictionPolicy
-from vectorq.vectorq_core.cache.eviction_policy.strategies.lru import LRUEvictionPolicy
+from vectorq.vectorq_core.cache.eviction_policy.strategies.no_eviction import (
+    NoEvictionPolicy,
+)
 
 
 class VectorQConfig:
@@ -30,7 +32,7 @@ class VectorQConfig:
         embedding_engine: EmbeddingEngine = OpenAIEmbeddingEngine(),
         vector_db: VectorDB = HNSWLibVectorDB(),
         embedding_metadata_storage: EmbeddingMetadataStorage = InMemoryEmbeddingMetadataStorage(),
-        eviction_policy: EvictionPolicy = LRUEvictionPolicy(),
+        eviction_policy: EvictionPolicy = NoEvictionPolicy(),
         system_prompt: Optional[str] = None,
     ):
         self.inference_engine = inference_engine

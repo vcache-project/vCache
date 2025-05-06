@@ -8,11 +8,17 @@ from vectorq.vectorq_core.cache.embedding_store.embedding_store import Embedding
 from vectorq.vectorq_policy.vectorq_policy import VectorQPolicy
 
 
-class StaticThresholdPolicy(VectorQPolicy):
+class StaticGlobalThresholdPolicy(VectorQPolicy):
     def __init__(
         self,
         threshold: float = 0.8,
     ):
+        """
+        This policy uses a static threshold to determine if a response is a cache hit.
+
+        Args
+            threshold: float - The threshold to use
+        """
         self.threshold = threshold
         self.inference_engine = None
         self.cache = None

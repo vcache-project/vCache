@@ -1,7 +1,9 @@
 from typing import List, Optional, Tuple
 
 from vectorq.config import VectorQConfig
-from vectorq.vectorq_policy.strategies.static import StaticThresholdPolicy
+from vectorq.vectorq_policy.strategies.static_global_threshold import (
+    StaticGlobalThresholdPolicy,
+)
 from vectorq.vectorq_policy.vectorq_policy import VectorQPolicy
 
 
@@ -13,11 +15,27 @@ class VectorQ:
     def __init__(
         self,
         config: VectorQConfig = VectorQConfig(),
-        policy: VectorQPolicy = StaticThresholdPolicy(),
+        policy: VectorQPolicy = StaticGlobalThresholdPolicy(),
     ):
         self.vectorq_config = config
         self.vectorq_policy = policy
         self.vectorq_policy.setup(config)
+
+    def infer(
+        self,
+        prompt: str,
+        system_prompt: Optional[str] = None,
+    ) -> str:
+        """
+        Infer a response from the cache and return the response.
+        Args
+            prompt: str - The prompt to create a response for.
+            system_prompt: Optional[str] - The optional system prompt to use for the response. It will override the system prompt in the VectorQConfig if provided.
+        Returns
+            str - The response to be used by the user
+        """
+        _, response, _ = self.infer_with_cache_info(prompt, system_prompt)
+        return response
 
     def infer_with_cache_info(
         self,
@@ -36,22 +54,6 @@ class VectorQ:
             system_prompt = self.vectorq_config.system_prompt
 
         return self.vectorq_policy.process_request(prompt, system_prompt)
-
-    def infer(
-        self,
-        prompt: str,
-        system_prompt: Optional[str] = None,
-    ) -> str:
-        """
-        Infer a response from the cache and return the response.
-        Args
-            prompt: str - The prompt to create a response for.
-            system_prompt: Optional[str] - The optional system prompt to use for the response. It will override the system prompt in the VectorQConfig if provided.
-        Returns
-            str - The response to be used by the user
-        """
-        _, response, _ = self.infer_with_cache_info(prompt, system_prompt)
-        return response
 
     def import_data(self, data: List[str]) -> bool:
         # TODO
