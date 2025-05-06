@@ -1,12 +1,8 @@
-import random
 from enum import Enum
-from typing import Dict, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 import numpy as np
-import statsmodels.api as sm
-from scipy.special import expit
 from scipy.stats import norm
-from sklearn.linear_model import LogisticRegression
 from typing_extensions import override
 
 from vectorq.config import VectorQConfig
@@ -22,14 +18,14 @@ from vectorq.vectorq_core.similarity_evaluator import (
 from vectorq.vectorq_policy.vectorq_policy import VectorQPolicy
 
 
-class DynamicLocalThresholdPolicy(VectorQPolicy):
+class IIDLocalThresholdPolicy(VectorQPolicy):
     def __init__(
         self,
         similarity_evaluator: SimilarityEvaluator = StringComparisonSimilarityEvaluator(),
         delta: float = 0.01,
     ):
         """
-        This policy uses the VectorQ algorithm to compute the optimal threshold for each
+        This policy uses the VectorQ IID algorithm to compute the optimal threshold for each
         embedding in the cache.
         Each threshold is used to determine if a response is a cache hit.
 
@@ -113,57 +109,7 @@ class _Action(Enum):
 class _Algorithm:
     def __init__(self, delta: float):
         self.delta: float = delta
-        self.P_c: float = 1.0 - self.delta
         self.epsilon_grid: np.ndarray = np.linspace(1e-6, 1 - 1e-6, 50)
-        self.logistic_regression: LogisticRegression = LogisticRegression(
-            penalty=None, solver="lbfgs", tol=1e-8, max_iter=1000, fit_intercept=False
-        )
-
-        self.variance_map: Dict[int, List[float]] = {
-            6: 0.035445,
-            7: 0.028285,
-            8: 0.026436,
-            9: 0.021349,
-            10: 0.019371,
-            11: 0.012615,
-            12: 0.011433,
-            13: 0.010228,
-            14: 0.009963,
-            15: 0.009253,
-            16: 0.011674,
-            17: 0.013015,
-            18: 0.010897,
-            19: 0.011841,
-            20: 0.013081,
-            21: 0.010585,
-            22: 0.014255,
-            23: 0.012058,
-            24: 0.013002,
-            25: 0.011715,
-            26: 0.00839,
-            27: 0.008839,
-            28: 0.010628,
-            29: 0.009899,
-            30: 0.008033,
-            31: 0.00457,
-            32: 0.007335,
-            33: 0.008932,
-            34: 0.00729,
-            35: 0.007445,
-            36: 0.00761,
-            37: 0.011423,
-            38: 0.011233,
-            39: 0.006783,
-            40: 0.005233,
-            41: 0.00872,
-            42: 0.010005,
-            43: 0.01199,
-            44: 0.00977,
-            45: 0.01891,
-            46: 0.01513,
-            47: 0.02109,
-            48: 0.01531,
-        }
 
     def update_metadata(
         self, similarity_score: float, is_correct: bool, metadata: EmbeddingMetadataObj
@@ -198,139 +144,96 @@ class _Algorithm:
         if len(similarities) < 6 or len(labels) < 6:
             return _Action.EXPLORE
 
-        t_hat, gamma, var_t = self._estimate_parameters(
+        t_prime, t_hat, var_t = self._estimate_t_prime(
             similarities=similarities, labels=labels
         )
 
-        if t_hat == -1:
-            return _Action.EXPLORE
-        metadata.gamma = gamma
+        metadata.t_prime = t_prime
         metadata.t_hat = t_hat
         metadata.var_t = var_t
 
-        tau: float = self._get_tau(
-            var_t=var_t, s=similarity_score, t_hat=t_hat, metadata=metadata
-        )
-
-        u: float = random.uniform(0, 1)
-        if u <= tau:
+        if similarity_score <= t_prime:
             return _Action.EXPLORE
         else:
             return _Action.EXPLOIT
 
-    def _estimate_parameters(
+    def _estimate_t_prime(
         self, similarities: np.ndarray, labels: np.ndarray
     ) -> Tuple[float, float, float]:
         """
-        Optimize parameters with logistic regression
+        Compute the threshold under an IID assumption
         Args
-            similarities: np.ndarray - The similarities of the embeddings
-            labels: np.ndarray - The labels of the embeddings
-            metadata: EmbeddingMetadataObj - The metadata of the embedding
+            similarities: np.ndarray - The nearest neighbor similarity observations
+            labels: np.ndarray - The nearest neighbor label observations
         Returns
+            t_prime: float - The estimated threshold
             t_hat: float - The estimated threshold
-            gamma: float - The estimated gamma
-            var_t: float - The estimated variance of t
+            var_t: float - The variance of t
         """
 
-        similarities = sm.add_constant(similarities)
+        n = len(labels)
+        num_steps = 100
 
         try:
-            if len(similarities) != len(labels):
-                print(f"len does not match: {len(similarities)} != {len(labels)}")
-            self.logistic_regression.fit(similarities, labels)
-            intercept, gamma = self.logistic_regression.coef_[0]
-
-            gamma = max(gamma, 1e-6)
-            t_hat = -intercept / gamma
-            t_hat = float(np.clip(t_hat, 0.0, 1.0))
-
-            similarities_col = (
-                similarities[:, 1] if similarities.shape[1] > 1 else similarities[:, 0]
+            # 1) Approximate t_hat
+            thresholds: np.ndarray = np.linspace(0.0, 1.0, num_steps)
+            failures: np.ndarray = np.array(
+                [np.sum((labels == 0) & (similarities > t)) for t in thresholds]
             )
-            perfect_seperation = np.min(similarities_col[labels == 1]) > np.max(
-                similarities_col[labels == 0]
-            )
-            var_t = self._get_var_t(
-                perfect_seperation=perfect_seperation,
-                n_observations=len(similarities),
-                X=similarities,
-                gamma=gamma,
-                intercept=intercept,
-            )
+            failure_rates: np.ndarray = failures / n
 
-            return round(t_hat, 3), round(gamma, 3), var_t
+            valid: np.ndarray = np.where(failure_rates <= self.delta)[0]
+            idx: int = valid[0] if valid.size > 0 else 100 - 1
+            t_hat: float = thresholds[idx]
+
+            # 2) Approximate variance of t_hat
+            f_t: float = self._approximate_f_t(
+                idx=idx,
+                num_steps=num_steps,
+                thresholds=thresholds,
+                failure_rates=failure_rates,
+            )
+            var_F_hat: float = self.delta * (1 - self.delta) / n
+            var_t: float = var_F_hat / (f_t**2) if f_t != 0 else np.inf
+
+            # 3) Calculate t_prime
+            t_primes: List[float] = self._get_t_primes(t_hat=t_hat, var_t=var_t)
+            return min(t_primes), t_hat, var_t
 
         except Exception as e:
-            print(f"Logistic regression failed: {e}")
-            return -1.0, -1.0, -1.0
+            print(f"IID-based threshold estimation failed: {e}")
+            return 1.0
 
-    def _get_var_t(
+    def _approximate_f_t(
         self,
-        perfect_seperation: bool,
-        n_observations: int,
-        X: np.ndarray,
-        gamma: float,
-        intercept: float,
+        idx: int,
+        num_steps: int,
+        thresholds: np.ndarray,
+        failure_rates: np.ndarray,
     ) -> float:
         """
-        Compute the variance of t using the delta method
+        Approximate the failure rate at t_hat
         Args
-            perfect_seperation: bool - Whether the data is perfectly separable
-            n_observations: int - The number of observations
-            X: np.ndarray - The design matrix
-            gamma: float - The gamma parameter
-            intercept: float - The intercept parameter
+            idx: int - The index of t_hat
+            num_steps: int - The number of steps
+            thresholds: np.ndarray - The thresholds
+            failure_rates: np.ndarray - The failure rates
         Returns
-            float - The variance of t
-        Note:
-            If the data is perfectly separable, we use the variance map to estimate the variance of t
-            Otherwise, we use the delta method to estimate the variance of t
+            f_t: float - The failure rate at t_hat
         """
-        if perfect_seperation:
-            if n_observations in self.variance_map:
-                var_t = self.variance_map[n_observations]
-            else:
-                max_observations = max(self.variance_map.keys())
-                var_t = self.variance_map[max_observations]
-            return var_t
+        if 0 < idx < num_steps - 1:
+            dt: float = thresholds[idx + 1] - thresholds[idx - 1]
+            dF: float = failure_rates[idx + 1] - failure_rates[idx - 1]
+            f_t: float = -dF / dt
         else:
-            p = self.logistic_regression.predict_proba(X)[:, 1]
-            W = p * (1 - p)
-            H = X.T @ (W[:, None] * X)
-
-            cov_beta = np.linalg.inv(H)
-
-            grad = np.array([-1.0 / gamma, intercept / (gamma**2)])
-
-            var_t_hat = float(grad @ cov_beta @ grad)
-            var_t_hat = max(0.0, var_t_hat)
-            return var_t_hat
-
-    def _get_tau(
-        self,
-        var_t: float,
-        s: float,
-        t_hat: float,
-        metadata: EmbeddingMetadataObj,
-    ) -> float:
-        """
-        Find the minimum tau value for the given similarity score
-        Args
-            var_t: float - The variance of t
-            s: float - The similarity score between the query and the nearest neighbor
-            t_hat: float - The estimated threshold
-            metadata: EmbeddingMetadataObj - The metadata of the nearest neighbor
-        Returns
-            float - The minimum tau value
-        """
-        t_primes: List[float] = self._get_t_primes(t_hat=t_hat, var_t=var_t)
-        likelihoods = self._likelihood(s=s, t=t_primes, gamma=metadata.gamma)
-        alpha_lower_bounds = (1 - self.epsilon_grid) * likelihoods
-
-        taus = 1 - (1 - self.P_c) / (1 - alpha_lower_bounds)
-        metadata.t_prime = t_primes[np.argmin(taus)]
-        return round(np.min(taus), 5)
+            if idx == 0:
+                dt: float = thresholds[1] - thresholds[0]
+                dF: float = failure_rates[1] - failure_rates[0]
+            else:
+                dt: float = thresholds[-1] - thresholds[-2]
+                dF: float = failure_rates[-1] - failure_rates[-2]
+            f_t: float = -dF / dt
+        return f_t
 
     def _get_t_primes(self, t_hat: float, var_t: float) -> List[float]:
         """
@@ -364,19 +267,6 @@ class _Algorithm:
         Returns
             float - The t_prime value
         """
-        z = norm.ppf(quantile)
-        t_prime = t_hat + z * np.sqrt(var_t)
+        z: float = norm.ppf(quantile)
+        t_prime: float = t_hat + z * np.sqrt(var_t)
         return float(np.clip(t_prime, 0.0, 1.0))
-
-    def _likelihood(self, s: float, t: float, gamma: float) -> float:
-        """
-        Compute the likelihood of the given similarity score and threshold
-        Args
-            s: float - The similarity score between the query and the nearest neighbor
-            t: float - The threshold
-            gamma: float - The gamma parameter
-        Returns
-            float - The likelihood of the given similarity score and threshold
-        """
-        z = gamma * (s - t)
-        return expit(z)

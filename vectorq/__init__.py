@@ -51,6 +51,7 @@ from vectorq.vectorq_core.similarity_evaluator import (
 from vectorq.vectorq_policy import (
     DynamicGlobalThresholdPolicy,
     DynamicLocalThresholdPolicy,
+    IIDLocalThresholdPolicy,
     NoCachePolicy,
     StaticGlobalThresholdPolicy,
     VectorQPolicy,
@@ -89,4 +90,5 @@ __all__ = [
     "DynamicGlobalThresholdPolicy",
     "StaticGlobalThresholdPolicy",
     "NoCachePolicy",
+    "IIDLocalThresholdPolicy",
 ]

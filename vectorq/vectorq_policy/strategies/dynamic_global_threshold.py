@@ -38,7 +38,7 @@ class DynamicGlobalThresholdPolicy(VectorQPolicy):
             delta: float - The delta value to use
         """
         self.similarity_evaluator = similarity_evaluator
-        self.bayesian = _Bayesian(delta=delta)
+        self.bayesian = _Algorithm(delta=delta)
         self.inference_engine = None
         self.cache = None
 
@@ -110,7 +110,7 @@ class _Action(Enum):
     EXPLOIT = "exploit"
 
 
-class _Bayesian:
+class _Algorithm:
     def __init__(self, delta: float):
         self.delta: float = delta
         self.P_c: float = 1.0 - self.delta
