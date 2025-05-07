@@ -32,6 +32,12 @@ from vectorq.vectorq_core.cache.embedding_store.vector_db import (
     HNSWLibVectorDB,
     SimilarityMetricType,
 )
+from vectorq.vectorq_core.similarity_evaluator.strategies.llm_comparison import (
+    LLMComparisonSimilarityEvaluator,
+)
+from vectorq.vectorq_core.similarity_evaluator.strategies.string_comparison import (
+    StringComparisonSimilarityEvaluator,
+)
 from vectorq.vectorq_policy.strategies.dynamic_global_threshold import (
     DynamicGlobalThresholdPolicy,
 )
@@ -58,8 +64,10 @@ logging.basicConfig(
 ########################################################################################################################
 
 # Benchmark Config
-MAX_SAMPLES: int = 15000
+MAX_SAMPLES: int = 5000
 CONFIDENCE_INTERVALS_ITERATIONS: int = 3
+IS_LLM_JUDGE_BENCHMARK: bool = False
+
 EMBEDDING_MODEL_1 = (
     "embedding_1",
     "GteLargeENv1_5",
@@ -96,7 +104,7 @@ DATASETS: List[str] = [
     "ecommerce_dataset.json",
     "semantic_prompt_cache_benchmark.json",
 ]
-DATASETS_TO_EXCLUDE: List[str] = [DATASETS[1], DATASETS[2]]
+DATASETS_TO_EXCLUDE: List[str] = [DATASETS[0], DATASETS[2], DATASETS[3]]
 
 embedding_models: List[Tuple[str, str, str, int]] = [
     EMBEDDING_MODEL_1,
@@ -410,6 +418,11 @@ def __run_baseline(
     delta: float,
     threshold: float,
 ):
+    if IS_LLM_JUDGE_BENCHMARK:
+        similarity_evaluator = LLMComparisonSimilarityEvaluator()
+    else:
+        similarity_evaluator = StringComparisonSimilarityEvaluator()
+
     vectorq_config: VectorQConfig = VectorQConfig(
         inference_engine=BenchmarkInferenceEngine(),
         embedding_engine=BenchmarkEmbeddingEngine(),
@@ -418,6 +431,7 @@ def __run_baseline(
             max_capacity=MAX_VECTOR_DB_CAPACITY,
         ),
         embedding_metadata_storage=InMemoryEmbeddingMetadataStorage(),
+        similarity_evaluator=similarity_evaluator,
     )
     vectorQ: VectorQ = VectorQ(vectorq_config, vectorq_policy)
 

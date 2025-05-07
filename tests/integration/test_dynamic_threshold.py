@@ -8,7 +8,6 @@ from vectorq import (
     InMemoryEmbeddingMetadataStorage,
     LangChainEmbeddingEngine,
     OpenAIInferenceEngine,
-    StringComparisonSimilarityEvaluator,
     VectorQ,
     VectorQConfig,
 )
@@ -29,10 +28,7 @@ def create_default_config_and_policy():
         embedding_metadata_storage=InMemoryEmbeddingMetadataStorage(),
         system_prompt="Please answer in a single word with the first letter capitalized. Example: London",
     )
-    policy = DynamicLocalThresholdPolicy(
-        delta=0.05,
-        similarity_evaluator=StringComparisonSimilarityEvaluator(),
-    )
+    policy = DynamicLocalThresholdPolicy(delta=0.05)
     return config, policy
 
 
