@@ -18,6 +18,12 @@ from vectorq.vectorq_core.cache.eviction_policy.eviction_policy import EvictionP
 from vectorq.vectorq_core.cache.eviction_policy.strategies.no_eviction import (
     NoEvictionPolicy,
 )
+from vectorq.vectorq_core.similarity_evaluator.similarity_evaluator import (
+    SimilarityEvaluator,
+)
+from vectorq.vectorq_core.similarity_evaluator.strategies.string_comparison import (
+    StringComparisonSimilarityEvaluator,
+)
 
 
 class VectorQConfig:
@@ -33,6 +39,7 @@ class VectorQConfig:
         vector_db: VectorDB = HNSWLibVectorDB(),
         embedding_metadata_storage: EmbeddingMetadataStorage = InMemoryEmbeddingMetadataStorage(),
         eviction_policy: EvictionPolicy = NoEvictionPolicy(),
+        similarity_evaluator: SimilarityEvaluator = StringComparisonSimilarityEvaluator(),
         system_prompt: Optional[str] = None,
     ):
         self.inference_engine = inference_engine
@@ -40,4 +47,6 @@ class VectorQConfig:
         self.vector_db = vector_db
         self.eviction_policy = eviction_policy
         self.embedding_metadata_storage = embedding_metadata_storage
+        self.similarity_evaluator = similarity_evaluator
+        self.similarity_evaluator.set_inference_engine(self.inference_engine)
         self.system_prompt = system_prompt
