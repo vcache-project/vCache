@@ -10,6 +10,7 @@ from sklearn.linear_model import LogisticRegression
 from typing_extensions import override
 
 from vectorq.config import VectorQConfig
+from vectorq.inference_engine import InferenceEngine
 from vectorq.vectorq_core.cache.cache import Cache
 from vectorq.vectorq_core.cache.embedding_store.embedding_metadata_storage.embedding_metadata_obj import (
     EmbeddingMetadataObj,
@@ -23,27 +24,23 @@ from vectorq.vectorq_policy.vectorq_policy import VectorQPolicy
 
 
 class DynamicLocalThresholdPolicy(VectorQPolicy):
-    def __init__(
-        self,
-        similarity_evaluator: SimilarityEvaluator = StringComparisonSimilarityEvaluator(),
-        delta: float = 0.01,
-    ):
+    def __init__(self, delta: float = 0.01):
         """
         This policy uses the VectorQ algorithm to compute the optimal threshold for each
         embedding in the cache.
         Each threshold is used to determine if a response is a cache hit.
 
         Args
-            similarity_evaluator: SimilarityEvaluator - The similarity evaluator to use
             delta: float - The delta value to use
         """
-        self.similarity_evaluator = similarity_evaluator
         self.bayesian = _Algorithm(delta=delta)
-        self.inference_engine = None
-        self.cache = None
+        self.similarity_evaluator: SimilarityEvaluator = None
+        self.inference_engine: InferenceEngine = None
+        self.cache: Cache = None
 
     @override
     def setup(self, config: VectorQConfig):
+        self.similarity_evaluator = config.similarity_evaluator
         self.inference_engine = config.inference_engine
         self.cache = Cache(
             embedding_engine=config.embedding_engine,

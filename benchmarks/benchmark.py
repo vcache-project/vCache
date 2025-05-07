@@ -22,6 +22,13 @@ from vectorq.main import VectorQ
 from vectorq.vectorq_core.cache.embedding_engine.strategies.benchmark import (
     BenchmarkEmbeddingEngine,
 )
+from vectorq.inference_engine.strategies.benchmark import (
+    BenchmarkInferenceEngine,
+)
+from vectorq.main import VectorQ
+from vectorq.vectorq_core.cache.embedding_engine.strategies.benchmark import (
+    BenchmarkEmbeddingEngine,
+)
 from vectorq.vectorq_core.cache.embedding_store.embedding_metadata_storage import (
     InMemoryEmbeddingMetadataStorage,
 )
@@ -38,6 +45,26 @@ from vectorq.vectorq_policy.strategies.dynamic_global_threshold import (
 from vectorq.vectorq_policy.strategies.dynamic_local_threshold import (
     DynamicLocalThresholdPolicy,
 )
+from vectorq.vectorq_policy.strategies.iid_local_threshold import (
+    IIDLocalThresholdPolicy,
+)
+from vectorq.vectorq_policy.strategies.static_global_threshold import (
+    StaticGlobalThresholdPolicy,
+)
+from vectorq.vectorq_core.similarity_evaluator.strategies.llm_comparison import (
+    LLMComparisonSimilarityEvaluator,
+)
+from vectorq.vectorq_core.similarity_evaluator.strategies.string_comparison import (
+    StringComparisonSimilarityEvaluator,
+)
+from vectorq.vectorq_policy.strategies.dynamic_global_threshold import (
+    DynamicGlobalThresholdPolicy,
+)
+from vectorq.vectorq_policy.strategies.dynamic_local_threshold import (
+    DynamicLocalThresholdPolicy,
+)
+from vectorq.vectorq_policy.strategies.static_global_threshold import (
+    StaticGlobalThresholdPolicy,
 from vectorq.vectorq_policy.strategies.iid_local_threshold import (
     IIDLocalThresholdPolicy,
 )
@@ -62,7 +89,9 @@ logging.basicConfig(
 
 # Benchmark Config
 MAX_SAMPLES: int = 45000
-CONFIDENCE_INTERVALS_ITERATIONS: int = 5
+CONFIDENCE_INTERVALS_ITERATIONS: int = 3
+IS_LLM_JUDGE_BENCHMARK: bool = False
+
 EMBEDDING_MODEL_1 = (
     "embedding_1",
     "GteLargeENv1_5",
@@ -419,6 +448,11 @@ def __run_baseline(
     delta: float,
     threshold: float,
 ):
+    if IS_LLM_JUDGE_BENCHMARK:
+        similarity_evaluator = LLMComparisonSimilarityEvaluator()
+    else:
+        similarity_evaluator = StringComparisonSimilarityEvaluator()
+
     vectorq_config: VectorQConfig = VectorQConfig(
         inference_engine=BenchmarkInferenceEngine(),
         embedding_engine=BenchmarkEmbeddingEngine(),
@@ -427,6 +461,7 @@ def __run_baseline(
             max_capacity=MAX_VECTOR_DB_CAPACITY,
         ),
         embedding_metadata_storage=InMemoryEmbeddingMetadataStorage(),
+        similarity_evaluator=similarity_evaluator,
     )
     vectorQ: VectorQ = VectorQ(vectorq_config, vectorq_policy)
 
