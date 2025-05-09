@@ -57,7 +57,7 @@ def __get_result_files(results_dir: str):
                 if file.startswith("results_") and file.endswith(".json"):
                     vcache_global_files.append(os.path.join(dir_path, file))
 
-        # Process Berkeley embedding directories
+        # Process Fine-tuned Embedding directories
         elif d.startswith("berkeley_embedding_") and os.path.isdir(
             os.path.join(results_dir, d)
         ):
@@ -66,7 +66,7 @@ def __get_result_files(results_dir: str):
                 if file.startswith("results_") and file.endswith(".json"):
                     berkeley_embedding_files.append(os.path.join(dir_path, file))
 
-        # Process vCache Berkeley embedding directories
+        # Process vCache Fine-tuned Embedding directories
         elif d.startswith("vcache_berkeley_embedding_") and os.path.isdir(
             os.path.join(results_dir, d)
         ):
@@ -152,7 +152,7 @@ def generate_combined_plots(
                 continue
 
     ############################################################
-    ### Baseline: Berkeley Embedding
+    ### Baseline: Fine-tuned Embedding
     berkeley_embedding_data_frames: Dict[float, pd.DataFrame] = {}
     for berkeley_embedding_file_path in berkeley_embedding_files:
         with open(berkeley_embedding_file_path, "r") as f:
@@ -166,7 +166,7 @@ def generate_combined_plots(
                 continue
 
     ############################################################
-    ### vCache + Berkeley Embedding
+    ### vCache + Fine-tuned Embedding
     vcache_berkeley_embedding_data_frames: Dict[float, pd.DataFrame] = {}
     for vcache_berkeley_embedding_file_path in vcache_berkeley_embedding_files:
         with open(vcache_berkeley_embedding_file_path, "r") as f:
@@ -178,6 +178,17 @@ def generate_combined_plots(
             except Exception as e:
                 print(f"Error loading {vcache_berkeley_embedding_file_path}: {e}")
                 continue
+
+    __plot_legend(
+        gptcache_data_frames=gptcache_data_frames,
+        vcache_local_data_frames=vcache_local_data_frames,
+        vcache_global_data_frames=vcache_global_data_frames,
+        berkeley_embedding_data_frames=berkeley_embedding_data_frames,
+        vcache_berkeley_embedding_data_frames=vcache_berkeley_embedding_data_frames,
+        results_dir=results_dir,
+        timestamp=timestamp,
+        font_size=font_size,
+    )
 
     try:
         __plot_roc(
@@ -262,6 +273,106 @@ def generate_combined_plots(
         print(f"Error plotting delta accuracy: {e}")
 
 
+def __plot_legend(
+    gptcache_data_frames: Dict[float, pd.DataFrame],
+    vcache_local_data_frames: Dict[float, pd.DataFrame],
+    vcache_global_data_frames: Dict[float, pd.DataFrame],
+    berkeley_embedding_data_frames: Dict[float, pd.DataFrame],
+    vcache_berkeley_embedding_data_frames: Dict[float, pd.DataFrame],
+    results_dir: str,
+    timestamp: str,
+    font_size: int,
+):
+    figlegend = plt.figure(figsize=(12, 3))
+    ax = figlegend.add_subplot(111)
+    ax.axis("off")
+
+    lines = []
+    labels = []
+
+    if gptcache_data_frames:
+        lines.append(
+            Line2D(
+                [0],
+                [0],
+                color="blue",
+                linewidth=3,
+                linestyle="-",
+                marker="o",
+                markersize=8,
+            )
+        )
+        labels.append("GPTCache")
+
+    if vcache_local_data_frames:
+        lines.append(
+            Line2D(
+                [0],
+                [0],
+                color="green",
+                linewidth=3,
+                linestyle="-",
+                marker="o",
+                markersize=8,
+            )
+        )
+        labels.append("vCache")
+
+    if vcache_global_data_frames:
+        lines.append(
+            Line2D(
+                [0],
+                [0],
+                color="red",
+                linewidth=3,
+                linestyle="-",
+                marker="o",
+                markersize=8,
+            )
+        )
+        labels.append("vCache (Ablation)")
+
+    if vcache_berkeley_embedding_data_frames:
+        lines.append(
+            Line2D(
+                [0],
+                [0],
+                color="orange",
+                linewidth=3,
+                linestyle="-",
+                marker="o",
+                markersize=8,
+            )
+        )
+        labels.append("vCache + Fine-tuned Embedding")
+
+    if berkeley_embedding_data_frames:
+        lines.append(
+            Line2D(
+                [0],
+                [0],
+                color="purple",
+                linewidth=3,
+                linestyle="-",
+                marker="o",
+                markersize=8,
+            )
+        )
+        labels.append("Fine-tuned Embedding")
+
+    lines.append(Line2D([0], [0], color="grey", linewidth=3, linestyle="--", alpha=0.7))
+    labels.append("Random Classifier")
+
+    lines.append(Line2D([0], [0], color="grey", linewidth=3, linestyle="-"))
+    labels.append("No Cache")
+
+    ax.legend(lines, labels, loc="center", ncol=4, fontsize=font_size)
+
+    legend_filename = results_dir + "/legend.pdf"
+    figlegend.savefig(legend_filename, format="pdf", bbox_inches="tight")
+    plt.close(figlegend)
+
+
 def __plot_roc(
     gptcache_data_frames: Dict[float, pd.DataFrame],
     vcache_local_data_frames: Dict[float, pd.DataFrame],
@@ -280,7 +391,7 @@ def __plot_roc(
         "--",
         color="grey",
         alpha=0.7,
-        linewidth=2,
+        linewidth=3,
         label="Random Classifier",
     )
 
@@ -327,9 +438,6 @@ def __plot_roc(
     vcache_local_fpr_values = []
 
     for delta in vcache_local_deltas:
-        if delta == 0.01:
-            continue
-
         df = vcache_local_data_frames[delta]
 
         tpr = compute_recall_score(tp=df["tp_list"], fn=df["fn_list"])
@@ -396,7 +504,7 @@ def __plot_roc(
             )
 
     ############################################################
-    ### Baseline: Berkeley Embedding
+    ### Baseline: Fine-tuned Embedding
     berkeley_embedding_thresholds = sorted(berkeley_embedding_data_frames.keys())
     berkeley_embedding_tpr_values = []
     berkeley_embedding_fpr_values = []
@@ -417,7 +525,7 @@ def __plot_roc(
             "o-",
             color="purple",
             linewidth=3,
-            label="Berkeley Embedding",
+            label="Fine-tuned Embedding",
             markersize=10,
         )
 
@@ -432,7 +540,7 @@ def __plot_roc(
             )
 
     ############################################################
-    ### vCache + Berkeley Embedding
+    ### vCache + Fine-tuned Embedding
     vcache_berkeley_embedding_thresholds = sorted(
         vcache_berkeley_embedding_data_frames.keys()
     )
@@ -455,7 +563,7 @@ def __plot_roc(
             "o-",
             color="orange",
             linewidth=3,
-            label="vCache + Berkeley Embedding",
+            label="vCache + Fine-tuned Embedding",
             markersize=10,
         )
 
@@ -474,8 +582,6 @@ def __plot_roc(
 
     plt.xlabel("False Positive Rate", fontsize=font_size)
     plt.ylabel("True Positive Rate", fontsize=font_size)
-    plt.grid(True, linestyle="--", alpha=0.7)
-    plt.legend(loc="lower right", fontsize=font_size - 2)
     plt.tick_params(axis="both", labelsize=font_size - 2)
 
     plt.xlim(0, 1)
@@ -526,7 +632,7 @@ def __plot_precision_vs_recall(
             gptcache_precision_values,
             "o-",
             color="blue",
-            linewidth=2,
+            linewidth=3,
             label="GPTCache",
             markersize=8,
         )
@@ -548,9 +654,6 @@ def __plot_precision_vs_recall(
     vcache_local_recall_values = []
 
     for delta in vcache_local_deltas:
-        if delta == 0.01:
-            continue
-
         df = vcache_local_data_frames[delta]
         precision = compute_precision_score(tp=df["tp_list"], fp=df["fp_list"])
         recall = compute_recall_score(tp=df["tp_list"], fn=df["fn_list"])
@@ -564,7 +667,7 @@ def __plot_precision_vs_recall(
             vcache_local_precision_values,
             "o-",
             color="green",
-            linewidth=2,
+            linewidth=3,
             label="vCache",
             markersize=8,
         )
@@ -599,7 +702,7 @@ def __plot_precision_vs_recall(
             vcache_global_precision_values,
             "o-",
             color="red",
-            linewidth=2,
+            linewidth=3,
             label="vCache (Ablation)",
             markersize=8,
         )
@@ -615,7 +718,7 @@ def __plot_precision_vs_recall(
             )
 
     ############################################################
-    ### Baseline: Berkeley Embedding
+    ### Baseline: Fine-tuned Embedding
     berkeley_embedding_thresholds = sorted(berkeley_embedding_data_frames.keys())
     berkeley_embedding_precision_values = []
     berkeley_embedding_recall_values = []
@@ -635,8 +738,8 @@ def __plot_precision_vs_recall(
             berkeley_embedding_precision_values,
             "o-",
             color="purple",
-            linewidth=2,
-            label="Berkeley Embedding",
+            linewidth=3,
+            label="Fine-tuned Embedding",
             markersize=8,
         )
 
@@ -654,7 +757,7 @@ def __plot_precision_vs_recall(
             )
 
     ############################################################
-    ### vCache + Berkeley Embedding
+    ### vCache + Fine-tuned Embedding
     vcache_berkeley_embedding_thresholds = sorted(
         vcache_berkeley_embedding_data_frames.keys()
     )
@@ -676,8 +779,8 @@ def __plot_precision_vs_recall(
             vcache_berkeley_embedding_precision_values,
             "o-",
             color="orange",
-            linewidth=2,
-            label="vCache + Berkeley Embedding",
+            linewidth=3,
+            label="vCache + Fine-tuned Embedding",
             markersize=8,
         )
 
@@ -698,8 +801,6 @@ def __plot_precision_vs_recall(
     plt.ylim([0.0, 1.05])
     plt.xlabel("Recall", fontsize=font_size)
     plt.ylabel("Precision", fontsize=font_size)
-    plt.grid(True, linestyle="--", alpha=0.7)
-    plt.legend(loc="best", fontsize=font_size - 2)
     plt.tick_params(axis="both", labelsize=font_size - 2)
 
     yticks = plt.yticks()[0]
@@ -754,28 +855,26 @@ def __plot_avg_latency_vs_error_rate(
             gptcache_error_rates,
             "o-",
             color="blue",
-            linewidth=2,
+            linewidth=3,
             label="GPTCache",
             markersize=8,
         )
 
         for i, threshold in enumerate(gptcache_thresholds):
-            if i == 0 or i == len(gptcache_thresholds) - 1:
-                label = f"{threshold:.2f}"
-                plt.annotate(
-                    label,
-                    (gptcache_error_rates[i], gptcache_latencies[i]),
-                    textcoords="offset points",
-                    xytext=(0, 10),
-                    ha="center",
-                    fontsize=font_size - 4,
-                )
+            plt.annotate(
+                text="",
+                xy=(gptcache_error_rates[i], gptcache_latencies[i]),
+                textcoords="offset points",
+                xytext=(0, 10),
+                ha="center",
+                fontsize=font_size - 4,
+            )
 
         plt.axvline(
             x=avg_latency_no_cache,
             color="grey",
-            linestyle="--",
-            linewidth=2,
+            linestyle="-",
+            linewidth=3,
             label="No Cache",
         )
 
@@ -786,9 +885,6 @@ def __plot_avg_latency_vs_error_rate(
     vcache_local_latencies = []
 
     for delta in vcache_local_deltas:
-        if delta == 0.01:
-            continue
-
         df = vcache_local_data_frames[delta]
 
         error_rate = compute_error_rate_score(fp=df["fp_list"]) * 100
@@ -802,24 +898,20 @@ def __plot_avg_latency_vs_error_rate(
             vcache_local_error_rates,
             "o-",
             color="green",
-            linewidth=2,
+            linewidth=3,
             label="vCache",
             markersize=8,
         )
 
         for i, _ in enumerate(vcache_local_latencies):
-            if i == 0:
-                continue
-
-            if i == 0 or i == len(vcache_local_deltas) - 1:
-                label = f"{vcache_local_deltas[i]:.2f}"
-                plt.annotate(
-                    label,
-                    (vcache_local_error_rates[i], vcache_local_latencies[i]),
-                    xytext=(0, 10),
-                    ha="center",
-                    fontsize=font_size - 4,
-                )
+            plt.annotate(
+                text="",
+                xy=(vcache_local_error_rates[i], vcache_local_latencies[i]),
+                textcoords="offset points",
+                xytext=(0, 10),
+                ha="center",
+                fontsize=font_size - 4,
+            )
 
     ############################################################
     ### Baseline: vCache Global
@@ -843,25 +935,23 @@ def __plot_avg_latency_vs_error_rate(
             vcache_global_error_rates,
             "o-",
             color="red",
-            linewidth=2,
+            linewidth=3,
             label="vCache (Ablation)",
             markersize=8,
         )
 
         for i, delta in enumerate(vcache_global_deltas):
-            if i == 0 or i == len(vcache_global_deltas) - 1:
-                label = f"{delta:.2f}"
-                plt.annotate(
-                    label,
-                    (vcache_global_error_rates[i], vcache_global_latencies[i]),
-                    textcoords="offset points",
-                    xytext=(0, 10),
-                    ha="center",
-                    fontsize=font_size - 4,
-                )
+            plt.annotate(
+                text="",
+                xy=(vcache_global_error_rates[i], vcache_global_latencies[i]),
+                textcoords="offset points",
+                xytext=(0, 10),
+                ha="center",
+                fontsize=font_size - 4,
+            )
 
     ############################################################
-    ### Baseline: Berkeley Embedding
+    ### Baseline: Fine-tuned Embedding
     berkeley_embedding_thresholds = sorted(berkeley_embedding_data_frames.keys())
     berkeley_embedding_error_rates = []
     berkeley_embedding_latencies = []
@@ -880,15 +970,15 @@ def __plot_avg_latency_vs_error_rate(
             berkeley_embedding_error_rates,
             "o-",
             color="purple",
-            linewidth=2,
-            label="Berkeley Embedding",
+            linewidth=3,
+            label="Fine-tuned Embedding",
             markersize=8,
         )
 
         for i, threshold in enumerate(berkeley_embedding_thresholds):
             plt.annotate(
-                label,
-                (berkeley_embedding_error_rates[i], berkeley_embedding_latencies[i]),
+                text="",
+                xy=(berkeley_embedding_error_rates[i], berkeley_embedding_latencies[i]),
                 textcoords="offset points",
                 xytext=(0, 10),
                 ha="center",
@@ -896,7 +986,7 @@ def __plot_avg_latency_vs_error_rate(
             )
 
     ############################################################
-    ### vCache + Berkeley Embedding
+    ### vCache + Fine-tuned Embedding
     vcache_berkeley_embedding_thresholds = sorted(
         vcache_berkeley_embedding_data_frames.keys()
     )
@@ -917,15 +1007,15 @@ def __plot_avg_latency_vs_error_rate(
             vcache_berkeley_embedding_error_rates,
             "o-",
             color="orange",
-            linewidth=2,
-            label="vCache + Berkeley Embedding",
+            linewidth=3,
+            label="vCache + Fine-tuned Embedding",
             markersize=8,
         )
 
         for i, delta in enumerate(vcache_berkeley_embedding_thresholds):
             plt.annotate(
-                label,
-                (
+                text="",
+                xy=(
                     vcache_berkeley_embedding_error_rates[i],
                     vcache_berkeley_embedding_latencies[i],
                 ),
@@ -939,8 +1029,6 @@ def __plot_avg_latency_vs_error_rate(
     plt.ylabel("Error Rate (%)", fontsize=font_size)
     plt.xlim(left=0.0)
     plt.ylim(bottom=0.0)
-    plt.grid(True, linestyle="--", alpha=0.7)
-    plt.legend(loc="best", fontsize=font_size - 2)
     plt.tick_params(axis="both", labelsize=font_size - 2)
 
     yticks = plt.yticks()[0]
@@ -1014,9 +1102,6 @@ def __plot_cache_hit_vs_error_rate(
     vcache_local_error_rates = []
 
     for delta in vcache_local_deltas:
-        if delta == 0.01:
-            continue
-
         df = vcache_local_data_frames[delta]
 
         cache_hit_rate = (
@@ -1039,8 +1124,6 @@ def __plot_cache_hit_vs_error_rate(
         )
 
         for i, _ in enumerate(vcache_local_error_rates):
-            if i == 0:
-                continue
             plt.annotate(
                 text="",
                 xy=(vcache_local_error_rates[i], vcache_local_cache_hit_rates[i]),
@@ -1088,7 +1171,7 @@ def __plot_cache_hit_vs_error_rate(
             )
 
     ############################################################
-    ### Baseline: Berkeley Embedding
+    ### Baseline: Fine-tuned Embedding
     berkeley_embedding_thresholds = sorted(berkeley_embedding_data_frames.keys())
     berkeley_embedding_cache_hit_rates = []
     berkeley_embedding_error_rates = []
@@ -1110,8 +1193,8 @@ def __plot_cache_hit_vs_error_rate(
             berkeley_embedding_cache_hit_rates,
             "o-",
             color="purple",
-            linewidth=2,
-            label="Berkeley Embedding",
+            linewidth=3,
+            label="Fine-tuned Embedding",
             markersize=8,
         )
 
@@ -1129,7 +1212,7 @@ def __plot_cache_hit_vs_error_rate(
             )
 
     ############################################################
-    ### vCache + Berkeley Embedding
+    ### vCache + Fine-tuned Embedding
     vcache_berkeley_embedding_thresholds = sorted(
         vcache_berkeley_embedding_data_frames.keys()
     )
@@ -1153,8 +1236,8 @@ def __plot_cache_hit_vs_error_rate(
             vcache_berkeley_embedding_cache_hit_rates,
             "o-",
             color="orange",
-            linewidth=2,
-            label="vCache + Berkeley Embedding",
+            linewidth=3,
+            label="vCache + Fine-tuned Embedding",
             markersize=8,
         )
 
@@ -1173,8 +1256,6 @@ def __plot_cache_hit_vs_error_rate(
 
     plt.xlabel("Error Rate (%)", fontsize=font_size)
     plt.ylabel("Cache Hit Rate (%)", fontsize=font_size)
-    plt.grid(True, linestyle="--", alpha=0.7)
-    plt.legend(loc="best", fontsize=font_size - 2)
     plt.tick_params(axis="both", labelsize=font_size - 2)
 
     plt.ylim(0, 100)
@@ -1280,7 +1361,7 @@ def __plot_cache_hit_vs_error_rate_vs_sample_size(
             vcache_local_error_rates,
             "-",
             color="green",
-            linewidth=2,
+            linewidth=3,
             label=f"VectorQ (δ={delta:.2f})",
         )
 
@@ -1289,7 +1370,7 @@ def __plot_cache_hit_vs_error_rate_vs_sample_size(
             vcache_global_error_rates,
             "-",
             color="red",
-            linewidth=2,
+            linewidth=3,
             label=f"VectorQ Ablation (δ={delta:.2f})",
         )
 
@@ -1298,7 +1379,7 @@ def __plot_cache_hit_vs_error_rate_vs_sample_size(
             gptcache_error_rates,
             "-",
             color="blue",
-            linewidth=2,
+            linewidth=3,
             label=f"GPTCache (t={gptcache_threshold:.2f})",
         )
 
@@ -1314,7 +1395,7 @@ def __plot_cache_hit_vs_error_rate_vs_sample_size(
             vcache_local_cache_hit_rates,
             "-",
             color="green",
-            linewidth=2,
+            linewidth=3,
             label=f"VectorQ (δ={delta:.2f})",
         )
 
@@ -1323,7 +1404,7 @@ def __plot_cache_hit_vs_error_rate_vs_sample_size(
             vcache_global_cache_hit_rates,
             "-",
             color="red",
-            linewidth=2,
+            linewidth=3,
             label=f"VectorQ Ablation (δ={delta:.2f})",
         )
 
@@ -1332,7 +1413,7 @@ def __plot_cache_hit_vs_error_rate_vs_sample_size(
             gptcache_cache_hit_rates,
             "-",
             color="blue",
-            linewidth=2,
+            linewidth=3,
             label=f"GPTCache (t={gptcache_threshold:.2f})",
         )
 
@@ -1390,7 +1471,7 @@ def __plot_delta_accuracy(
                 xmax=i + bar_width / 2,
                 colors="red",
                 linestyles="dashed",
-                linewidth=2,
+                linewidth=3,
             )
 
         custom_lines = [
