@@ -150,65 +150,87 @@ def generate_combined_plots(
             except Exception as e:
                 print(f"Error loading {vcache_berkeley_embedding_file_path}: {e}")
                 continue
-
-    __plot_roc(
-        gptcache_data_frames=gptcache_data_frames,
-        vcache_local_data_frames=vcache_local_data_frames,
-        vcache_global_data_frames=vcache_global_data_frames,
-        berkeley_embedding_data_frames=berkeley_embedding_data_frames,
-        vcache_berkeley_embedding_data_frames=vcache_berkeley_embedding_data_frames,
-        results_dir=results_dir,
-        timestamp=timestamp,
-        font_size=font_size,
-    )
-    __plot_precision_vs_recall(
-        gptcache_data_frames=gptcache_data_frames,
-        vcache_local_data_frames=vcache_local_data_frames,
-        vcache_global_data_frames=vcache_global_data_frames,
-        berkeley_embedding_data_frames=berkeley_embedding_data_frames,
-        vcache_berkeley_embedding_data_frames=vcache_berkeley_embedding_data_frames,
-        results_dir=results_dir,
-        timestamp=timestamp,
-        font_size=font_size,
-    )
-    __plot_avg_latency_vs_error_rate(
-        gptcache_data_frames=gptcache_data_frames,
-        vcache_local_data_frames=vcache_local_data_frames,
-        vcache_global_data_frames=vcache_global_data_frames,
-        berkeley_embedding_data_frames=berkeley_embedding_data_frames,
-        vcache_berkeley_embedding_data_frames=vcache_berkeley_embedding_data_frames,
-        results_dir=results_dir,
-        timestamp=timestamp,
-        font_size=font_size,
-    )
-    __plot_cache_hit_vs_error_rate(
-        gptcache_data_frames=gptcache_data_frames,
-        vcache_local_data_frames=vcache_local_data_frames,
-        vcache_global_data_frames=vcache_global_data_frames,
-        berkeley_embedding_data_frames=berkeley_embedding_data_frames,
-        vcache_berkeley_embedding_data_frames=vcache_berkeley_embedding_data_frames,
-        results_dir=results_dir,
-        timestamp=timestamp,
-        font_size=font_size,
-    )
-    __plot_cache_hit_vs_error_rate_vs_sample_size(
-        gptcache_data_frames=gptcache_data_frames,
-        vcache_local_data_frames=vcache_local_data_frames,
-        vcache_global_data_frames=vcache_global_data_frames,
-        berkeley_embedding_data_frames=berkeley_embedding_data_frames,
-        vcache_berkeley_embedding_data_frames=vcache_berkeley_embedding_data_frames,
-        results_dir=results_dir,
-        timestamp=timestamp,
-        font_size=font_size,
-    )
-    __plot_delta_accuracy(
-        vcache_local_data_frames=vcache_local_data_frames,
-        vcache_global_data_frames=vcache_global_data_frames,
-        vcache_berkeley_embedding_data_frames=vcache_berkeley_embedding_data_frames,
-        results_dir=results_dir,
-        timestamp=timestamp,
-        font_size=font_size,
-    )
+    try:
+        __plot_roc(
+            gptcache_data_frames=gptcache_data_frames,
+            vcache_local_data_frames=vcache_local_data_frames,
+            vcache_global_data_frames=vcache_global_data_frames,
+            berkeley_embedding_data_frames=berkeley_embedding_data_frames,
+            vcache_berkeley_embedding_data_frames=vcache_berkeley_embedding_data_frames,
+            results_dir=results_dir,
+            timestamp=timestamp,
+            font_size=font_size,
+        )
+    except Exception as e:
+        print(f"Error plotting ROC: {e}")
+    
+    try:
+        __plot_precision_vs_recall(
+            gptcache_data_frames=gptcache_data_frames,
+            vcache_local_data_frames=vcache_local_data_frames,
+            vcache_global_data_frames=vcache_global_data_frames,
+            berkeley_embedding_data_frames=berkeley_embedding_data_frames,
+            vcache_berkeley_embedding_data_frames=vcache_berkeley_embedding_data_frames,
+            results_dir=results_dir,
+            timestamp=timestamp,
+            font_size=font_size,
+        )
+    except Exception as e:
+        print(f"Error plotting precision vs recall: {e}")
+    
+    try:
+        __plot_avg_latency_vs_error_rate(
+            gptcache_data_frames=gptcache_data_frames,
+            vcache_local_data_frames=vcache_local_data_frames,
+            vcache_global_data_frames=vcache_global_data_frames,
+            berkeley_embedding_data_frames=berkeley_embedding_data_frames,
+            vcache_berkeley_embedding_data_frames=vcache_berkeley_embedding_data_frames,
+            results_dir=results_dir,
+            timestamp=timestamp,
+            font_size=font_size,
+        )
+    except Exception as e:
+        print(f"Error plotting avg latency vs error rate: {e}")
+        
+    try:
+        __plot_cache_hit_vs_error_rate(
+            gptcache_data_frames=gptcache_data_frames,
+            vcache_local_data_frames=vcache_local_data_frames,
+            vcache_global_data_frames=vcache_global_data_frames,
+            berkeley_embedding_data_frames=berkeley_embedding_data_frames,
+            vcache_berkeley_embedding_data_frames=vcache_berkeley_embedding_data_frames,
+            results_dir=results_dir,
+            timestamp=timestamp,
+            font_size=font_size,
+        )
+    except Exception as e:
+        print(f"Error plotting cache hit vs error rate: {e}")
+        
+    try:
+        __plot_cache_hit_vs_error_rate_vs_sample_size(
+            gptcache_data_frames=gptcache_data_frames,
+            vcache_local_data_frames=vcache_local_data_frames,
+            vcache_global_data_frames=vcache_global_data_frames,
+            berkeley_embedding_data_frames=berkeley_embedding_data_frames,
+            vcache_berkeley_embedding_data_frames=vcache_berkeley_embedding_data_frames,
+            results_dir=results_dir,
+            timestamp=timestamp,
+            font_size=font_size,
+        )
+    except Exception as e:
+        print(f"Error plotting cache hit vs error rate vs sample size: {e}")
+        
+    try:
+        __plot_delta_accuracy(
+            vcache_local_data_frames=vcache_local_data_frames,
+            vcache_global_data_frames=vcache_global_data_frames,
+            vcache_berkeley_embedding_data_frames=vcache_berkeley_embedding_data_frames,
+            results_dir=results_dir,
+            timestamp=timestamp,
+            font_size=font_size,
+        )
+    except Exception as e:
+        print(f"Error plotting delta accuracy: {e}")
 
 
 def __plot_roc(
