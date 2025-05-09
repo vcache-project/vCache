@@ -3,6 +3,7 @@ import logging
 import os
 import time
 import unittest
+from enum import Enum
 from datetime import datetime
 from typing import Dict, List, Tuple
 
@@ -63,81 +64,73 @@ logging.basicConfig(
 )
 
 ########################################################################################################################
-### Parameters #########################################################################################################
+### Available Classes ##################################################################################################
 ########################################################################################################################
 
-# Benchmark Config
-MAX_SAMPLES: int = 15000
+class EmbeddingModel(Enum):
+    GTE = ("emb_gte", "GteLargeENv1_5", "float32", 1024)
+    GTE_FT = ("emb_gte_ft", "GteLargeENv1_5", "float32", 1024)
+    E5_MISTRAL_7B = ("emb_e5_mistral_7b", "E5_Mistral_7B_Instruct", "float16", 4096)
+    E5_LARGE_V2 = ("emb_e5_large_v2", "E5_Large_v2", "float16", 512)
+    E5_LARGE_V2_FT = ("emb_e5_large_v2_ft", "E5_Large_v2", "float16", 512)
+    
+class LargeLanguageModel(Enum):
+    LLAMA_3_8B = ("response_llama_3_8b", "Llama_3_8B_Instruct", "float16", None)
+    LLAMA_3_70B = ("response_llama_3_70b", "Llama_3_70B_Instruct", "float16", None)
+    GPT_4O_MINI = ("response_gpt-4o-mini", "GPT-4o-mini", "float16", None)
+    GPT_4O_NANO = ("response_gpt-4.1-nano", "GPT-4.1-nano", "float16", None)
+
+class Baseline(Enum):
+    GPTCache = "GPTCache"
+    VCacheLocal = "vCacheLocal"
+    VCacheGlobal = "vCacheGlobal"
+    BerkeleyEmbedding = "BerkeleyEmbedding"
+    VCacheBerkeleyEmbedding = "VCacheBerkeleyEmbedding"
+    IID = "iid"
+
+class Dataset(Enum):
+    SEM_BENCHMARK_CLASSIFICATION = "benchmark_classification"
+    SEM_BENCHMARK_ARENA = "benchmark_arena"
+    AMAZON_INSTANT_VIDEO = "amazon_instant_video"
+    COMMONSENSE_QA = "commonsense_qa"
+    ECOMMERCE_DATASET = "ecommerce_dataset"
+    SEMANTIC_PROMPT_CACHE_BENCHMARK = "semantic_prompt_cache_benchmark"
+    
+########################################################################################################################
+### Benchmark Config ###################################################################################################
+########################################################################################################################
+
+
+MAX_SAMPLES: int = 150
 CONFIDENCE_INTERVALS_ITERATIONS: int = 3
 IS_LLM_JUDGE_BENCHMARK: bool = False
 
-EMBEDDING_MODEL_1 = (
-    "embedding_1",
-    "GteLargeENv1_5",
-    "float32",
-    1024,
-)  # 'Alibaba-NLP/gte-large-en-v1.5'
-EMBEDDING_MODEL_2 = (
-    "embedding_2",
-    "E5_Mistral_7B_Instruct",
-    "float16",
-    4096,
-)  # 'intfloat/e5-mistral-7b-instruct'
-LARGE_LANGUAGE_MODEL_1 = (
-    "response_1",
-    "Llama_3_8B_Instruct",
-    "float16",
-    None,
-)  # 'meta-llama/Meta-Llama-3-8B-Instruct'
-LARGE_LANGUAGE_MODEL_2 = (
-    "response_2",
-    "Llama_3_70B_Instruct",
-    "float16",
-    None,
-)  # 'meta-llama/Meta-Llama-3-70B-Instruct'
-SIMILARITY_STRATEGY = (
-    "string_comparison",
-    "embedding_comparison",
-    "llm_judge_comparison",
-)
-
-DATASETS: List[str] = [
-    "amazon_instant_video.json",
-    "commonsense_qa.json",
-    "ecommerce_dataset.json",
-    "semantic_prompt_cache_benchmark.json",
+RUN_COMBINATIONS: List[Tuple[EmbeddingModel, LargeLanguageModel]] = [
+    (EmbeddingModel.GTE, LargeLanguageModel.LLAMA_3_8B),
+    (EmbeddingModel.E5_LARGE_V2, LargeLanguageModel.LLAMA_3_8B)
 ]
-DATASETS_TO_EXCLUDE: List[str] = [DATASETS[1], DATASETS[2]]
-
-embedding_models: List[Tuple[str, str, str, int]] = [
-    EMBEDDING_MODEL_1,
-    EMBEDDING_MODEL_2,
+    
+BASELINES_TO_RUN: List[Baseline] = [
+    Baseline.GPTCache,
+    Baseline.VCacheLocal,
+   # Baseline.BerkeleyEmbedding,
+    #Baseline.VCacheBerkeleyEmbedding
 ]
-llm_models: List[Tuple[str, str, str, int]] = [
-    LARGE_LANGUAGE_MODEL_1,
-    LARGE_LANGUAGE_MODEL_2,
+
+DATASETS_TO_RUN: List[str] = [
+    Dataset.SEM_BENCHMARK_CLASSIFICATION
 ]
-candidate_strategy: str = SIMILARITY_STRATEGY[0]
 
-static_thresholds = np.array(
-    [0.76, 0.78, 0.80, 0.82, 0.84, 0.86, 0.88, 0.90, 0.92, 0.94, 0.96]
-)
-deltas = np.array([0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1])
+STATIC_THRESHOLDS: List[float] = [
+    0.76, 0.80, 0.84, 0.88, 0.92, 0.96
+]
 
-# VectorQ Config
+DELTAS: List[float] = [
+    0.01, 0.02, 0.03, 0.04, 0.05, 0.06
+]
+
 MAX_VECTOR_DB_CAPACITY: int = 100000
 PLOT_FONT_SIZE: int = 32
-
-SYSTEM_TYPES: List[str] = [
-    "static",
-    "dynamic_local",
-    "dynamic_global",
-    "iid_local",
-    "all",
-    "just_plot",
-]
-SYSTEM_TYPE: str = SYSTEM_TYPES[3]
-
 
 ########################################################################################################################
 ### Benchmark Class ####################################################################################################
@@ -237,6 +230,9 @@ class Benchmark(unittest.TestCase):
 
                 pbar.close()
 
+        except FileNotFoundError as e:
+            logging.error(f"Benchmark dataset file not found: {e}")
+            raise e
         except Exception as e:
             logging.error(f"Error processing benchmark: {e}")
             raise e
@@ -410,7 +406,7 @@ class Benchmark(unittest.TestCase):
         filepath = self.output_folder_path + f"/results_{self.timestamp}.json"
         with open(filepath, "w") as json_file:
             json.dump(data, json_file, indent=4)
-        print(f"Results successfully dumped to {filepath}")
+        logging.info(f"Results successfully dumped to {filepath}")
 
 
 ########################################################################################################################
@@ -469,176 +465,245 @@ def main():
     datasets_dir = os.path.join(benchmarks_dir, "data", "large_scale")
     if not os.path.exists(datasets_dir):
         os.makedirs(datasets_dir, exist_ok=True)
-        print(f"Created directory: {datasets_dir}")
-
-    datasets_dir = datasets_dir + "/"
-    datasets = [
-        f.split(".")[0]
-        for f in os.listdir(datasets_dir)
-        if (f.endswith(".json") and (f not in DATASETS_TO_EXCLUDE))
-    ]
-    print(f"Datasets to be processed: {datasets}")
+        logging.info(f"Created directory: {datasets_dir}")
 
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
 
-    for dataset in datasets:
-        dataset_file = f"{datasets_dir}{dataset}.json"
-        logging.info(f"Running benchmark for dataset: {dataset}\n\n\n")
+    for dataset in DATASETS_TO_RUN:
+        dataset_file = os.path.join(datasets_dir, f"{dataset.value}.json")
+        logging.info(f"Running benchmark for dataset: {dataset}\n\n")
         start_time_dataset = time.time()
 
-        for embedding_model in embedding_models:
+        for embedding_model, llm_model in RUN_COMBINATIONS:
             logging.info(
-                f"Running benchmark for dataset: {dataset}, embedding model: {embedding_model[1]}\n\n"
+                f"Running benchmark for dataset: {dataset}, embedding model: {embedding_model.value[1]}, LLM model: {llm_model.value[1]}\n"
             )
-            start_time_embedding_model = time.time()
+            start_time_llm_model = time.time()
 
-            for llm_model in llm_models:
-                logging.info(
-                    f"Running benchmark for dataset: {dataset}, embedding model: {embedding_model[1]}, LLM model: {llm_model[1]}\n"
-                )
-                start_time_llm_model = time.time()
-
-                # Baseline 1) Dynamic thresholds (VectorQ, Local)
-                if SYSTEM_TYPE in ["dynamic_local", "all"]:
-                    for delta in deltas:
-                        for i in range(0, CONFIDENCE_INTERVALS_ITERATIONS):
-                            path = os.path.join(
-                                results_dir,
-                                dataset,
-                                embedding_model[1],
-                                llm_model[1],
-                                f"vectorq_local_{delta}_run_{i + 1}",
-                            )
-                            if os.path.exists(path) and os.listdir(path):
-                                continue
-
-                            logging.info(
-                                f"Using dynamic threshold with delta: {delta}. Run {i + 1} of {CONFIDENCE_INTERVALS_ITERATIONS}"
-                            )
-
-                            __run_baseline(
-                                vectorq_policy=DynamicLocalThresholdPolicy(delta=delta),
-                                path=path,
-                                dataset_file=dataset_file,
-                                embedding_model=embedding_model,
-                                llm_model=llm_model,
-                                timestamp=timestamp,
-                                delta=delta,
-                                threshold=-1,
-                            )
-
-                # Baseline 2) Dynamic thresholds (VectorQ, Global)
-                if SYSTEM_TYPE in ["dynamic_global", "all"]:
-                    for delta in deltas:
-                        for i in range(0, CONFIDENCE_INTERVALS_ITERATIONS):
-                            path = os.path.join(
-                                results_dir,
-                                dataset,
-                                embedding_model[1],
-                                llm_model[1],
-                                f"vectorq_global_{delta}_run_{i + 1}",
-                            )
-                            if os.path.exists(path) and os.listdir(path):
-                                continue
-
-                            logging.info(
-                                f"Using dynamic threshold with delta: {delta}. Run {i + 1} of {CONFIDENCE_INTERVALS_ITERATIONS}"
-                            )
-
-                            __run_baseline(
-                                vectorq_policy=DynamicGlobalThresholdPolicy(
-                                    delta=delta
-                                ),
-                                path=path,
-                                dataset_file=dataset_file,
-                                embedding_model=embedding_model,
-                                llm_model=llm_model,
-                                timestamp=timestamp,
-                                delta=delta,
-                                threshold=-1,
-                            )
-
-                # Baseline 3) IID Local thresholds
-                if SYSTEM_TYPE in ["iid_local", "all"]:
-                    for delta in deltas:
-                        for i in range(0, CONFIDENCE_INTERVALS_ITERATIONS):
-                            path = os.path.join(
-                                results_dir,
-                                dataset,
-                                embedding_model[1],
-                                llm_model[1],
-                                f"iid_local_{delta}_run_{i + 1}",
-                            )
-                            if os.path.exists(path) and os.listdir(path):
-                                continue
-
-                            logging.info(
-                                f"Using IID local threshold with delta: {delta}. Run {i + 1} of {CONFIDENCE_INTERVALS_ITERATIONS}"
-                            )
-
-                            __run_baseline(
-                                vectorq_policy=IIDLocalThresholdPolicy(delta=delta),
-                                path=path,
-                                dataset_file=dataset_file,
-                                embedding_model=embedding_model,
-                                llm_model=llm_model,
-                                timestamp=timestamp,
-                                delta=delta,
-                                threshold=-1,
-                            )
-
-                # Baseline 4) Static thresholds
-                if SYSTEM_TYPE in ["static", "all"]:
-                    for threshold in static_thresholds:
+            #####################################################
+            ### Baseline: vCache Local
+            if Baseline.VCacheLocal in BASELINES_TO_RUN:
+                for delta in DELTAS:
+                    for i in range(0, CONFIDENCE_INTERVALS_ITERATIONS):
                         path = os.path.join(
                             results_dir,
-                            dataset,
-                            embedding_model[1],
-                            llm_model[1],
-                            f"static_{threshold}",
+                            dataset.value,
+                            embedding_model.value[1],
+                            llm_model.value[1],
+                            f"vcache_local_{delta}_run_{i + 1}",
                         )
                         if os.path.exists(path) and os.listdir(path):
                             continue
 
-                        logging.info(f"Using static threshold: {threshold}")
-
-                        __run_baseline(
-                            vectorq_policy=StaticGlobalThresholdPolicy(
-                                threshold=threshold
-                            ),
-                            path=path,
-                            dataset_file=dataset_file,
-                            embedding_model=embedding_model,
-                            llm_model=llm_model,
-                            timestamp=timestamp,
-                            delta=-1,
-                            threshold=threshold,
+                        logging.info(
+                            f"Using dynamic threshold with delta: {delta}. Run {i + 1} of {CONFIDENCE_INTERVALS_ITERATIONS}"
                         )
 
-                if SYSTEM_TYPE == "all" or SYSTEM_TYPE == "just_plot":
-                    generate_combined_plots(
-                        dataset=dataset,
-                        embedding_model_name=embedding_model[1],
-                        llm_model_name=llm_model[1],
-                        results_dir=results_dir,
-                        timestamp=timestamp,
-                        font_size=PLOT_FONT_SIZE,
+                        __run_baseline(
+                            vectorq_policy=DynamicLocalThresholdPolicy(delta=delta),
+                            path=path,
+                            dataset_file=dataset_file,
+                            embedding_model=embedding_model.value,
+                            llm_model=llm_model.value,
+                            timestamp=timestamp,
+                            delta=delta,
+                            threshold=-1,
+                        )
+
+            #####################################################
+            ### Baseline: vCache Global
+            if Baseline.VCacheGlobal in BASELINES_TO_RUN:
+                for delta in DELTAS:
+                    path = os.path.join(
+                        results_dir,
+                        dataset.value,
+                        embedding_model.value[1],
+                        llm_model.value[1],
+                        f"vcache_global_{delta}",
+                    )
+                    if os.path.exists(path) and os.listdir(path):
+                        continue
+
+                    logging.info(
+                        f"Using dynamic threshold with delta: {delta}. Run {i + 1} of {CONFIDENCE_INTERVALS_ITERATIONS}"
                     )
 
-                end_time_llm_model = time.time()
-                logging.info(
-                    f"LLM Model Time: {(end_time_llm_model - start_time_llm_model) / 60:.2f} minutes, {(end_time_llm_model - start_time_llm_model) / 3600:.4f} hours"
-                )
+                    __run_baseline(
+                        vectorq_policy=DynamicGlobalThresholdPolicy(
+                            delta=delta
+                        ),
+                        path=path,
+                        dataset_file=dataset_file,
+                        embedding_model=embedding_model.value,
+                        llm_model=llm_model.value,
+                        timestamp=timestamp,
+                        delta=delta,
+                        threshold=-1,
+                    )
+                    
+            #####################################################
+            ### Baseline: Berkeley Embedding
+            if Baseline.BerkeleyEmbedding in BASELINES_TO_RUN:
+                for threshold in STATIC_THRESHOLDS:
+                    if embedding_model == EmbeddingModel.E5_MISTRAL_7B:
+                        logging.info(f"Skipping Berkeley Embedding for {embedding_model.value[1]}. No fine-tuned Berkeley Embedding for this model.")
+                        continue
+                    
+                    if embedding_model == EmbeddingModel.GTE:
+                        berkeley_embedding_model = EmbeddingModel.GTE_FT
+                    elif embedding_model == EmbeddingModel.E5_LARGE_V2:
+                        berkeley_embedding_model = EmbeddingModel.E5_LARGE_V2_FT
+                    else:
+                        logging.info(f"Skipping Berkeley Embedding for {embedding_model.value[1]}. No fine-tuned Berkeley Embedding for this model.")
+                        continue
+                    
+                    path = os.path.join(
+                        results_dir,
+                        dataset.value,
+                        berkeley_embedding_model.value[1],
+                        llm_model.value[1],
+                        f"berkeley_embedding_{threshold}",
+                    )
+                    if os.path.exists(path) and os.listdir(path):
+                        continue
+
+                    logging.info(f"Using static threshold: {threshold}")
+
+                    __run_baseline(
+                        vectorq_policy=StaticGlobalThresholdPolicy(
+                            threshold=threshold
+                        ),
+                        path=path,
+                        dataset_file=dataset_file,
+                        embedding_model=berkeley_embedding_model.value,
+                        llm_model=llm_model.value,
+                        timestamp=timestamp,
+                        delta=-1,
+                        threshold=threshold,
+                    )
+                    
+            #####################################################
+            ### Baseline: vCache & Berkeley Embedding
+            if Baseline.VCacheBerkeleyEmbedding in BASELINES_TO_RUN:
+                for delta in DELTAS:
+                    for i in range(0, CONFIDENCE_INTERVALS_ITERATIONS):
+                        if embedding_model == EmbeddingModel.E5_MISTRAL_7B:
+                            logging.info(f"Skipping Berkeley Embedding for {embedding_model.value[1]}. No fine-tuned Berkeley Embedding for this model.")
+                            continue
+                        
+                        if embedding_model == EmbeddingModel.GTE:
+                            berkeley_embedding_model = EmbeddingModel.GTE_FT
+                        elif embedding_model == EmbeddingModel.E5_LARGE_V2:
+                            berkeley_embedding_model = EmbeddingModel.E5_LARGE_V2_FT
+                        else:
+                            logging.info(f"Skipping Berkeley Embedding for {embedding_model.value[1]}. No fine-tuned Berkeley Embedding for this model.")
+                            continue
+                            
+                        path = os.path.join(
+                            results_dir,
+                            dataset.value,
+                            berkeley_embedding_model.value[1],
+                            llm_model.value[1],
+                            f"vcache_berkeley_embedding_{delta}_run_{i + 1}",
+                        )
+                        if os.path.exists(path) and os.listdir(path):
+                            continue
+
+                        logging.info(
+                            f"Using dynamic threshold with delta: {delta}. Run {i + 1} of {CONFIDENCE_INTERVALS_ITERATIONS}"
+                        )
+
+                        __run_baseline(
+                            vectorq_policy=DynamicLocalThresholdPolicy(delta=delta),
+                            path=path,
+                            dataset_file=dataset_file,
+                            embedding_model=berkeley_embedding_model.value,
+                            llm_model=llm_model.value,
+                            timestamp=timestamp,
+                            delta=delta,
+                            threshold=-1,
+                        )
+
+            #####################################################
+            ### Baseline: IID Local
+            if Baseline.IID in BASELINES_TO_RUN:
+                for delta in DELTAS:
+                    for i in range(0, CONFIDENCE_INTERVALS_ITERATIONS):
+                        path = os.path.join(
+                            results_dir,
+                            dataset.value,
+                            embedding_model.value[1],
+                            llm_model.value[1],
+                            f"iid_local_{delta}_run_{i + 1}",
+                        )
+                        if os.path.exists(path) and os.listdir(path):
+                            continue
+
+                        logging.info(
+                            f"Using IID local threshold with delta: {delta}. Run {i + 1} of {CONFIDENCE_INTERVALS_ITERATIONS}"
+                        )
+
+                        __run_baseline(
+                            vectorq_policy=IIDLocalThresholdPolicy(delta=delta),
+                            path=path,
+                            dataset_file=dataset_file,
+                            embedding_model=embedding_model.value,
+                            llm_model=llm_model.value,
+                            timestamp=timestamp,
+                            delta=delta,
+                            threshold=-1,
+                        )
+
+            #####################################################
+            ### Baseline: GPTCache
+            if Baseline.GPTCache in BASELINES_TO_RUN:
+                for threshold in STATIC_THRESHOLDS:
+                    path = os.path.join(
+                        results_dir,
+                        dataset.value,
+                        embedding_model.value[1],
+                        llm_model.value[1],
+                        f"gptcache_{threshold}",
+                    )
+                    if os.path.exists(path) and os.listdir(path):
+                        continue
+
+                    logging.info(f"Using static threshold: {threshold}")
+
+                    __run_baseline(
+                        vectorq_policy=StaticGlobalThresholdPolicy(
+                            threshold=threshold
+                        ),
+                        path=path,
+                        dataset_file=dataset_file,
+                        embedding_model=embedding_model.value,
+                        llm_model=llm_model.value,
+                        timestamp=timestamp,
+                        delta=-1,
+                        threshold=threshold,
+                    )
+
+            #####################################################
+            generate_combined_plots(
+                dataset=dataset.value,
+                embedding_model_name=embedding_model.value[1],
+                llm_model_name=llm_model.value[1],
+                results_dir=results_dir,
+                timestamp=timestamp,
+                font_size=PLOT_FONT_SIZE,
+            )
+
             end_time_embedding_model = time.time()
             logging.info(
-                f"Embedding Model Time: {(end_time_embedding_model - start_time_embedding_model) / 60:.2f} minutes, {(end_time_embedding_model - start_time_embedding_model) / 3600:.4f} hours"
+                f"LLM Model Time: {(end_time_embedding_model - start_time_llm_model) / 60:.2f} minutes, {(end_time_embedding_model - start_time_llm_model) / 3600:.4f} hours"
             )
+            
         end_time_dataset = time.time()
         logging.info(
             f"Dataset Time: {(end_time_dataset - start_time_dataset) / 60:.2f} minutes, {(end_time_dataset - start_time_dataset) / 3600:.4f} hours"
         )
 
-    print("All benchmarks completed!")
+    logging.info("All benchmarks completed!")
 
 
 if __name__ == "__main__":
