@@ -38,13 +38,13 @@ class VectorQ:
         """
         prompt: str - The prompt to create a response for.
         benchmark: VectorQBenchmark - The optional benchmark object containing the pre-computed embedding and response.
-        Returns: Tuple[bool, str, str] - [is_cache_hit, actual_response, nn_response] (the actual response is the one supposed to be used by the user, the nn_response is for benchmarking purposes)
+        Returns: Tuple[bool, str, str] - [is_cache_hit, cache_response, nn_response] (the actual response is the one supposed to be used by the user, the nn_response is for benchmarking purposes)
         """
         if self.vectorq_config.enable_cache:
-            is_cache_hit, actual_response, nn_response, nearest_qu_idx = self.core.process_request(
+            is_cache_hit, cache_response, nn_response, nearest_qu_idx = self.core.process_request(
                 prompt, benchmark, output_format
             )
-            return is_cache_hit, actual_response, nn_response, nearest_qu_idx
+            return is_cache_hit, cache_response, nn_response, nearest_qu_idx
         else:
             response = self.inference_engine.create(prompt, output_format)
             return False, response, response

@@ -92,7 +92,6 @@ DATASETS: List[str] = [
 # DATASETS_TO_EXCLUDE: List[str] = [DATASETS[0], DATASETS[1], DATASETS[2]] seb
 DATASETS_TO_EXCLUDE: List[str] = [DATASETS[0]]
 embedding_models: List[Tuple[str, str, str, int]] = [
-    EMBEDDING_MODEL_1,
     EMBEDDING_MODEL_2,
 ]
 llm_models: List[Tuple[str, str, str, int]] = [
@@ -405,9 +404,9 @@ def main():
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
 
     
-    for policy in [EvictionPolicyType.LFU, EvictionPolicyType.LRU]:
+    for policy in [EvictionPolicyType.LRU]:
 
-        for cache_size in [500, 2500, 10000, 20000]:
+        for cache_size in [500]:
         
             for dataset in datasets:
                 dataset_file = f"{datasets_dir}{dataset}.json"
