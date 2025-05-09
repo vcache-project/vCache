@@ -310,8 +310,8 @@ def __plot_roc(
     plt.gca().spines["bottom"].set_linewidth(1)
     plt.gca().spines["left"].set_linewidth(1)
 
-    filename = results_dir + f"/roc_{timestamp}.png"
-    plt.savefig(filename, format="png", transparent=True)
+    filename = results_dir + f"/roc_{timestamp}.pdf"
+    plt.savefig(filename, format="pdf", transparent=True)
     plt.close()
 
 
@@ -759,9 +759,8 @@ def __plot_cache_hit_vs_error_rate(
     plt.gca().spines["bottom"].set_linewidth(1)
     plt.gca().spines["left"].set_linewidth(1)
 
-    filename = results_dir + f"/cache_hit_vs_error_rate_{timestamp}.png"
-    # plt.savefig(filename, format="pdf", bbox_inches="tight")
-    plt.savefig(filename, format="png", transparent=True)
+    filename = results_dir + f"/cache_hit_vs_error_rate_{timestamp}.pdf"
+    plt.savefig(filename, format="pdf", bbox_inches="tight")
     plt.close()
 
 
