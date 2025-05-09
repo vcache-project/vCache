@@ -63,8 +63,6 @@ from vectorq.vectorq_policy.strategies.dynamic_global_threshold import (
 from vectorq.vectorq_policy.strategies.dynamic_local_threshold import (
     DynamicLocalThresholdPolicy,
 )
-from vectorq.vectorq_policy.strategies.static_global_threshold import (
-    StaticGlobalThresholdPolicy,
 from vectorq.vectorq_policy.strategies.iid_local_threshold import (
     IIDLocalThresholdPolicy,
 )
@@ -88,7 +86,7 @@ logging.basicConfig(
 ########################################################################################################################
 
 # Benchmark Config
-MAX_SAMPLES: int = 45000
+MAX_SAMPLES: int = 15000
 CONFIDENCE_INTERVALS_ITERATIONS: int = 3
 IS_LLM_JUDGE_BENCHMARK: bool = False
 
@@ -145,9 +143,14 @@ static_thresholds = np.array(
 )
 deltas = np.array([0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1])
 
+# static_thresholds = np.array(
+#     []
+# )
+# deltas = np.array([])
+
 # VectorQ Config
 MAX_VECTOR_DB_CAPACITY: int = 100000
-PLOT_FONT_SIZE: int = 24
+PLOT_FONT_SIZE: int = 32
 
 SYSTEM_TYPES: List[str] = [
     "static",
@@ -155,8 +158,9 @@ SYSTEM_TYPES: List[str] = [
     "dynamic_global",
     "iid_local",
     "all",
+    "just_plot",
 ]
-SYSTEM_TYPE: str = SYSTEM_TYPES[1]
+SYSTEM_TYPE: str = SYSTEM_TYPES[3]
 
 
 ########################################################################################################################
@@ -635,7 +639,7 @@ def main():
                             threshold=threshold,
                         )
 
-                if SYSTEM_TYPE == "all":
+                if SYSTEM_TYPE == "all" or SYSTEM_TYPE == "just_plot":
                     generate_combined_plots(
                         dataset=dataset,
                         embedding_model_name=embedding_model[1],
