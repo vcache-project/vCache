@@ -1,4 +1,4 @@
-# VectorQ Benchmarking Framework
+# vCache Benchmarking Framework
 
 This directory contains the benchmarking framework for VectorQ, which allows you to evaluate the performance of VectorQ's semantic caching system.
 
