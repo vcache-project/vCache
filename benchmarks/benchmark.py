@@ -22,13 +22,6 @@ from vectorq.main import VectorQ
 from vectorq.vectorq_core.cache.embedding_engine.strategies.benchmark import (
     BenchmarkEmbeddingEngine,
 )
-from vectorq.inference_engine.strategies.benchmark import (
-    BenchmarkInferenceEngine,
-)
-from vectorq.main import VectorQ
-from vectorq.vectorq_core.cache.embedding_engine.strategies.benchmark import (
-    BenchmarkEmbeddingEngine,
-)
 from vectorq.vectorq_core.cache.embedding_store.embedding_metadata_storage import (
     InMemoryEmbeddingMetadataStorage,
 )
@@ -38,18 +31,6 @@ from vectorq.vectorq_core.cache.embedding_store.embedding_metadata_storage.embed
 from vectorq.vectorq_core.cache.embedding_store.vector_db import (
     HNSWLibVectorDB,
     SimilarityMetricType,
-)
-from vectorq.vectorq_policy.strategies.dynamic_global_threshold import (
-    DynamicGlobalThresholdPolicy,
-)
-from vectorq.vectorq_policy.strategies.dynamic_local_threshold import (
-    DynamicLocalThresholdPolicy,
-)
-from vectorq.vectorq_policy.strategies.iid_local_threshold import (
-    IIDLocalThresholdPolicy,
-)
-from vectorq.vectorq_policy.strategies.static_global_threshold import (
-    StaticGlobalThresholdPolicy,
 )
 from vectorq.vectorq_core.similarity_evaluator.strategies.llm_comparison import (
     LLMComparisonSimilarityEvaluator,
@@ -142,11 +123,6 @@ static_thresholds = np.array(
     [0.76, 0.78, 0.80, 0.82, 0.84, 0.86, 0.88, 0.90, 0.92, 0.94, 0.96]
 )
 deltas = np.array([0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1])
-
-# static_thresholds = np.array(
-#     []
-# )
-# deltas = np.array([])
 
 # VectorQ Config
 MAX_VECTOR_DB_CAPACITY: int = 100000

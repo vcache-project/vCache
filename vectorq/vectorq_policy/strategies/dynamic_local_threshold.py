@@ -18,7 +18,6 @@ from vectorq.vectorq_core.cache.embedding_store.embedding_metadata_storage.embed
 from vectorq.vectorq_core.cache.embedding_store.embedding_store import EmbeddingStore
 from vectorq.vectorq_core.similarity_evaluator import (
     SimilarityEvaluator,
-    StringComparisonSimilarityEvaluator,
 )
 from vectorq.vectorq_policy.vectorq_policy import VectorQPolicy
 

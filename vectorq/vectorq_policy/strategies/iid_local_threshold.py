@@ -144,11 +144,12 @@ class _Algorithm:
         if len(similarities) < 6 or len(labels) < 6:
             return _Action.EXPLORE
 
-
         t_primes: List[Tuple[float, float, float]] = np.array(
             [
                 self._estimate_parameters(
-                    similarities=similarities, labels=labels, epsilon=self.epsilon_grid[i]
+                    similarities=similarities,
+                    labels=labels,
+                    epsilon=self.epsilon_grid[i],
                 )
                 for i in range(len(self.epsilon_grid))
             ]
@@ -157,7 +158,7 @@ class _Algorithm:
         t_prime_values = np.array([t[0] for t in t_primes])
         min_index = np.argmin(t_prime_values)
         t_prime, t_hat, var_t_hat = t_primes[min_index]
-        
+
         metadata.t_prime = t_prime
         metadata.t_hat = t_hat
         metadata.var_t = var_t_hat
@@ -186,7 +187,9 @@ class _Algorithm:
 
         try:
             # 1) Approximate t_hat
-            thresholds: np.ndarray = np.linspace(min(similarities), max(similarities), num_steps)
+            thresholds: np.ndarray = np.linspace(
+                min(similarities), max(similarities), num_steps
+            )
             failures: np.ndarray = np.array(
                 [np.sum((labels == 0) & (similarities > t)) for t in thresholds]
             )
