@@ -101,9 +101,10 @@ class Dataset(Enum):
 ########################################################################################################################
 
 
-MAX_SAMPLES: int = 150
+MAX_SAMPLES: int = 45000
 CONFIDENCE_INTERVALS_ITERATIONS: int = 3
 IS_LLM_JUDGE_BENCHMARK: bool = False
+DISABLE_PROGRESS_BAR: bool = True
 
 RUN_COMBINATIONS: List[Tuple[EmbeddingModel, LargeLanguageModel]] = [
     (EmbeddingModel.GTE, LargeLanguageModel.LLAMA_3_8B),
@@ -113,8 +114,8 @@ RUN_COMBINATIONS: List[Tuple[EmbeddingModel, LargeLanguageModel]] = [
 BASELINES_TO_RUN: List[Baseline] = [
     Baseline.GPTCache,
     Baseline.VCacheLocal,
-   # Baseline.BerkeleyEmbedding,
-    #Baseline.VCacheBerkeleyEmbedding
+    Baseline.BerkeleyEmbedding,
+    Baseline.VCacheBerkeleyEmbedding
 ]
 
 DATASETS_TO_RUN: List[str] = [
@@ -176,7 +177,7 @@ class Benchmark(unittest.TestCase):
             with open(self.filepath, "rb") as file:
                 data_entries = ijson.items(file, "item")
 
-                pbar = tqdm(total=MAX_SAMPLES, desc="Processing entries")
+                pbar = tqdm(total=MAX_SAMPLES, desc="Processing entries", disable=DISABLE_PROGRESS_BAR)
                 for idx, data_entry in enumerate(data_entries):
                     if idx >= MAX_SAMPLES:
                         break
@@ -583,7 +584,7 @@ def main():
                     )
                     
             #####################################################
-            ### Baseline: vCache & Berkeley Embedding
+            ### Baseline: vCache + Berkeley Embedding
             if Baseline.VCacheBerkeleyEmbedding in BASELINES_TO_RUN:
                 for delta in DELTAS:
                     for i in range(0, CONFIDENCE_INTERVALS_ITERATIONS):
