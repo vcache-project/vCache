@@ -16,7 +16,9 @@ from vectorq.vectorq_core.cache.embedding_store.embedding_metadata_storage.embed
     EmbeddingMetadataObj,
 )
 from vectorq.vectorq_core.cache.embedding_store.embedding_store import EmbeddingStore
-from vectorq.vectorq_core.similarity_evaluator import SimilarityEvaluator
+from vectorq.vectorq_core.similarity_evaluator import (
+    SimilarityEvaluator,
+)
 from vectorq.vectorq_policy.vectorq_policy import VectorQPolicy
 
 
@@ -30,7 +32,7 @@ class DynamicLocalThresholdPolicy(VectorQPolicy):
         Args
             delta: float - The delta value to use
         """
-        self.bayesian = _Bayesian(delta=delta)
+        self.bayesian = _Algorithm(delta=delta)
         self.similarity_evaluator: SimilarityEvaluator = None
         self.inference_engine: InferenceEngine = None
         self.cache: Cache = None
@@ -104,7 +106,7 @@ class _Action(Enum):
     EXPLOIT = "exploit"
 
 
-class _Bayesian:
+class _Algorithm:
     def __init__(self, delta: float):
         self.delta: float = delta
         self.P_c: float = 1.0 - self.delta

@@ -44,6 +44,9 @@ from vectorq.vectorq_policy.strategies.dynamic_global_threshold import (
 from vectorq.vectorq_policy.strategies.dynamic_local_threshold import (
     DynamicLocalThresholdPolicy,
 )
+from vectorq.vectorq_policy.strategies.iid_local_threshold import (
+    IIDLocalThresholdPolicy,
+)
 from vectorq.vectorq_policy.strategies.static_global_threshold import (
     StaticGlobalThresholdPolicy,
 )
@@ -64,7 +67,7 @@ logging.basicConfig(
 ########################################################################################################################
 
 # Benchmark Config
-MAX_SAMPLES: int = 5000
+MAX_SAMPLES: int = 15000
 CONFIDENCE_INTERVALS_ITERATIONS: int = 3
 IS_LLM_JUDGE_BENCHMARK: bool = False
 
@@ -104,7 +107,7 @@ DATASETS: List[str] = [
     "ecommerce_dataset.json",
     "semantic_prompt_cache_benchmark.json",
 ]
-DATASETS_TO_EXCLUDE: List[str] = [DATASETS[0], DATASETS[2], DATASETS[3]]
+DATASETS_TO_EXCLUDE: List[str] = [DATASETS[1], DATASETS[2]]
 
 embedding_models: List[Tuple[str, str, str, int]] = [
     EMBEDDING_MODEL_1,
@@ -123,9 +126,16 @@ deltas = np.array([0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1])
 
 # VectorQ Config
 MAX_VECTOR_DB_CAPACITY: int = 100000
-PLOT_FONT_SIZE: int = 24
+PLOT_FONT_SIZE: int = 32
 
-SYSTEM_TYPES: List[str] = ["static", "dynamic_local", "dynamic_global", "all"]
+SYSTEM_TYPES: List[str] = [
+    "static",
+    "dynamic_local",
+    "dynamic_global",
+    "iid_local",
+    "all",
+    "just_plot",
+]
 SYSTEM_TYPE: str = SYSTEM_TYPES[3]
 
 
@@ -548,7 +558,36 @@ def main():
                                 threshold=-1,
                             )
 
-                # Baseline 3) Static thresholds
+                # Baseline 3) IID Local thresholds
+                if SYSTEM_TYPE in ["iid_local", "all"]:
+                    for delta in deltas:
+                        for i in range(0, CONFIDENCE_INTERVALS_ITERATIONS):
+                            path = os.path.join(
+                                results_dir,
+                                dataset,
+                                embedding_model[1],
+                                llm_model[1],
+                                f"iid_local_{delta}_run_{i + 1}",
+                            )
+                            if os.path.exists(path) and os.listdir(path):
+                                continue
+
+                            logging.info(
+                                f"Using IID local threshold with delta: {delta}. Run {i + 1} of {CONFIDENCE_INTERVALS_ITERATIONS}"
+                            )
+
+                            __run_baseline(
+                                vectorq_policy=IIDLocalThresholdPolicy(delta=delta),
+                                path=path,
+                                dataset_file=dataset_file,
+                                embedding_model=embedding_model,
+                                llm_model=llm_model,
+                                timestamp=timestamp,
+                                delta=delta,
+                                threshold=-1,
+                            )
+
+                # Baseline 4) Static thresholds
                 if SYSTEM_TYPE in ["static", "all"]:
                     for threshold in static_thresholds:
                         path = os.path.join(
@@ -576,7 +615,7 @@ def main():
                             threshold=threshold,
                         )
 
-                if SYSTEM_TYPE == "all":
+                if SYSTEM_TYPE == "all" or SYSTEM_TYPE == "just_plot":
                     generate_combined_plots(
                         dataset=dataset,
                         embedding_model_name=embedding_model[1],

@@ -100,10 +100,14 @@ def generate_combined_plots(
     vectorq_global_data_frames: Dict[float, pd.DataFrame] = {}
     for global_file_path in vectorq_global_files:
         with open(global_file_path, "r") as f:
-            data: Any = json.load(f)
-            dataframe, _ = convert_to_dataframe_from_json_file(data)
-            delta: float = data["config"]["delta"]
-            vectorq_global_data_frames[delta] = dataframe
+            try:
+                data: Any = json.load(f)
+                dataframe, _ = convert_to_dataframe_from_json_file(data)
+                delta: float = data["config"]["delta"]
+                vectorq_global_data_frames[delta] = dataframe
+            except Exception as e:
+                print(f"Error loading {global_file_path}: {e}")
+                continue
 
     __plot_roc(
         static_data_frames=static_data_frames,
@@ -184,14 +188,15 @@ def __plot_roc(
             static_tpr_values,
             "o-",
             color="blue",
-            linewidth=2,
+            linewidth=3,
             label="GPTCache",
-            markersize=8,
+            markersize=10,
         )
 
         for i, threshold in enumerate(static_thresholds):
             if i == 0 or i == len(static_thresholds) - 1:
-                label = f"{threshold:.2f}"
+                # label = f"{threshold:.2f}"
+                label = None
             else:
                 label = None
             plt.annotate(
@@ -226,14 +231,15 @@ def __plot_roc(
             vectorq_local_tpr_values,
             "o-",
             color="green",
-            linewidth=2,
-            label="VectorQ (Local)",
-            markersize=8,
+            linewidth=3,
+            label="vCache",
+            markersize=10,
         )
 
         for i, _ in enumerate(vectorq_local_tpr_values):
             if i == 0 or i == len(vectorq_local_deltas) - 1:
-                label = f"{vectorq_local_deltas[i]:.2f}"
+                # label = f"{vectorq_local_deltas[i]:.2f}"
+                label = None
             else:
                 label = None
             plt.annotate(
@@ -265,14 +271,15 @@ def __plot_roc(
             vectorq_global_tpr_values,
             "o-",
             color="red",
-            linewidth=2,
-            label="VectorQ (Global)",
-            markersize=8,
+            linewidth=3,
+            label="vCache (Ablation)",
+            markersize=10,
         )
 
         for i, delta in enumerate(vectorq_global_deltas):
             if i == 0 or i == len(vectorq_global_deltas) - 1:
-                label = f"{delta:.2f}"
+                # label = f"{delta:.2f}"
+                label = None
             else:
                 label = None
             plt.annotate(
@@ -294,9 +301,17 @@ def __plot_roc(
 
     plt.xlim(0, 1)
     plt.ylim(0, 1)
+    yticks = plt.yticks()[0]
+    if yticks[0] == 0.0:
+        plt.yticks(yticks[1:])
+
+    plt.gca().spines["top"].set_linewidth(1)
+    plt.gca().spines["right"].set_linewidth(1)
+    plt.gca().spines["bottom"].set_linewidth(1)
+    plt.gca().spines["left"].set_linewidth(1)
 
     filename = results_dir + f"/roc_{timestamp}.pdf"
-    plt.savefig(filename, format="pdf", bbox_inches="tight")
+    plt.savefig(filename, format="pdf", transparent=True)
     plt.close()
 
 
@@ -618,14 +633,15 @@ def __plot_cache_hit_vs_error_rate(
             static_cache_hit_rates,
             "o-",
             color="blue",
-            linewidth=2,
+            linewidth=3,
             label="GPTCache",
-            markersize=8,
+            markersize=10,
         )
 
         for i, threshold in enumerate(static_thresholds):
             if i == 0 or i == len(static_thresholds) - 2:
-                label = f"{threshold:.2f}"
+                # label = f"{threshold:.2f}"
+                label = None
             else:
                 label = None
             plt.annotate(
@@ -662,9 +678,9 @@ def __plot_cache_hit_vs_error_rate(
             vectorq_local_cache_hit_rates,
             "o-",
             color="green",
-            linewidth=2,
-            label="VectorQ (Local)",
-            markersize=8,
+            linewidth=3,
+            label="vCache",
+            markersize=10,
         )
 
         for i, _ in enumerate(vectorq_local_error_rates):
@@ -672,7 +688,8 @@ def __plot_cache_hit_vs_error_rate(
                 continue
 
             if i == 0 or i == len(vectorq_local_deltas) - 1:
-                label = f"{vectorq_local_deltas[i]:.2f}"
+                # label = f"{vectorq_local_deltas[i]:.2f}"
+                label = None
             else:
                 label = None
             plt.annotate(
@@ -705,14 +722,15 @@ def __plot_cache_hit_vs_error_rate(
             vectorq_global_cache_hit_rates,
             "o-",
             color="red",
-            linewidth=2,
-            label="VectorQ (Global)",
-            markersize=8,
+            linewidth=3,
+            label="vCache (Ablation)",
+            markersize=10,
         )
 
         for i, delta in enumerate(vectorq_global_deltas):
             if i == 0 or i == len(vectorq_global_deltas) - 1:
-                label = f"{delta:.2f}"
+                # label = f"{delta:.2f}"
+                label = None
             else:
                 label = None
             plt.annotate(
@@ -729,8 +747,17 @@ def __plot_cache_hit_vs_error_rate(
     plt.grid(True, linestyle="--", alpha=0.7)
     plt.legend(loc="best", fontsize=font_size - 2)
     plt.tick_params(axis="both", labelsize=font_size - 2)
+
     plt.xlim(0, 0.3)
     plt.ylim(0, 1)
+    yticks = plt.yticks()[0]
+    if yticks[0] == 0.0:
+        plt.yticks(yticks[1:])
+
+    plt.gca().spines["top"].set_linewidth(1)
+    plt.gca().spines["right"].set_linewidth(1)
+    plt.gca().spines["bottom"].set_linewidth(1)
+    plt.gca().spines["left"].set_linewidth(1)
 
     filename = results_dir + f"/cache_hit_vs_error_rate_{timestamp}.pdf"
     plt.savefig(filename, format="pdf", bbox_inches="tight")

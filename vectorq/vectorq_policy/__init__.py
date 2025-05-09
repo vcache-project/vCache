@@ -4,6 +4,9 @@ from vectorq.vectorq_policy.strategies.dynamic_global_threshold import (
 from vectorq.vectorq_policy.strategies.dynamic_local_threshold import (
     DynamicLocalThresholdPolicy,
 )
+from vectorq.vectorq_policy.strategies.iid_local_threshold import (
+    IIDLocalThresholdPolicy,
+)
 from vectorq.vectorq_policy.strategies.no_cache import NoCachePolicy
 from vectorq.vectorq_policy.strategies.static_global_threshold import (
     StaticGlobalThresholdPolicy,
@@ -15,5 +18,6 @@ __all__ = [
     "StaticGlobalThresholdPolicy",
     "DynamicLocalThresholdPolicy",
     "DynamicGlobalThresholdPolicy",
+    "IIDLocalThresholdPolicy",
     "NoCachePolicy",
 ]
