@@ -25,37 +25,63 @@ def __get_result_files(results_dir: str):
         print(f"No results found in {results_dir}")
         return [], []
 
-    static_files: List[str] = []
-    vectorq_local_files: List[str] = []
-    vectorq_global_files: List[str] = []
+    gptcache_files: List[str] = []
+    vcache_local_files: List[str] = []
+    vcache_global_files: List[str] = []
+    berkeley_embedding_files: List[str] = []
+    vcache_berkeley_embedding_files: List[str] = []
 
     for d in os.listdir(results_dir):
-        # Process static threshold directories
-        if d.startswith("static_") and os.path.isdir(os.path.join(results_dir, d)):
+        # Process GPTCache (static threshold) directories
+        if d.startswith("gptcache_") and os.path.isdir(os.path.join(results_dir, d)):
             dir_path: str = os.path.join(results_dir, d)
             for file in os.listdir(dir_path):
                 if file.startswith("results_") and file.endswith(".json"):
-                    static_files.append(os.path.join(dir_path, file))
+                    gptcache_files.append(os.path.join(dir_path, file))
 
-        # Process vectorq (embedding specific threshold) directories
-        elif d.startswith("vectorq_local") and os.path.isdir(
+        # Process vCache local directories
+        elif d.startswith("vcache_local_") and os.path.isdir(
             os.path.join(results_dir, d)
         ):
             dir_path: str = os.path.join(results_dir, d)
             for file in os.listdir(dir_path):
                 if file.startswith("results_") and file.endswith(".json"):
-                    vectorq_local_files.append(os.path.join(dir_path, file))
+                    vcache_local_files.append(os.path.join(dir_path, file))
 
-        # Process vectorq (global threshold) directories
-        elif d.startswith("vectorq_global") and os.path.isdir(
+        # Process vCache global directories
+        elif d.startswith("vcache_global_") and os.path.isdir(
             os.path.join(results_dir, d)
         ):
             dir_path: str = os.path.join(results_dir, d)
             for file in os.listdir(dir_path):
                 if file.startswith("results_") and file.endswith(".json"):
-                    vectorq_global_files.append(os.path.join(dir_path, file))
+                    vcache_global_files.append(os.path.join(dir_path, file))
 
-    return static_files, vectorq_local_files, vectorq_global_files
+        # Process Fine-tuned Embedding directories
+        elif d.startswith("berkeley_embedding_") and os.path.isdir(
+            os.path.join(results_dir, d)
+        ):
+            dir_path: str = os.path.join(results_dir, d)
+            for file in os.listdir(dir_path):
+                if file.startswith("results_") and file.endswith(".json"):
+                    berkeley_embedding_files.append(os.path.join(dir_path, file))
+
+        # Process vCache Fine-tuned Embedding directories
+        elif d.startswith("vcache_berkeley_embedding_") and os.path.isdir(
+            os.path.join(results_dir, d)
+        ):
+            dir_path: str = os.path.join(results_dir, d)
+            for file in os.listdir(dir_path):
+                if file.startswith("results_") and file.endswith(".json"):
+                    vcache_berkeley_embedding_files.append(os.path.join(dir_path, file))
+
+    return (
+        gptcache_files,
+        vcache_local_files,
+        vcache_global_files,
+        berkeley_embedding_files,
+        vcache_berkeley_embedding_files,
+    )
 
 
 def generate_combined_plots(
@@ -70,122 +96,324 @@ def generate_combined_plots(
         f"{results_dir}/{dataset}/{embedding_model_name}/{llm_model_name}/"
     )
 
-    static_files, vectorq_local_files, vectorq_global_files = __get_result_files(
-        results_dir
-    )
+    (
+        gptcache_files,
+        vcache_local_files,
+        vcache_global_files,
+        berkeley_embedding_files,
+        vcache_berkeley_embedding_files,
+    ) = __get_result_files(results_dir)
 
-    if not static_files and not vectorq_local_files and not vectorq_global_files:
+    if (
+        not gptcache_files
+        and not vcache_local_files
+        and not vcache_global_files
+        and not berkeley_embedding_files
+        and not vcache_berkeley_embedding_files
+    ):
         print(
             f"No folders found for {dataset}, {embedding_model_name}, {llm_model_name}\n"
             f"in {results_dir}"
         )
         return
 
-    static_data_frames: Dict[float, pd.DataFrame] = {}
-    for static_file_path in static_files:
-        with open(static_file_path, "r") as f:
+    ############################################################
+    ### Baseline: GPTCache
+    gptcache_data_frames: Dict[float, pd.DataFrame] = {}
+    for gptcache_file_path in gptcache_files:
+        with open(gptcache_file_path, "r") as f:
             data: Any = json.load(f)
             dataframe, _ = convert_to_dataframe_from_json_file(data)
             threshold: float = data["config"]["threshold"]
-            static_data_frames[threshold] = dataframe
+            gptcache_data_frames[threshold] = dataframe
 
-    vectorq_local_data_frames: Dict[float, pd.DataFrame] = {}
-    for dynamic_file_path in vectorq_local_files:
-        with open(dynamic_file_path, "r") as f:
+    ############################################################
+    ### Baseline: vCache Local
+    vcache_local_data_frames: Dict[float, pd.DataFrame] = {}
+    for vcache_local_file_path in vcache_local_files:
+        with open(vcache_local_file_path, "r") as f:
             data: Any = json.load(f)
             dataframe, _ = convert_to_dataframe_from_json_file(data)
             delta: float = data["config"]["delta"]
-            vectorq_local_data_frames[delta] = dataframe
+            vcache_local_data_frames[delta] = dataframe
 
-    vectorq_global_data_frames: Dict[float, pd.DataFrame] = {}
-    for global_file_path in vectorq_global_files:
-        with open(global_file_path, "r") as f:
+    ############################################################
+    ### Baseline: vCache Global
+    vcache_global_data_frames: Dict[float, pd.DataFrame] = {}
+    for vcache_global_file_path in vcache_global_files:
+        with open(vcache_global_file_path, "r") as f:
             try:
                 data: Any = json.load(f)
                 dataframe, _ = convert_to_dataframe_from_json_file(data)
                 delta: float = data["config"]["delta"]
-                vectorq_global_data_frames[delta] = dataframe
+                vcache_global_data_frames[delta] = dataframe
             except Exception as e:
-                print(f"Error loading {global_file_path}: {e}")
+                print(f"Error loading {vcache_global_file_path}: {e}")
                 continue
 
-    __plot_roc(
-        static_data_frames=static_data_frames,
-        vectorq_local_data_frames=vectorq_local_data_frames,
-        vectorq_global_data_frames=vectorq_global_data_frames,
+    ############################################################
+    ### Baseline: Fine-tuned Embedding
+    berkeley_embedding_data_frames: Dict[float, pd.DataFrame] = {}
+    for berkeley_embedding_file_path in berkeley_embedding_files:
+        with open(berkeley_embedding_file_path, "r") as f:
+            try:
+                data: Any = json.load(f)
+                dataframe, _ = convert_to_dataframe_from_json_file(data)
+                threshold: float = data["config"]["threshold"]
+                berkeley_embedding_data_frames[threshold] = dataframe
+            except Exception as e:
+                print(f"Error loading {berkeley_embedding_file_path}: {e}")
+                continue
+
+    ############################################################
+    ### vCache + Fine-tuned Embedding
+    vcache_berkeley_embedding_data_frames: Dict[float, pd.DataFrame] = {}
+    for vcache_berkeley_embedding_file_path in vcache_berkeley_embedding_files:
+        with open(vcache_berkeley_embedding_file_path, "r") as f:
+            try:
+                data: Any = json.load(f)
+                dataframe, _ = convert_to_dataframe_from_json_file(data)
+                delta: float = data["config"]["delta"]
+                vcache_berkeley_embedding_data_frames[delta] = dataframe
+            except Exception as e:
+                print(f"Error loading {vcache_berkeley_embedding_file_path}: {e}")
+                continue
+
+    __plot_legend(
+        gptcache_data_frames=gptcache_data_frames,
+        vcache_local_data_frames=vcache_local_data_frames,
+        vcache_global_data_frames=vcache_global_data_frames,
+        berkeley_embedding_data_frames=berkeley_embedding_data_frames,
+        vcache_berkeley_embedding_data_frames=vcache_berkeley_embedding_data_frames,
         results_dir=results_dir,
         timestamp=timestamp,
         font_size=font_size,
     )
-    __plot_precision_vs_recall(
-        static_data_frames=static_data_frames,
-        vectorq_local_data_frames=vectorq_local_data_frames,
-        vectorq_global_data_frames=vectorq_global_data_frames,
-        results_dir=results_dir,
-        timestamp=timestamp,
-        font_size=font_size,
-    )
-    __plot_avg_latency_vs_error_rate(
-        static_data_frames=static_data_frames,
-        vectorq_local_data_frames=vectorq_local_data_frames,
-        vectorq_global_data_frames=vectorq_global_data_frames,
-        results_dir=results_dir,
-        timestamp=timestamp,
-        font_size=font_size,
-    )
-    __plot_cache_hit_vs_error_rate(
-        static_data_frames=static_data_frames,
-        vectorq_local_data_frames=vectorq_local_data_frames,
-        vectorq_global_data_frames=vectorq_global_data_frames,
-        results_dir=results_dir,
-        timestamp=timestamp,
-        font_size=font_size,
-    )
-    __plot_cache_hit_vs_error_rate_vs_sample_size(
-        static_data_frames=static_data_frames,
-        vectorq_local_data_frames=vectorq_local_data_frames,
-        vectorq_global_data_frames=vectorq_global_data_frames,
-        results_dir=results_dir,
-        timestamp=timestamp,
-        font_size=font_size,
-    )
-    __plot_delta_accuracy(
-        vectorq_local_data_frames=vectorq_local_data_frames,
-        vectorq_global_data_frames=vectorq_global_data_frames,
-        results_dir=results_dir,
-        timestamp=timestamp,
-        font_size=font_size,
-    )
+
+    try:
+        __plot_roc(
+            gptcache_data_frames=gptcache_data_frames,
+            vcache_local_data_frames=vcache_local_data_frames,
+            vcache_global_data_frames=vcache_global_data_frames,
+            berkeley_embedding_data_frames=berkeley_embedding_data_frames,
+            vcache_berkeley_embedding_data_frames=vcache_berkeley_embedding_data_frames,
+            results_dir=results_dir,
+            timestamp=timestamp,
+            font_size=font_size,
+        )
+    except Exception as e:
+        print(f"Error plotting ROC: {e}")
+
+    try:
+        __plot_precision_vs_recall(
+            gptcache_data_frames=gptcache_data_frames,
+            vcache_local_data_frames=vcache_local_data_frames,
+            vcache_global_data_frames=vcache_global_data_frames,
+            berkeley_embedding_data_frames=berkeley_embedding_data_frames,
+            vcache_berkeley_embedding_data_frames=vcache_berkeley_embedding_data_frames,
+            results_dir=results_dir,
+            timestamp=timestamp,
+            font_size=font_size,
+        )
+    except Exception as e:
+        print(f"Error plotting precision vs recall: {e}")
+
+    try:
+        __plot_avg_latency_vs_error_rate(
+            gptcache_data_frames=gptcache_data_frames,
+            vcache_local_data_frames=vcache_local_data_frames,
+            vcache_global_data_frames=vcache_global_data_frames,
+            berkeley_embedding_data_frames=berkeley_embedding_data_frames,
+            vcache_berkeley_embedding_data_frames=vcache_berkeley_embedding_data_frames,
+            results_dir=results_dir,
+            timestamp=timestamp,
+            font_size=font_size,
+        )
+    except Exception as e:
+        print(f"Error plotting avg latency vs error rate: {e}")
+
+    try:
+        __plot_cache_hit_vs_error_rate(
+            gptcache_data_frames=gptcache_data_frames,
+            vcache_local_data_frames=vcache_local_data_frames,
+            vcache_global_data_frames=vcache_global_data_frames,
+            berkeley_embedding_data_frames=berkeley_embedding_data_frames,
+            vcache_berkeley_embedding_data_frames=vcache_berkeley_embedding_data_frames,
+            results_dir=results_dir,
+            timestamp=timestamp,
+            font_size=font_size,
+        )
+    except Exception as e:
+        print(f"Error plotting cache hit vs error rate: {e}")
+
+    try:
+        __plot_cache_hit_vs_error_rate_vs_sample_size(
+            gptcache_data_frames=gptcache_data_frames,
+            vcache_local_data_frames=vcache_local_data_frames,
+            vcache_global_data_frames=vcache_global_data_frames,
+            berkeley_embedding_data_frames=berkeley_embedding_data_frames,
+            vcache_berkeley_embedding_data_frames=vcache_berkeley_embedding_data_frames,
+            results_dir=results_dir,
+            timestamp=timestamp,
+            font_size=font_size,
+        )
+    except Exception as e:
+        print(f"Error plotting cache hit vs error rate vs sample size: {e}")
+
+    try:
+        __plot_delta_accuracy(
+            vcache_local_data_frames=vcache_local_data_frames,
+            vcache_global_data_frames=vcache_global_data_frames,
+            vcache_berkeley_embedding_data_frames=vcache_berkeley_embedding_data_frames,
+            results_dir=results_dir,
+            timestamp=timestamp,
+            font_size=font_size,
+        )
+    except Exception as e:
+        print(f"Error plotting delta accuracy: {e}")
+
+
+def __plot_legend(
+    gptcache_data_frames: Dict[float, pd.DataFrame],
+    vcache_local_data_frames: Dict[float, pd.DataFrame],
+    vcache_global_data_frames: Dict[float, pd.DataFrame],
+    berkeley_embedding_data_frames: Dict[float, pd.DataFrame],
+    vcache_berkeley_embedding_data_frames: Dict[float, pd.DataFrame],
+    results_dir: str,
+    timestamp: str,
+    font_size: int,
+):
+    figlegend = plt.figure(figsize=(12, 3))
+    ax = figlegend.add_subplot(111)
+    ax.axis("off")
+
+    lines = []
+    labels = []
+
+    if gptcache_data_frames:
+        lines.append(
+            Line2D(
+                [0],
+                [0],
+                color="blue",
+                linewidth=3,
+                linestyle="-",
+                marker="o",
+                markersize=8,
+            )
+        )
+        labels.append("GPTCache")
+
+    if vcache_local_data_frames:
+        lines.append(
+            Line2D(
+                [0],
+                [0],
+                color="green",
+                linewidth=3,
+                linestyle="-",
+                marker="o",
+                markersize=8,
+            )
+        )
+        labels.append("vCache")
+
+    if vcache_global_data_frames:
+        lines.append(
+            Line2D(
+                [0],
+                [0],
+                color="red",
+                linewidth=3,
+                linestyle="-",
+                marker="o",
+                markersize=8,
+            )
+        )
+        labels.append("vCache (Ablation)")
+
+    if vcache_berkeley_embedding_data_frames:
+        lines.append(
+            Line2D(
+                [0],
+                [0],
+                color="orange",
+                linewidth=3,
+                linestyle="-",
+                marker="o",
+                markersize=8,
+            )
+        )
+        labels.append("vCache + Fine-tuned Embedding")
+
+    if berkeley_embedding_data_frames:
+        lines.append(
+            Line2D(
+                [0],
+                [0],
+                color="purple",
+                linewidth=3,
+                linestyle="-",
+                marker="o",
+                markersize=8,
+            )
+        )
+        labels.append("Fine-tuned Embedding")
+
+    lines.append(Line2D([0], [0], color="grey", linewidth=3, linestyle="--", alpha=0.7))
+    labels.append("Random Classifier")
+
+    lines.append(Line2D([0], [0], color="grey", linewidth=3, linestyle="-"))
+    labels.append("No Cache")
+
+    ax.legend(lines, labels, loc="center", ncol=4, fontsize=font_size)
+
+    legend_filename = results_dir + "/legend.pdf"
+    figlegend.savefig(legend_filename, format="pdf", bbox_inches="tight")
+    plt.close(figlegend)
 
 
 def __plot_roc(
-    static_data_frames: Dict[float, pd.DataFrame],
-    vectorq_local_data_frames: Dict[float, pd.DataFrame],
-    vectorq_global_data_frames: Dict[float, pd.DataFrame],
+    gptcache_data_frames: Dict[float, pd.DataFrame],
+    vcache_local_data_frames: Dict[float, pd.DataFrame],
+    vcache_global_data_frames: Dict[float, pd.DataFrame],
+    berkeley_embedding_data_frames: Dict[float, pd.DataFrame],
+    vcache_berkeley_embedding_data_frames: Dict[float, pd.DataFrame],
     results_dir: str,
     timestamp: str,
     font_size: int,
 ):
     plt.figure(figsize=(12, 10))
 
-    static_thresholds = sorted(static_data_frames.keys())
-    static_tpr_values = []
-    static_fpr_values = []
+    plt.plot(
+        [0, 1],
+        [0, 1],
+        "--",
+        color="grey",
+        alpha=0.7,
+        linewidth=3,
+        label="Random Classifier",
+    )
 
-    for threshold in static_thresholds:
-        df = static_data_frames[threshold]
+    ############################################################
+    ### Baseline: GPTCache
+    gptcache_thresholds = sorted(gptcache_data_frames.keys())
+    gptcache_tpr_values = []
+    gptcache_fpr_values = []
+
+    for threshold in gptcache_thresholds:
+        df = gptcache_data_frames[threshold]
 
         tpr = compute_recall_score(tp=df["tp_list"], fn=df["fn_list"])
-
         fpr = compute_false_positive_rate_score(fp=df["fp_list"], tn=df["tn_list"])
 
-        static_tpr_values.append(tpr)
-        static_fpr_values.append(fpr)
+        gptcache_tpr_values.append(tpr)
+        gptcache_fpr_values.append(fpr)
 
-    if static_thresholds:
+    if gptcache_thresholds:
         plt.plot(
-            static_fpr_values,
-            static_tpr_values,
+            gptcache_fpr_values,
+            gptcache_tpr_values,
             "o-",
             color="blue",
             linewidth=3,
@@ -193,42 +421,35 @@ def __plot_roc(
             markersize=10,
         )
 
-        for i, threshold in enumerate(static_thresholds):
-            if i == 0 or i == len(static_thresholds) - 1:
-                # label = f"{threshold:.2f}"
-                label = None
-            else:
-                label = None
+        for i, threshold in enumerate(gptcache_thresholds):
             plt.annotate(
-                label,
-                (static_fpr_values[i], static_tpr_values[i]),
+                text="",
+                xy=(gptcache_fpr_values[i], gptcache_tpr_values[i]),
                 textcoords="offset points",
                 xytext=(0, 10),
                 ha="center",
                 fontsize=font_size - 4,
             )
 
-    vectorq_local_deltas = sorted(vectorq_local_data_frames.keys())
-    vectorq_local_tpr_values = []
-    vectorq_local_fpr_values = []
+    ############################################################
+    ### Baseline: vCache Local
+    vcache_local_deltas = sorted(vcache_local_data_frames.keys())
+    vcache_local_tpr_values = []
+    vcache_local_fpr_values = []
 
-    for delta in vectorq_local_deltas:
-        if delta == 0.01:
-            continue
-
-        df = vectorq_local_data_frames[delta]
+    for delta in vcache_local_deltas:
+        df = vcache_local_data_frames[delta]
 
         tpr = compute_recall_score(tp=df["tp_list"], fn=df["fn_list"])
-
         fpr = compute_false_positive_rate_score(fp=df["fp_list"], tn=df["tn_list"])
 
-        vectorq_local_tpr_values.append(tpr)
-        vectorq_local_fpr_values.append(fpr)
+        vcache_local_tpr_values.append(tpr)
+        vcache_local_fpr_values.append(fpr)
 
-    if vectorq_local_deltas:
+    if vcache_local_deltas:
         plt.plot(
-            vectorq_local_fpr_values,
-            vectorq_local_tpr_values,
+            vcache_local_fpr_values,
+            vcache_local_tpr_values,
             "o-",
             color="green",
             linewidth=3,
@@ -236,39 +457,35 @@ def __plot_roc(
             markersize=10,
         )
 
-        for i, _ in enumerate(vectorq_local_tpr_values):
-            if i == 0 or i == len(vectorq_local_deltas) - 1:
-                # label = f"{vectorq_local_deltas[i]:.2f}"
-                label = None
-            else:
-                label = None
+        for i, _ in enumerate(vcache_local_tpr_values):
             plt.annotate(
-                label,
-                (vectorq_local_fpr_values[i], vectorq_local_tpr_values[i]),
+                text="",
+                xy=(vcache_local_fpr_values[i], vcache_local_tpr_values[i]),
                 textcoords="offset points",
                 xytext=(0, 10),
                 ha="center",
                 fontsize=font_size - 4,
             )
 
-    vectorq_global_deltas = sorted(vectorq_global_data_frames.keys())
-    vectorq_global_tpr_values = []
-    vectorq_global_fpr_values = []
+    ############################################################
+    ### Baseline: vCache Global
+    vcache_global_deltas = sorted(vcache_global_data_frames.keys())
+    vcache_global_tpr_values = []
+    vcache_global_fpr_values = []
 
-    for delta in vectorq_global_deltas:
-        df = vectorq_global_data_frames[delta]
+    for delta in vcache_global_deltas:
+        df = vcache_global_data_frames[delta]
 
         tpr = compute_recall_score(tp=df["tp_list"], fn=df["fn_list"])
-
         fpr = compute_false_positive_rate_score(fp=df["fp_list"], tn=df["tn_list"])
 
-        vectorq_global_tpr_values.append(tpr)
-        vectorq_global_fpr_values.append(fpr)
+        vcache_global_tpr_values.append(tpr)
+        vcache_global_fpr_values.append(fpr)
 
-    if vectorq_global_deltas:
+    if vcache_global_deltas:
         plt.plot(
-            vectorq_global_fpr_values,
-            vectorq_global_tpr_values,
+            vcache_global_fpr_values,
+            vcache_global_tpr_values,
             "o-",
             color="red",
             linewidth=3,
@@ -276,27 +493,95 @@ def __plot_roc(
             markersize=10,
         )
 
-        for i, delta in enumerate(vectorq_global_deltas):
-            if i == 0 or i == len(vectorq_global_deltas) - 1:
-                # label = f"{delta:.2f}"
-                label = None
-            else:
-                label = None
+        for i, delta in enumerate(vcache_global_deltas):
             plt.annotate(
-                label,
-                (vectorq_global_fpr_values[i], vectorq_global_tpr_values[i]),
+                text="",
+                xy=(vcache_global_fpr_values[i], vcache_global_tpr_values[i]),
                 textcoords="offset points",
                 xytext=(0, 10),
                 ha="center",
                 fontsize=font_size - 4,
             )
 
-    plt.plot([0, 1], [0, 1], "k--", label="Random classifier")
+    ############################################################
+    ### Baseline: Fine-tuned Embedding
+    berkeley_embedding_thresholds = sorted(berkeley_embedding_data_frames.keys())
+    berkeley_embedding_tpr_values = []
+    berkeley_embedding_fpr_values = []
+
+    for threshold in berkeley_embedding_thresholds:
+        df = berkeley_embedding_data_frames[threshold]
+
+        tpr = compute_recall_score(tp=df["tp_list"], fn=df["fn_list"])
+        fpr = compute_false_positive_rate_score(fp=df["fp_list"], tn=df["tn_list"])
+
+        berkeley_embedding_tpr_values.append(tpr)
+        berkeley_embedding_fpr_values.append(fpr)
+
+    if berkeley_embedding_thresholds:
+        plt.plot(
+            berkeley_embedding_fpr_values,
+            berkeley_embedding_tpr_values,
+            "o-",
+            color="purple",
+            linewidth=3,
+            label="Fine-tuned Embedding",
+            markersize=10,
+        )
+
+        for i, threshold in enumerate(berkeley_embedding_thresholds):
+            plt.annotate(
+                text="",
+                xy=(berkeley_embedding_fpr_values[i], berkeley_embedding_tpr_values[i]),
+                textcoords="offset points",
+                xytext=(0, 10),
+                ha="center",
+                fontsize=font_size - 4,
+            )
+
+    ############################################################
+    ### vCache + Fine-tuned Embedding
+    vcache_berkeley_embedding_thresholds = sorted(
+        vcache_berkeley_embedding_data_frames.keys()
+    )
+    vcache_berkeley_embedding_tpr_values = []
+    vcache_berkeley_embedding_fpr_values = []
+
+    for delta in vcache_berkeley_embedding_thresholds:
+        df = vcache_berkeley_embedding_data_frames[delta]
+
+        tpr = compute_recall_score(tp=df["tp_list"], fn=df["fn_list"])
+        fpr = compute_false_positive_rate_score(fp=df["fp_list"], tn=df["tn_list"])
+
+        vcache_berkeley_embedding_tpr_values.append(tpr)
+        vcache_berkeley_embedding_fpr_values.append(fpr)
+
+    if vcache_berkeley_embedding_thresholds:
+        plt.plot(
+            vcache_berkeley_embedding_fpr_values,
+            vcache_berkeley_embedding_tpr_values,
+            "o-",
+            color="orange",
+            linewidth=3,
+            label="vCache + Fine-tuned Embedding",
+            markersize=10,
+        )
+
+        for i, delta in enumerate(vcache_berkeley_embedding_thresholds):
+            plt.annotate(
+                text="",
+                xy=(
+                    vcache_berkeley_embedding_fpr_values[i],
+                    vcache_berkeley_embedding_tpr_values[i],
+                ),
+                textcoords="offset points",
+                xytext=(0, 10),
+                ha="center",
+                fontsize=font_size - 4,
+            )
 
     plt.xlabel("False Positive Rate", fontsize=font_size)
     plt.ylabel("True Positive Rate", fontsize=font_size)
-    plt.grid(True, linestyle="--", alpha=0.7)
-    plt.legend(loc="lower right", fontsize=font_size - 2)
     plt.tick_params(axis="both", labelsize=font_size - 2)
 
     plt.xlim(0, 1)
@@ -316,123 +601,196 @@ def __plot_roc(
 
 
 def __plot_precision_vs_recall(
-    static_data_frames: Dict[float, pd.DataFrame],
-    vectorq_local_data_frames: Dict[float, pd.DataFrame],
-    vectorq_global_data_frames: Dict[float, pd.DataFrame],
+    gptcache_data_frames: Dict[float, pd.DataFrame],
+    vcache_local_data_frames: Dict[float, pd.DataFrame],
+    vcache_global_data_frames: Dict[float, pd.DataFrame],
+    berkeley_embedding_data_frames: Dict[float, pd.DataFrame],
+    vcache_berkeley_embedding_data_frames: Dict[float, pd.DataFrame],
     results_dir: str,
     timestamp: str,
     font_size: int,
 ):
     plt.figure(figsize=(12, 10))
 
-    static_thresholds = sorted(static_data_frames.keys())
-    static_precision_values = []
-    static_recall_values = []
+    ############################################################
+    ### Baseline: GPTCache
+    gptcache_thresholds = sorted(gptcache_data_frames.keys())
+    gptcache_precision_values = []
+    gptcache_recall_values = []
 
-    for threshold in static_thresholds:
-        df = static_data_frames[threshold]
+    for threshold in gptcache_thresholds:
+        df = gptcache_data_frames[threshold]
         precision = compute_precision_score(tp=df["tp_list"], fp=df["fp_list"])
         recall = compute_recall_score(tp=df["tp_list"], fn=df["fn_list"])
 
-        static_precision_values.append(precision)
-        static_recall_values.append(recall)
+        gptcache_precision_values.append(precision)
+        gptcache_recall_values.append(recall)
 
-    if static_thresholds:
+    if gptcache_thresholds:
         plt.plot(
-            static_recall_values,
-            static_precision_values,
+            gptcache_recall_values,
+            gptcache_precision_values,
             "o-",
             color="blue",
-            linewidth=2,
+            linewidth=3,
             label="GPTCache",
             markersize=8,
         )
 
-        for i, threshold in enumerate(static_thresholds):
-            if i == 0 or i == len(static_thresholds) - 1:
-                label = f"{threshold:.2f}"
-            else:
-                label = None
+        for i, threshold in enumerate(gptcache_thresholds):
             plt.annotate(
-                label,
-                (static_recall_values[i], static_precision_values[i]),
+                text="",
+                xy=(gptcache_recall_values[i], gptcache_precision_values[i]),
                 textcoords="offset points",
                 xytext=(0, 10),
                 ha="center",
                 fontsize=font_size - 4,
             )
 
-    vectorq_local_deltas = sorted(vectorq_local_data_frames.keys())
-    vectorq_local_precision_values = []
-    vectorq_local_recall_values = []
+    ############################################################
+    ### Baseline: vCache Local
+    vcache_local_deltas = sorted(vcache_local_data_frames.keys())
+    vcache_local_precision_values = []
+    vcache_local_recall_values = []
 
-    for delta in vectorq_local_deltas:
-        if delta == 0.01:
-            continue
-
-        df = vectorq_local_data_frames[delta]
+    for delta in vcache_local_deltas:
+        df = vcache_local_data_frames[delta]
         precision = compute_precision_score(tp=df["tp_list"], fp=df["fp_list"])
         recall = compute_recall_score(tp=df["tp_list"], fn=df["fn_list"])
 
-        vectorq_local_precision_values.append(precision)
-        vectorq_local_recall_values.append(recall)
+        vcache_local_precision_values.append(precision)
+        vcache_local_recall_values.append(recall)
 
-    if vectorq_local_deltas:
+    if vcache_local_deltas:
         plt.plot(
-            vectorq_local_recall_values,
-            vectorq_local_precision_values,
+            vcache_local_recall_values,
+            vcache_local_precision_values,
             "o-",
             color="green",
-            linewidth=2,
-            label="VectorQ (Local)",
+            linewidth=3,
+            label="vCache",
             markersize=8,
         )
 
-        for i, _ in enumerate(vectorq_local_precision_values):
-            if i == 0 or i == len(vectorq_local_deltas) - 1:
-                label = f"{vectorq_local_deltas[i]:.2f}"
-            else:
-                label = None
+        for i, _ in enumerate(vcache_local_precision_values):
             plt.annotate(
-                label,
-                (vectorq_local_recall_values[i], vectorq_local_precision_values[i]),
+                text="",
+                xy=(vcache_local_recall_values[i], vcache_local_precision_values[i]),
                 textcoords="offset points",
                 xytext=(0, 10),
                 ha="center",
                 fontsize=font_size - 4,
             )
 
-    vectorq_global_deltas = sorted(vectorq_global_data_frames.keys())
-    vectorq_global_precision_values = []
-    vectorq_global_recall_values = []
+    ############################################################
+    ### Baseline: vCache Global
+    vcache_global_deltas = sorted(vcache_global_data_frames.keys())
+    vcache_global_precision_values = []
+    vcache_global_recall_values = []
 
-    for delta in vectorq_global_deltas:
-        df = vectorq_global_data_frames[delta]
+    for delta in vcache_global_deltas:
+        df = vcache_global_data_frames[delta]
         precision = compute_precision_score(tp=df["tp_list"], fp=df["fp_list"])
         recall = compute_recall_score(tp=df["tp_list"], fn=df["fn_list"])
 
-        vectorq_global_precision_values.append(precision)
-        vectorq_global_recall_values.append(recall)
+        vcache_global_precision_values.append(precision)
+        vcache_global_recall_values.append(recall)
 
-    if vectorq_global_deltas:
+    if vcache_global_deltas:
         plt.plot(
-            vectorq_global_recall_values,
-            vectorq_global_precision_values,
+            vcache_global_recall_values,
+            vcache_global_precision_values,
             "o-",
             color="red",
-            linewidth=2,
-            label="VectorQ (Global)",
+            linewidth=3,
+            label="vCache (Ablation)",
             markersize=8,
         )
 
-        for i, delta in enumerate(vectorq_global_deltas):
-            if i == 0 or i == len(vectorq_global_deltas) - 1:
-                label = f"{delta:.2f}"
-            else:
-                label = None
+        for i, delta in enumerate(vcache_global_deltas):
             plt.annotate(
-                label,
-                (vectorq_global_recall_values[i], vectorq_global_precision_values[i]),
+                text="",
+                xy=(vcache_global_recall_values[i], vcache_global_precision_values[i]),
+                textcoords="offset points",
+                xytext=(0, 10),
+                ha="center",
+                fontsize=font_size - 4,
+            )
+
+    ############################################################
+    ### Baseline: Fine-tuned Embedding
+    berkeley_embedding_thresholds = sorted(berkeley_embedding_data_frames.keys())
+    berkeley_embedding_precision_values = []
+    berkeley_embedding_recall_values = []
+
+    for threshold in berkeley_embedding_thresholds:
+        df = berkeley_embedding_data_frames[threshold]
+
+        precision = compute_precision_score(tp=df["tp_list"], fp=df["fp_list"])
+        recall = compute_recall_score(tp=df["tp_list"], fn=df["fn_list"])
+
+        berkeley_embedding_precision_values.append(precision)
+        berkeley_embedding_recall_values.append(recall)
+
+    if berkeley_embedding_thresholds:
+        plt.plot(
+            berkeley_embedding_recall_values,
+            berkeley_embedding_precision_values,
+            "o-",
+            color="purple",
+            linewidth=3,
+            label="Fine-tuned Embedding",
+            markersize=8,
+        )
+
+        for i, threshold in enumerate(berkeley_embedding_thresholds):
+            plt.annotate(
+                text="",
+                xy=(
+                    berkeley_embedding_recall_values[i],
+                    berkeley_embedding_precision_values[i],
+                ),
+                textcoords="offset points",
+                xytext=(0, 10),
+                ha="center",
+                fontsize=font_size - 4,
+            )
+
+    ############################################################
+    ### vCache + Fine-tuned Embedding
+    vcache_berkeley_embedding_thresholds = sorted(
+        vcache_berkeley_embedding_data_frames.keys()
+    )
+    vcache_berkeley_embedding_precision_values = []
+    vcache_berkeley_embedding_recall_values = []
+
+    for delta in vcache_berkeley_embedding_thresholds:
+        df = vcache_berkeley_embedding_data_frames[delta]
+
+        precision = compute_precision_score(tp=df["tp_list"], fp=df["fp_list"])
+        recall = compute_recall_score(tp=df["tp_list"], fn=df["fn_list"])
+
+        vcache_berkeley_embedding_precision_values.append(precision)
+        vcache_berkeley_embedding_recall_values.append(recall)
+
+    if vcache_berkeley_embedding_thresholds:
+        plt.plot(
+            vcache_berkeley_embedding_recall_values,
+            vcache_berkeley_embedding_precision_values,
+            "o-",
+            color="orange",
+            linewidth=3,
+            label="vCache + Fine-tuned Embedding",
+            markersize=8,
+        )
+
+        for i, delta in enumerate(vcache_berkeley_embedding_thresholds):
+            plt.annotate(
+                text="",
+                xy=(
+                    vcache_berkeley_embedding_recall_values[i],
+                    vcache_berkeley_embedding_precision_values[i],
+                ),
                 textcoords="offset points",
                 xytext=(0, 10),
                 ha="center",
@@ -443,9 +801,16 @@ def __plot_precision_vs_recall(
     plt.ylim([0.0, 1.05])
     plt.xlabel("Recall", fontsize=font_size)
     plt.ylabel("Precision", fontsize=font_size)
-    plt.grid(True, linestyle="--", alpha=0.7)
-    plt.legend(loc="best", fontsize=font_size - 2)
     plt.tick_params(axis="both", labelsize=font_size - 2)
+
+    yticks = plt.yticks()[0]
+    if yticks[0] == 0.0:
+        plt.yticks(yticks[1:])
+
+    plt.gca().spines["top"].set_linewidth(1)
+    plt.gca().spines["right"].set_linewidth(1)
+    plt.gca().spines["bottom"].set_linewidth(1)
+    plt.gca().spines["left"].set_linewidth(1)
 
     filename = results_dir + f"/precision_vs_recall_{timestamp}.pdf"
     plt.savefig(filename, format="pdf", bbox_inches="tight")
@@ -453,148 +818,227 @@ def __plot_precision_vs_recall(
 
 
 def __plot_avg_latency_vs_error_rate(
-    static_data_frames: Dict[float, pd.DataFrame],
-    vectorq_local_data_frames: Dict[float, pd.DataFrame],
-    vectorq_global_data_frames: Dict[float, pd.DataFrame],
+    gptcache_data_frames: Dict[float, pd.DataFrame],
+    vcache_local_data_frames: Dict[float, pd.DataFrame],
+    vcache_global_data_frames: Dict[float, pd.DataFrame],
+    berkeley_embedding_data_frames: Dict[float, pd.DataFrame],
+    vcache_berkeley_embedding_data_frames: Dict[float, pd.DataFrame],
     results_dir: str,
     timestamp: str,
     font_size: int,
 ):
     plt.figure(figsize=(12, 10))
 
-    static_thresholds = sorted(static_data_frames.keys())
-    static_error_rates = []
-    static_latencies = []
+    ############################################################
+    ### Baseline: GPTCache
+    gptcache_thresholds = sorted(gptcache_data_frames.keys())
+    gptcache_error_rates = []
+    gptcache_latencies = []
 
     avg_latency_no_cache = 0.0
 
-    for threshold in static_thresholds:
-        df = static_data_frames[threshold]
+    for threshold in gptcache_thresholds:
+        df = gptcache_data_frames[threshold]
 
-        error_rate = compute_error_rate_score(fp=df["fp_list"])
+        error_rate = compute_error_rate_score(fp=df["fp_list"]) * 100
         avg_latency = compute_avg_latency_score(latency_list=df["latency_vectorq_list"])
-        static_error_rates.append(error_rate)
-        static_latencies.append(avg_latency)
+        gptcache_error_rates.append(error_rate)
+        gptcache_latencies.append(avg_latency)
 
         avg_latency_no_cache = compute_avg_latency_score(
             latency_list=df["latency_direct_list"]
         )
 
-    if static_thresholds:
+    if gptcache_thresholds:
         plt.plot(
-            static_latencies,
-            static_error_rates,
+            gptcache_latencies,
+            gptcache_error_rates,
             "o-",
             color="blue",
-            linewidth=2,
+            linewidth=3,
             label="GPTCache",
             markersize=8,
         )
 
-        for i, threshold in enumerate(static_thresholds):
-            if i == 0 or i == len(static_thresholds) - 1:
-                label = f"{threshold:.2f}"
-                plt.annotate(
-                    label,
-                    (static_error_rates[i], static_latencies[i]),
-                    textcoords="offset points",
-                    xytext=(0, 10),
-                    ha="center",
-                    fontsize=font_size - 4,
-                )
+        for i, threshold in enumerate(gptcache_thresholds):
+            plt.annotate(
+                text="",
+                xy=(gptcache_error_rates[i], gptcache_latencies[i]),
+                textcoords="offset points",
+                xytext=(0, 10),
+                ha="center",
+                fontsize=font_size - 4,
+            )
 
         plt.axvline(
             x=avg_latency_no_cache,
             color="grey",
-            linestyle="--",
-            linewidth=2,
+            linestyle="-",
+            linewidth=3,
             label="No Cache",
         )
 
-    vectorq_local_deltas = sorted(vectorq_local_data_frames.keys())
-    vectorq_local_error_rates = []
-    vectorq_local_latencies = []
+    ############################################################
+    ### Baseline: vCache Local
+    vcache_local_deltas = sorted(vcache_local_data_frames.keys())
+    vcache_local_error_rates = []
+    vcache_local_latencies = []
 
-    for delta in vectorq_local_deltas:
-        if delta == 0.01:
-            continue
+    for delta in vcache_local_deltas:
+        df = vcache_local_data_frames[delta]
 
-        df = vectorq_local_data_frames[delta]
-
-        error_rate = compute_error_rate_score(fp=df["fp_list"])
+        error_rate = compute_error_rate_score(fp=df["fp_list"]) * 100
         avg_latency = compute_avg_latency_score(latency_list=df["latency_vectorq_list"])
-        vectorq_local_error_rates.append(error_rate)
-        vectorq_local_latencies.append(avg_latency)
+        vcache_local_error_rates.append(error_rate)
+        vcache_local_latencies.append(avg_latency)
 
-    if vectorq_local_deltas:
+    if vcache_local_deltas:
         plt.plot(
-            vectorq_local_latencies,
-            vectorq_local_error_rates,
+            vcache_local_latencies,
+            vcache_local_error_rates,
             "o-",
             color="green",
-            linewidth=2,
-            label="VectorQ (Local)",
+            linewidth=3,
+            label="vCache",
             markersize=8,
         )
 
-        for i, _ in enumerate(vectorq_local_latencies):
-            if i == 0:
-                continue
+        for i, _ in enumerate(vcache_local_latencies):
+            plt.annotate(
+                text="",
+                xy=(vcache_local_error_rates[i], vcache_local_latencies[i]),
+                textcoords="offset points",
+                xytext=(0, 10),
+                ha="center",
+                fontsize=font_size - 4,
+            )
 
-            if i == 0 or i == len(vectorq_local_deltas) - 1:
-                label = f"{vectorq_local_deltas[i]:.2f}"
-                plt.annotate(
-                    label,
-                    (vectorq_local_error_rates[i], vectorq_local_latencies[i]),
-                    xytext=(0, 10),
-                    ha="center",
-                    fontsize=font_size - 4,
-                )
+    ############################################################
+    ### Baseline: vCache Global
+    vcache_global_deltas = sorted(vcache_global_data_frames.keys())
+    vcache_global_error_rates = []
+    vcache_global_latencies = []
 
-    vectorq_global_deltas = sorted(vectorq_global_data_frames.keys())
-    vectorq_global_error_rates = []
-    vectorq_global_latencies = []
+    for delta in vcache_global_deltas:
+        df = vcache_global_data_frames[delta]
 
-    for delta in vectorq_global_deltas:
-        df = vectorq_global_data_frames[delta]
-
-        error_rate = compute_error_rate_score(fp=df["fp_list"])
+        error_rate = compute_error_rate_score(fp=df["fp_list"]) * 100
 
         avg_latency = compute_avg_latency_score(latency_list=df["latency_vectorq_list"])
 
-        vectorq_global_error_rates.append(error_rate)
-        vectorq_global_latencies.append(avg_latency)
+        vcache_global_error_rates.append(error_rate)
+        vcache_global_latencies.append(avg_latency)
 
-    if vectorq_global_deltas:
+    if vcache_global_deltas:
         plt.plot(
-            vectorq_global_latencies,
-            vectorq_global_error_rates,
+            vcache_global_latencies,
+            vcache_global_error_rates,
             "o-",
             color="red",
-            linewidth=2,
-            label="VectorQ (Global)",
+            linewidth=3,
+            label="vCache (Ablation)",
             markersize=8,
         )
 
-        for i, delta in enumerate(vectorq_global_deltas):
-            if i == 0 or i == len(vectorq_global_deltas) - 1:
-                label = f"{delta:.2f}"
-                plt.annotate(
-                    label,
-                    (vectorq_global_error_rates[i], vectorq_global_latencies[i]),
-                    textcoords="offset points",
-                    xytext=(0, 10),
-                    ha="center",
-                    fontsize=font_size - 4,
-                )
+        for i, delta in enumerate(vcache_global_deltas):
+            plt.annotate(
+                text="",
+                xy=(vcache_global_error_rates[i], vcache_global_latencies[i]),
+                textcoords="offset points",
+                xytext=(0, 10),
+                ha="center",
+                fontsize=font_size - 4,
+            )
+
+    ############################################################
+    ### Baseline: Fine-tuned Embedding
+    berkeley_embedding_thresholds = sorted(berkeley_embedding_data_frames.keys())
+    berkeley_embedding_error_rates = []
+    berkeley_embedding_latencies = []
+
+    for threshold in berkeley_embedding_thresholds:
+        df = berkeley_embedding_data_frames[threshold]
+
+        error_rate = compute_error_rate_score(fp=df["fp_list"]) * 100
+        avg_latency = compute_avg_latency_score(latency_list=df["latency_vectorq_list"])
+        berkeley_embedding_error_rates.append(error_rate)
+        berkeley_embedding_latencies.append(avg_latency)
+
+    if berkeley_embedding_thresholds:
+        plt.plot(
+            berkeley_embedding_latencies,
+            berkeley_embedding_error_rates,
+            "o-",
+            color="purple",
+            linewidth=3,
+            label="Fine-tuned Embedding",
+            markersize=8,
+        )
+
+        for i, threshold in enumerate(berkeley_embedding_thresholds):
+            plt.annotate(
+                text="",
+                xy=(berkeley_embedding_error_rates[i], berkeley_embedding_latencies[i]),
+                textcoords="offset points",
+                xytext=(0, 10),
+                ha="center",
+                fontsize=font_size - 4,
+            )
+
+    ############################################################
+    ### vCache + Fine-tuned Embedding
+    vcache_berkeley_embedding_thresholds = sorted(
+        vcache_berkeley_embedding_data_frames.keys()
+    )
+    vcache_berkeley_embedding_error_rates = []
+    vcache_berkeley_embedding_latencies = []
+
+    for delta in vcache_berkeley_embedding_thresholds:
+        df = vcache_berkeley_embedding_data_frames[delta]
+
+        error_rate = compute_error_rate_score(fp=df["fp_list"]) * 100
+        avg_latency = compute_avg_latency_score(latency_list=df["latency_vectorq_list"])
+        vcache_berkeley_embedding_error_rates.append(error_rate)
+        vcache_berkeley_embedding_latencies.append(avg_latency)
+
+    if vcache_berkeley_embedding_thresholds:
+        plt.plot(
+            vcache_berkeley_embedding_latencies,
+            vcache_berkeley_embedding_error_rates,
+            "o-",
+            color="orange",
+            linewidth=3,
+            label="vCache + Fine-tuned Embedding",
+            markersize=8,
+        )
+
+        for i, delta in enumerate(vcache_berkeley_embedding_thresholds):
+            plt.annotate(
+                text="",
+                xy=(
+                    vcache_berkeley_embedding_error_rates[i],
+                    vcache_berkeley_embedding_latencies[i],
+                ),
+                textcoords="offset points",
+                xytext=(0, 10),
+                ha="center",
+                fontsize=font_size - 4,
+            )
 
     plt.xlabel("Average Latency (sec)", fontsize=font_size)
-    plt.ylabel("Error Rate", fontsize=font_size)
+    plt.ylabel("Error Rate (%)", fontsize=font_size)
     plt.xlim(left=0.0)
     plt.ylim(bottom=0.0)
-    plt.grid(True, linestyle="--", alpha=0.7)
-    plt.legend(loc="best", fontsize=font_size - 2)
     plt.tick_params(axis="both", labelsize=font_size - 2)
+
+    yticks = plt.yticks()[0]
+    if yticks[0] == 0.0:
+        plt.yticks(yticks[1:])
+
+    plt.gca().spines["top"].set_linewidth(1)
+    plt.gca().spines["right"].set_linewidth(1)
+    plt.gca().spines["bottom"].set_linewidth(1)
+    plt.gca().spines["left"].set_linewidth(1)
 
     filename = results_dir + f"/avg_latency_vs_error_rate_{timestamp}.pdf"
     plt.savefig(filename, format="pdf", bbox_inches="tight")
@@ -602,35 +1046,38 @@ def __plot_avg_latency_vs_error_rate(
 
 
 def __plot_cache_hit_vs_error_rate(
-    static_data_frames: Dict[float, pd.DataFrame],
-    vectorq_local_data_frames: Dict[float, pd.DataFrame],
-    vectorq_global_data_frames: Dict[float, pd.DataFrame],
+    gptcache_data_frames: Dict[float, pd.DataFrame],
+    vcache_local_data_frames: Dict[float, pd.DataFrame],
+    vcache_global_data_frames: Dict[float, pd.DataFrame],
+    berkeley_embedding_data_frames: Dict[float, pd.DataFrame],
+    vcache_berkeley_embedding_data_frames: Dict[float, pd.DataFrame],
     results_dir: str,
     timestamp: str,
     font_size: int,
 ):
     plt.figure(figsize=(12, 10))
 
-    static_thresholds = sorted(static_data_frames.keys())
-    static_cache_hit_rates = []
-    static_error_rates = []
+    ############################################################
+    ### Baseline: GPTCache
+    gptcache_thresholds = sorted(gptcache_data_frames.keys())
+    gptcache_cache_hit_rates = []
+    gptcache_error_rates = []
 
-    for threshold in static_thresholds:
-        df = static_data_frames[threshold]
+    for threshold in gptcache_thresholds:
+        df = gptcache_data_frames[threshold]
 
-        cache_hit_rate = compute_cache_hit_rate_score(
-            cache_hit_list=df["cache_hit_list"]
+        cache_hit_rate = (
+            compute_cache_hit_rate_score(cache_hit_list=df["cache_hit_list"]) * 100
         )
+        error_rate = compute_error_rate_score(fp=df["fp_list"]) * 100
 
-        error_rate = compute_error_rate_score(fp=df["fp_list"])
+        gptcache_cache_hit_rates.append(cache_hit_rate)
+        gptcache_error_rates.append(error_rate)
 
-        static_cache_hit_rates.append(cache_hit_rate)
-        static_error_rates.append(error_rate)
-
-    if static_thresholds:
+    if gptcache_thresholds:
         plt.plot(
-            static_error_rates,
-            static_cache_hit_rates,
+            gptcache_error_rates,
+            gptcache_cache_hit_rates,
             "o-",
             color="blue",
             linewidth=3,
@@ -638,44 +1085,37 @@ def __plot_cache_hit_vs_error_rate(
             markersize=10,
         )
 
-        for i, threshold in enumerate(static_thresholds):
-            if i == 0 or i == len(static_thresholds) - 2:
-                # label = f"{threshold:.2f}"
-                label = None
-            else:
-                label = None
+        for i, threshold in enumerate(gptcache_thresholds):
             plt.annotate(
-                label,
-                (static_error_rates[i], static_cache_hit_rates[i]),
+                text="",
+                xy=(gptcache_error_rates[i], gptcache_cache_hit_rates[i]),
                 textcoords="offset points",
                 xytext=(0, 10),
                 ha="center",
                 fontsize=font_size - 4,
             )
 
-    vectorq_local_deltas = sorted(vectorq_local_data_frames.keys())
-    vectorq_local_cache_hit_rates = []
-    vectorq_local_error_rates = []
+    ############################################################
+    ### Baseline: vCache Local
+    vcache_local_deltas = sorted(vcache_local_data_frames.keys())
+    vcache_local_cache_hit_rates = []
+    vcache_local_error_rates = []
 
-    for delta in vectorq_local_deltas:
-        if delta == 0.01:
-            continue
+    for delta in vcache_local_deltas:
+        df = vcache_local_data_frames[delta]
 
-        df = vectorq_local_data_frames[delta]
-
-        cache_hit_rate = compute_cache_hit_rate_score(
-            cache_hit_list=df["cache_hit_list"]
+        cache_hit_rate = (
+            compute_cache_hit_rate_score(cache_hit_list=df["cache_hit_list"]) * 100
         )
+        error_rate = compute_error_rate_score(fp=df["fp_list"]) * 100
 
-        error_rate = compute_error_rate_score(fp=df["fp_list"])
+        vcache_local_cache_hit_rates.append(cache_hit_rate)
+        vcache_local_error_rates.append(error_rate)
 
-        vectorq_local_cache_hit_rates.append(cache_hit_rate)
-        vectorq_local_error_rates.append(error_rate)
-
-    if vectorq_local_deltas:
+    if vcache_local_deltas:
         plt.plot(
-            vectorq_local_error_rates,
-            vectorq_local_cache_hit_rates,
+            vcache_local_error_rates,
+            vcache_local_cache_hit_rates,
             "o-",
             color="green",
             linewidth=3,
@@ -683,43 +1123,36 @@ def __plot_cache_hit_vs_error_rate(
             markersize=10,
         )
 
-        for i, _ in enumerate(vectorq_local_error_rates):
-            if i == 0:
-                continue
-
-            if i == 0 or i == len(vectorq_local_deltas) - 1:
-                # label = f"{vectorq_local_deltas[i]:.2f}"
-                label = None
-            else:
-                label = None
+        for i, _ in enumerate(vcache_local_error_rates):
             plt.annotate(
-                label,
-                (vectorq_local_error_rates[i], vectorq_local_cache_hit_rates[i]),
+                text="",
+                xy=(vcache_local_error_rates[i], vcache_local_cache_hit_rates[i]),
                 xytext=(0, 10),
                 ha="center",
                 fontsize=font_size - 4,
             )
 
-    vectorq_global_deltas = sorted(vectorq_global_data_frames.keys())
-    vectorq_global_cache_hit_rates = []
-    vectorq_global_error_rates = []
+    ############################################################
+    ### Baseline: vCache Global
+    vcache_global_deltas = sorted(vcache_global_data_frames.keys())
+    vcache_global_cache_hit_rates = []
+    vcache_global_error_rates = []
 
-    for delta in vectorq_global_deltas:
-        df = vectorq_global_data_frames[delta]
+    for delta in vcache_global_deltas:
+        df = vcache_global_data_frames[delta]
 
-        cache_hit_rate = compute_cache_hit_rate_score(
-            cache_hit_list=df["cache_hit_list"]
+        cache_hit_rate = (
+            compute_cache_hit_rate_score(cache_hit_list=df["cache_hit_list"]) * 100
         )
+        error_rate = compute_error_rate_score(fp=df["fp_list"]) * 100
 
-        error_rate = compute_error_rate_score(fp=df["fp_list"])
+        vcache_global_cache_hit_rates.append(cache_hit_rate)
+        vcache_global_error_rates.append(error_rate)
 
-        vectorq_global_cache_hit_rates.append(cache_hit_rate)
-        vectorq_global_error_rates.append(error_rate)
-
-    if vectorq_global_deltas:
+    if vcache_global_deltas:
         plt.plot(
-            vectorq_global_error_rates,
-            vectorq_global_cache_hit_rates,
+            vcache_global_error_rates,
+            vcache_global_cache_hit_rates,
             "o-",
             color="red",
             linewidth=3,
@@ -727,29 +1160,105 @@ def __plot_cache_hit_vs_error_rate(
             markersize=10,
         )
 
-        for i, delta in enumerate(vectorq_global_deltas):
-            if i == 0 or i == len(vectorq_global_deltas) - 1:
-                # label = f"{delta:.2f}"
-                label = None
-            else:
-                label = None
+        for i, delta in enumerate(vcache_global_deltas):
             plt.annotate(
-                label,
-                (vectorq_global_error_rates[i], vectorq_global_cache_hit_rates[i]),
+                text="",
+                xy=(vcache_global_error_rates[i], vcache_global_cache_hit_rates[i]),
                 textcoords="offset points",
                 xytext=(0, 10),
                 ha="center",
                 fontsize=font_size - 4,
             )
 
-    plt.xlabel("Error Rate", fontsize=font_size)
-    plt.ylabel("Cache Hit Rate", fontsize=font_size)
-    plt.grid(True, linestyle="--", alpha=0.7)
-    plt.legend(loc="best", fontsize=font_size - 2)
+    ############################################################
+    ### Baseline: Fine-tuned Embedding
+    berkeley_embedding_thresholds = sorted(berkeley_embedding_data_frames.keys())
+    berkeley_embedding_cache_hit_rates = []
+    berkeley_embedding_error_rates = []
+
+    for threshold in berkeley_embedding_thresholds:
+        df = berkeley_embedding_data_frames[threshold]
+
+        cache_hit_rate = (
+            compute_cache_hit_rate_score(cache_hit_list=df["cache_hit_list"]) * 100
+        )
+        error_rate = compute_error_rate_score(fp=df["fp_list"]) * 100
+
+        berkeley_embedding_cache_hit_rates.append(cache_hit_rate)
+        berkeley_embedding_error_rates.append(error_rate)
+
+    if berkeley_embedding_thresholds:
+        plt.plot(
+            berkeley_embedding_error_rates,
+            berkeley_embedding_cache_hit_rates,
+            "o-",
+            color="purple",
+            linewidth=3,
+            label="Fine-tuned Embedding",
+            markersize=8,
+        )
+
+        for i, threshold in enumerate(berkeley_embedding_thresholds):
+            plt.annotate(
+                text="",
+                xy=(
+                    berkeley_embedding_error_rates[i],
+                    berkeley_embedding_cache_hit_rates[i],
+                ),
+                textcoords="offset points",
+                xytext=(0, 10),
+                ha="center",
+                fontsize=font_size - 4,
+            )
+
+    ############################################################
+    ### vCache + Fine-tuned Embedding
+    vcache_berkeley_embedding_thresholds = sorted(
+        vcache_berkeley_embedding_data_frames.keys()
+    )
+    vcache_berkeley_embedding_cache_hit_rates = []
+    vcache_berkeley_embedding_error_rates = []
+
+    for delta in vcache_berkeley_embedding_thresholds:
+        df = vcache_berkeley_embedding_data_frames[delta]
+
+        cache_hit_rate = (
+            compute_cache_hit_rate_score(cache_hit_list=df["cache_hit_list"]) * 100
+        )
+        error_rate = compute_error_rate_score(fp=df["fp_list"]) * 100
+
+        vcache_berkeley_embedding_cache_hit_rates.append(cache_hit_rate)
+        vcache_berkeley_embedding_error_rates.append(error_rate)
+
+    if vcache_berkeley_embedding_thresholds:
+        plt.plot(
+            vcache_berkeley_embedding_error_rates,
+            vcache_berkeley_embedding_cache_hit_rates,
+            "o-",
+            color="orange",
+            linewidth=3,
+            label="vCache + Fine-tuned Embedding",
+            markersize=8,
+        )
+
+        for i, delta in enumerate(vcache_berkeley_embedding_thresholds):
+            plt.annotate(
+                text="",
+                xy=(
+                    vcache_berkeley_embedding_error_rates[i],
+                    vcache_berkeley_embedding_cache_hit_rates[i],
+                ),
+                textcoords="offset points",
+                xytext=(0, 10),
+                ha="center",
+                fontsize=font_size - 4,
+            )
+
+    plt.xlabel("Error Rate (%)", fontsize=font_size)
+    plt.ylabel("Cache Hit Rate (%)", fontsize=font_size)
     plt.tick_params(axis="both", labelsize=font_size - 2)
 
-    plt.xlim(0, 0.3)
-    plt.ylim(0, 1)
+    plt.ylim(0, 100)
     yticks = plt.yticks()[0]
     if yticks[0] == 0.0:
         plt.yticks(yticks[1:])
@@ -765,98 +1274,113 @@ def __plot_cache_hit_vs_error_rate(
 
 
 def __plot_cache_hit_vs_error_rate_vs_sample_size(
-    static_data_frames: Dict[float, pd.DataFrame],
-    vectorq_local_data_frames: Dict[float, pd.DataFrame],
-    vectorq_global_data_frames: Dict[float, pd.DataFrame],
+    gptcache_data_frames: Dict[float, pd.DataFrame],
+    vcache_local_data_frames: Dict[float, pd.DataFrame],
+    vcache_global_data_frames: Dict[float, pd.DataFrame],
+    berkeley_embedding_data_frames: Dict[float, pd.DataFrame],
+    vcache_berkeley_embedding_data_frames: Dict[float, pd.DataFrame],
     results_dir: str,
     timestamp: str,
     font_size: int,
 ):
     target_deltas = [0.02, 0.03]
+    # Filter out deltas that don't exist in both dictionaries
+    available_deltas = []
+    for delta in target_deltas:
+        if delta in vcache_local_data_frames and delta in vcache_global_data_frames:
+            available_deltas.append(delta)
+
+    if not available_deltas:
+        print(
+            "No matching delta values found for generating cache hit vs error rate vs sample size plots"
+        )
+        return
 
     # Baseline 1) VectorQ (Local)
-    vectorq_local_error_rates = []
+    vcache_local_error_rates = []
 
-    for delta in target_deltas:
-        df = vectorq_local_data_frames[delta]
+    for delta in available_deltas:
+        df = vcache_local_data_frames[delta]
         error_rate = compute_error_rate_score(fp=df["fp_list"])
-        vectorq_local_error_rates.append(error_rate)
+        vcache_local_error_rates.append(error_rate)
 
     # Baseline 3) Static thresholds
     # Find the static thresholds that match the VectorQ (Local) error rates
-    static_thresholds = sorted(static_data_frames.keys())
-    static_error_rates = []
+    gptcache_thresholds = sorted(gptcache_data_frames.keys())
+    gptcache_error_rates = []
 
-    for threshold in static_thresholds:
-        df = static_data_frames[threshold]
+    for threshold in gptcache_thresholds:
+        df = gptcache_data_frames[threshold]
         error_rate = compute_error_rate_score(fp=df["fp_list"])
-        static_error_rates.append(error_rate)
+        gptcache_error_rates.append(error_rate)
 
-    matched_static_thresholds = []
+    matched_gptcache_thresholds = []
 
-    for _, target_error_rate in enumerate(vectorq_local_error_rates):
+    for _, target_error_rate in enumerate(vcache_local_error_rates):
         closest_idx = min(
-            range(len(static_error_rates)),
-            key=lambda j: abs(static_error_rates[j] - target_error_rate),
+            range(len(gptcache_error_rates)),
+            key=lambda j: abs(gptcache_error_rates[j] - target_error_rate),
         )
 
-        matched_static_thresholds.append(static_thresholds[closest_idx])
+        matched_gptcache_thresholds.append(gptcache_thresholds[closest_idx])
 
     # Plot the results
-    for i, delta in enumerate(target_deltas):
-        df_vectorq_local = vectorq_local_data_frames[delta]
-        df_vectorq_global = vectorq_global_data_frames[delta]
-        static_threshold = matched_static_thresholds[i]
-        df_static = static_data_frames[static_threshold]
+    for i, delta in enumerate(available_deltas):
+        df_vcache_local = vcache_local_data_frames[delta]
+        df_vcache_global = vcache_global_data_frames[delta]
+        gptcache_threshold = matched_gptcache_thresholds[i]
+        df_gptcache = gptcache_data_frames[gptcache_threshold]
 
-        vectorq_local_error_rates = compute_error_rate_cumulative_list(
-            fp=df_vectorq_local["fp_list"]
+        vcache_local_error_rates = compute_error_rate_cumulative_list(
+            fp=df_vcache_local["fp_list"]
         )
-        vectorq_global_error_rates = compute_error_rate_cumulative_list(
-            fp=df_vectorq_global["fp_list"]
+        vcache_global_error_rates = compute_error_rate_cumulative_list(
+            fp=df_vcache_global["fp_list"]
         )
-        static_error_rates = compute_error_rate_cumulative_list(fp=df_static["fp_list"])
-
-        vectorq_local_cache_hit_rates = compute_cache_hit_rate_cumulative_list(
-            cache_hit_list=df_vectorq_local["cache_hit_list"]
-        )
-        vectorq_global_cache_hit_rates = compute_cache_hit_rate_cumulative_list(
-            cache_hit_list=df_vectorq_global["cache_hit_list"]
-        )
-        static_cache_hit_rates = compute_cache_hit_rate_cumulative_list(
-            cache_hit_list=df_static["cache_hit_list"]
+        gptcache_error_rates = compute_error_rate_cumulative_list(
+            fp=df_gptcache["fp_list"]
         )
 
-        sample_sizes = np.arange(1, len(vectorq_local_error_rates) + 1)
+        vcache_local_cache_hit_rates = compute_cache_hit_rate_cumulative_list(
+            cache_hit_list=df_vcache_local["cache_hit_list"]
+        )
+        vcache_global_cache_hit_rates = compute_cache_hit_rate_cumulative_list(
+            cache_hit_list=df_vcache_global["cache_hit_list"]
+        )
+        gptcache_cache_hit_rates = compute_cache_hit_rate_cumulative_list(
+            cache_hit_list=df_gptcache["cache_hit_list"]
+        )
+
+        sample_sizes = np.arange(1, len(vcache_local_error_rates) + 1)
 
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 8))
 
         # Plot 1: Error Rate vs Sample Size
         ax1.plot(
             sample_sizes,
-            vectorq_local_error_rates,
+            vcache_local_error_rates,
             "-",
             color="green",
-            linewidth=2,
-            label=f"VectorQ Local (δ={delta:.2f})",
+            linewidth=3,
+            label=f"VectorQ (δ={delta:.2f})",
         )
 
         ax1.plot(
             sample_sizes,
-            vectorq_global_error_rates,
+            vcache_global_error_rates,
             "-",
             color="red",
-            linewidth=2,
-            label=f"VectorQ Global (δ={delta:.2f})",
+            linewidth=3,
+            label=f"VectorQ Ablation (δ={delta:.2f})",
         )
 
         ax1.plot(
             sample_sizes,
-            static_error_rates,
+            gptcache_error_rates,
             "-",
             color="blue",
-            linewidth=2,
-            label=f"GPTCache (t={static_threshold:.2f})",
+            linewidth=3,
+            label=f"GPTCache (t={gptcache_threshold:.2f})",
         )
 
         ax1.set_xlabel("Sample Size", fontsize=font_size)
@@ -868,29 +1392,29 @@ def __plot_cache_hit_vs_error_rate_vs_sample_size(
         # Plot 2: Cache Hit Rate vs Sample Size
         ax2.plot(
             sample_sizes,
-            vectorq_local_cache_hit_rates,
+            vcache_local_cache_hit_rates,
             "-",
             color="green",
-            linewidth=2,
-            label=f"VectorQ Local (δ={delta:.2f})",
+            linewidth=3,
+            label=f"VectorQ (δ={delta:.2f})",
         )
 
         ax2.plot(
             sample_sizes,
-            vectorq_global_cache_hit_rates,
+            vcache_global_cache_hit_rates,
             "-",
             color="red",
-            linewidth=2,
-            label=f"VectorQ Global (δ={delta:.2f})",
+            linewidth=3,
+            label=f"VectorQ Ablation (δ={delta:.2f})",
         )
 
         ax2.plot(
             sample_sizes,
-            static_cache_hit_rates,
+            gptcache_cache_hit_rates,
             "-",
             color="blue",
-            linewidth=2,
-            label=f"GPTCache (t={static_threshold:.2f})",
+            linewidth=3,
+            label=f"GPTCache (t={gptcache_threshold:.2f})",
         )
 
         ax2.set_xlabel("Sample Size", fontsize=font_size)
@@ -910,43 +1434,44 @@ def __plot_cache_hit_vs_error_rate_vs_sample_size(
 
 
 def __plot_delta_accuracy(
-    vectorq_local_data_frames: Dict[float, pd.DataFrame],
-    vectorq_global_data_frames: Dict[float, pd.DataFrame],
+    vcache_local_data_frames: Dict[float, pd.DataFrame],
+    vcache_global_data_frames: Dict[float, pd.DataFrame],
+    vcache_berkeley_embedding_data_frames: Dict[float, pd.DataFrame],
     results_dir: str,
     timestamp: str,
     font_size: int,
 ):
     plt.figure(figsize=(16, 10))
 
-    vectorq_local_deltas = sorted(vectorq_local_data_frames.keys())
+    vcache_local_deltas = sorted(vcache_local_data_frames.keys())
 
-    if vectorq_local_deltas:
+    if vcache_local_deltas:
         error_rates = []
         delta_labels = []
 
-        for delta in vectorq_local_deltas:
-            df = vectorq_local_data_frames[delta]
+        for delta in vcache_local_deltas:
+            df = vcache_local_data_frames[delta]
 
             error_rate = compute_error_rate_score(fp=df["fp_list"])
 
             error_rates.append(error_rate)
             delta_labels.append(f"{delta:.3f}")
 
-        x_pos = np.arange(len(vectorq_local_deltas))
+        x_pos = np.arange(len(vcache_local_deltas))
         bar_width = 0.8
 
         plt.bar(
             x_pos, error_rates, bar_width, color="skyblue", label="Achieved Error Rate"
         )
 
-        for i, delta in enumerate(vectorq_local_deltas):
+        for i, delta in enumerate(vcache_local_deltas):
             plt.hlines(
                 y=delta,
                 xmin=i - bar_width / 2,
                 xmax=i + bar_width / 2,
                 colors="red",
                 linestyles="dashed",
-                linewidth=2,
+                linewidth=3,
             )
 
         custom_lines = [
@@ -964,6 +1489,15 @@ def __plot_delta_accuracy(
         plt.xticks(x_pos, delta_labels, fontsize=font_size - 2)
         plt.yticks(fontsize=font_size - 2)
 
+        yticks = plt.yticks()[0]
+        if yticks[0] == 0.0:
+            plt.yticks(yticks[1:])
+
+        plt.gca().spines["top"].set_linewidth(1)
+        plt.gca().spines["right"].set_linewidth(1)
+        plt.gca().spines["bottom"].set_linewidth(1)
+        plt.gca().spines["left"].set_linewidth(1)
+
         for i, err in enumerate(error_rates):
             plt.text(
                 x_pos[i],
@@ -976,7 +1510,7 @@ def __plot_delta_accuracy(
 
             plt.text(
                 x_pos[i],
-                vectorq_local_deltas[i] + 0.002,
+                vcache_local_deltas[i] + 0.002,
                 "",
                 ha="center",
                 va="bottom",
@@ -984,7 +1518,7 @@ def __plot_delta_accuracy(
                 color="red",
             )
 
-        all_values = error_rates + vectorq_local_deltas
+        all_values = error_rates + vcache_local_deltas
         if all_values:
             y_min = 0
             y_max = max(all_values) * 1.15
