@@ -56,7 +56,7 @@ def __get_result_files(results_dir: str):
             for file in os.listdir(dir_path):
                 if file.startswith("results_") and file.endswith(".json"):
                     vcache_global_files.append(os.path.join(dir_path, file))
-                    
+
         # Process Berkeley embedding directories
         elif d.startswith("berkeley_embedding_") and os.path.isdir(
             os.path.join(results_dir, d)
@@ -65,7 +65,7 @@ def __get_result_files(results_dir: str):
             for file in os.listdir(dir_path):
                 if file.startswith("results_") and file.endswith(".json"):
                     berkeley_embedding_files.append(os.path.join(dir_path, file))
-                    
+
         # Process vCache Berkeley embedding directories
         elif d.startswith("vcache_berkeley_embedding_") and os.path.isdir(
             os.path.join(results_dir, d)
@@ -75,7 +75,13 @@ def __get_result_files(results_dir: str):
                 if file.startswith("results_") and file.endswith(".json"):
                     vcache_berkeley_embedding_files.append(os.path.join(dir_path, file))
 
-    return gptcache_files, vcache_local_files, vcache_global_files, berkeley_embedding_files, vcache_berkeley_embedding_files
+    return (
+        gptcache_files,
+        vcache_local_files,
+        vcache_global_files,
+        berkeley_embedding_files,
+        vcache_berkeley_embedding_files,
+    )
 
 
 def generate_combined_plots(
@@ -90,11 +96,21 @@ def generate_combined_plots(
         f"{results_dir}/{dataset}/{embedding_model_name}/{llm_model_name}/"
     )
 
-    gptcache_files, vcache_local_files, vcache_global_files, berkeley_embedding_files, vcache_berkeley_embedding_files = __get_result_files(
-        results_dir
-    )
+    (
+        gptcache_files,
+        vcache_local_files,
+        vcache_global_files,
+        berkeley_embedding_files,
+        vcache_berkeley_embedding_files,
+    ) = __get_result_files(results_dir)
 
-    if not gptcache_files and not vcache_local_files and not vcache_global_files and not berkeley_embedding_files and not vcache_berkeley_embedding_files:
+    if (
+        not gptcache_files
+        and not vcache_local_files
+        and not vcache_global_files
+        and not berkeley_embedding_files
+        and not vcache_berkeley_embedding_files
+    ):
         print(
             f"No folders found for {dataset}, {embedding_model_name}, {llm_model_name}\n"
             f"in {results_dir}"
@@ -134,7 +150,7 @@ def generate_combined_plots(
             except Exception as e:
                 print(f"Error loading {vcache_global_file_path}: {e}")
                 continue
-         
+
     ############################################################
     ### Baseline: Berkeley Embedding
     berkeley_embedding_data_frames: Dict[float, pd.DataFrame] = {}
@@ -148,7 +164,7 @@ def generate_combined_plots(
             except Exception as e:
                 print(f"Error loading {berkeley_embedding_file_path}: {e}")
                 continue
-            
+
     ############################################################
     ### vCache + Berkeley Embedding
     vcache_berkeley_embedding_data_frames: Dict[float, pd.DataFrame] = {}
@@ -162,7 +178,7 @@ def generate_combined_plots(
             except Exception as e:
                 print(f"Error loading {vcache_berkeley_embedding_file_path}: {e}")
                 continue
-    
+
     try:
         __plot_roc(
             gptcache_data_frames=gptcache_data_frames,
@@ -176,7 +192,7 @@ def generate_combined_plots(
         )
     except Exception as e:
         print(f"Error plotting ROC: {e}")
-    
+
     try:
         __plot_precision_vs_recall(
             gptcache_data_frames=gptcache_data_frames,
@@ -190,7 +206,7 @@ def generate_combined_plots(
         )
     except Exception as e:
         print(f"Error plotting precision vs recall: {e}")
-    
+
     try:
         __plot_avg_latency_vs_error_rate(
             gptcache_data_frames=gptcache_data_frames,
@@ -204,7 +220,7 @@ def generate_combined_plots(
         )
     except Exception as e:
         print(f"Error plotting avg latency vs error rate: {e}")
-        
+
     try:
         __plot_cache_hit_vs_error_rate(
             gptcache_data_frames=gptcache_data_frames,
@@ -218,7 +234,7 @@ def generate_combined_plots(
         )
     except Exception as e:
         print(f"Error plotting cache hit vs error rate: {e}")
-        
+
     try:
         __plot_cache_hit_vs_error_rate_vs_sample_size(
             gptcache_data_frames=gptcache_data_frames,
@@ -232,7 +248,7 @@ def generate_combined_plots(
         )
     except Exception as e:
         print(f"Error plotting cache hit vs error rate vs sample size: {e}")
-        
+
     try:
         __plot_delta_accuracy(
             vcache_local_data_frames=vcache_local_data_frames,
@@ -257,6 +273,16 @@ def __plot_roc(
     font_size: int,
 ):
     plt.figure(figsize=(12, 10))
+
+    plt.plot(
+        [0, 1],
+        [0, 1],
+        "--",
+        color="grey",
+        alpha=0.7,
+        linewidth=2,
+        label="Random Classifier",
+    )
 
     ############################################################
     ### Baseline: GPTCache
@@ -377,13 +403,13 @@ def __plot_roc(
 
     for threshold in berkeley_embedding_thresholds:
         df = berkeley_embedding_data_frames[threshold]
-        
+
         tpr = compute_recall_score(tp=df["tp_list"], fn=df["fn_list"])
         fpr = compute_false_positive_rate_score(fp=df["fp_list"], tn=df["tn_list"])
-        
+
         berkeley_embedding_tpr_values.append(tpr)
         berkeley_embedding_fpr_values.append(fpr)
-        
+
     if berkeley_embedding_thresholds:
         plt.plot(
             berkeley_embedding_fpr_values,
@@ -394,7 +420,7 @@ def __plot_roc(
             label="Berkeley Embedding",
             markersize=10,
         )
-        
+
         for i, threshold in enumerate(berkeley_embedding_thresholds):
             plt.annotate(
                 text="",
@@ -407,19 +433,21 @@ def __plot_roc(
 
     ############################################################
     ### vCache + Berkeley Embedding
-    vcache_berkeley_embedding_thresholds = sorted(vcache_berkeley_embedding_data_frames.keys())
+    vcache_berkeley_embedding_thresholds = sorted(
+        vcache_berkeley_embedding_data_frames.keys()
+    )
     vcache_berkeley_embedding_tpr_values = []
     vcache_berkeley_embedding_fpr_values = []
-    
+
     for delta in vcache_berkeley_embedding_thresholds:
         df = vcache_berkeley_embedding_data_frames[delta]
-        
+
         tpr = compute_recall_score(tp=df["tp_list"], fn=df["fn_list"])
         fpr = compute_false_positive_rate_score(fp=df["fp_list"], tn=df["tn_list"])
-        
+
         vcache_berkeley_embedding_tpr_values.append(tpr)
         vcache_berkeley_embedding_fpr_values.append(fpr)
-        
+
     if vcache_berkeley_embedding_thresholds:
         plt.plot(
             vcache_berkeley_embedding_fpr_values,
@@ -430,11 +458,14 @@ def __plot_roc(
             label="vCache + Berkeley Embedding",
             markersize=10,
         )
-        
+
         for i, delta in enumerate(vcache_berkeley_embedding_thresholds):
             plt.annotate(
                 text="",
-                xy=(vcache_berkeley_embedding_fpr_values[i], vcache_berkeley_embedding_tpr_values[i]),
+                xy=(
+                    vcache_berkeley_embedding_fpr_values[i],
+                    vcache_berkeley_embedding_tpr_values[i],
+                ),
                 textcoords="offset points",
                 xytext=(0, 10),
                 ha="center",
@@ -588,16 +619,16 @@ def __plot_precision_vs_recall(
     berkeley_embedding_thresholds = sorted(berkeley_embedding_data_frames.keys())
     berkeley_embedding_precision_values = []
     berkeley_embedding_recall_values = []
-    
+
     for threshold in berkeley_embedding_thresholds:
         df = berkeley_embedding_data_frames[threshold]
-        
+
         precision = compute_precision_score(tp=df["tp_list"], fp=df["fp_list"])
         recall = compute_recall_score(tp=df["tp_list"], fn=df["fn_list"])
-        
+
         berkeley_embedding_precision_values.append(precision)
         berkeley_embedding_recall_values.append(recall)
-        
+
     if berkeley_embedding_thresholds:
         plt.plot(
             berkeley_embedding_recall_values,
@@ -608,11 +639,14 @@ def __plot_precision_vs_recall(
             label="Berkeley Embedding",
             markersize=8,
         )
-        
+
         for i, threshold in enumerate(berkeley_embedding_thresholds):
             plt.annotate(
                 text="",
-                xy=(berkeley_embedding_recall_values[i], berkeley_embedding_precision_values[i]),
+                xy=(
+                    berkeley_embedding_recall_values[i],
+                    berkeley_embedding_precision_values[i],
+                ),
                 textcoords="offset points",
                 xytext=(0, 10),
                 ha="center",
@@ -621,19 +655,21 @@ def __plot_precision_vs_recall(
 
     ############################################################
     ### vCache + Berkeley Embedding
-    vcache_berkeley_embedding_thresholds = sorted(vcache_berkeley_embedding_data_frames.keys())
+    vcache_berkeley_embedding_thresholds = sorted(
+        vcache_berkeley_embedding_data_frames.keys()
+    )
     vcache_berkeley_embedding_precision_values = []
     vcache_berkeley_embedding_recall_values = []
-    
+
     for delta in vcache_berkeley_embedding_thresholds:
         df = vcache_berkeley_embedding_data_frames[delta]
-        
+
         precision = compute_precision_score(tp=df["tp_list"], fp=df["fp_list"])
         recall = compute_recall_score(tp=df["tp_list"], fn=df["fn_list"])
-        
+
         vcache_berkeley_embedding_precision_values.append(precision)
         vcache_berkeley_embedding_recall_values.append(recall)
-        
+
     if vcache_berkeley_embedding_thresholds:
         plt.plot(
             vcache_berkeley_embedding_recall_values,
@@ -644,11 +680,14 @@ def __plot_precision_vs_recall(
             label="vCache + Berkeley Embedding",
             markersize=8,
         )
-        
+
         for i, delta in enumerate(vcache_berkeley_embedding_thresholds):
             plt.annotate(
                 text="",
-                xy=(vcache_berkeley_embedding_recall_values[i], vcache_berkeley_embedding_precision_values[i]),
+                xy=(
+                    vcache_berkeley_embedding_recall_values[i],
+                    vcache_berkeley_embedding_precision_values[i],
+                ),
                 textcoords="offset points",
                 xytext=(0, 10),
                 ha="center",
@@ -662,7 +701,7 @@ def __plot_precision_vs_recall(
     plt.grid(True, linestyle="--", alpha=0.7)
     plt.legend(loc="best", fontsize=font_size - 2)
     plt.tick_params(axis="both", labelsize=font_size - 2)
-    
+
     yticks = plt.yticks()[0]
     if yticks[0] == 0.0:
         plt.yticks(yticks[1:])
@@ -826,15 +865,15 @@ def __plot_avg_latency_vs_error_rate(
     berkeley_embedding_thresholds = sorted(berkeley_embedding_data_frames.keys())
     berkeley_embedding_error_rates = []
     berkeley_embedding_latencies = []
-    
+
     for threshold in berkeley_embedding_thresholds:
         df = berkeley_embedding_data_frames[threshold]
-        
+
         error_rate = compute_error_rate_score(fp=df["fp_list"]) * 100
         avg_latency = compute_avg_latency_score(latency_list=df["latency_vectorq_list"])
         berkeley_embedding_error_rates.append(error_rate)
         berkeley_embedding_latencies.append(avg_latency)
-        
+
     if berkeley_embedding_thresholds:
         plt.plot(
             berkeley_embedding_latencies,
@@ -845,7 +884,7 @@ def __plot_avg_latency_vs_error_rate(
             label="Berkeley Embedding",
             markersize=8,
         )
-        
+
         for i, threshold in enumerate(berkeley_embedding_thresholds):
             plt.annotate(
                 label,
@@ -858,18 +897,20 @@ def __plot_avg_latency_vs_error_rate(
 
     ############################################################
     ### vCache + Berkeley Embedding
-    vcache_berkeley_embedding_thresholds = sorted(vcache_berkeley_embedding_data_frames.keys())
+    vcache_berkeley_embedding_thresholds = sorted(
+        vcache_berkeley_embedding_data_frames.keys()
+    )
     vcache_berkeley_embedding_error_rates = []
     vcache_berkeley_embedding_latencies = []
-    
+
     for delta in vcache_berkeley_embedding_thresholds:
-        df = vcache_berkeley_embedding_data_frames[delta]   
-        
+        df = vcache_berkeley_embedding_data_frames[delta]
+
         error_rate = compute_error_rate_score(fp=df["fp_list"]) * 100
         avg_latency = compute_avg_latency_score(latency_list=df["latency_vectorq_list"])
         vcache_berkeley_embedding_error_rates.append(error_rate)
         vcache_berkeley_embedding_latencies.append(avg_latency)
-        
+
     if vcache_berkeley_embedding_thresholds:
         plt.plot(
             vcache_berkeley_embedding_latencies,
@@ -880,11 +921,14 @@ def __plot_avg_latency_vs_error_rate(
             label="vCache + Berkeley Embedding",
             markersize=8,
         )
-        
+
         for i, delta in enumerate(vcache_berkeley_embedding_thresholds):
             plt.annotate(
                 label,
-                (vcache_berkeley_embedding_error_rates[i], vcache_berkeley_embedding_latencies[i]), 
+                (
+                    vcache_berkeley_embedding_error_rates[i],
+                    vcache_berkeley_embedding_latencies[i],
+                ),
                 textcoords="offset points",
                 xytext=(0, 10),
                 ha="center",
@@ -898,7 +942,7 @@ def __plot_avg_latency_vs_error_rate(
     plt.grid(True, linestyle="--", alpha=0.7)
     plt.legend(loc="best", fontsize=font_size - 2)
     plt.tick_params(axis="both", labelsize=font_size - 2)
-    
+
     yticks = plt.yticks()[0]
     if yticks[0] == 0.0:
         plt.yticks(yticks[1:])
@@ -934,9 +978,9 @@ def __plot_cache_hit_vs_error_rate(
     for threshold in gptcache_thresholds:
         df = gptcache_data_frames[threshold]
 
-        cache_hit_rate = compute_cache_hit_rate_score(
-            cache_hit_list=df["cache_hit_list"]
-        ) * 100
+        cache_hit_rate = (
+            compute_cache_hit_rate_score(cache_hit_list=df["cache_hit_list"]) * 100
+        )
         error_rate = compute_error_rate_score(fp=df["fp_list"]) * 100
 
         gptcache_cache_hit_rates.append(cache_hit_rate)
@@ -975,9 +1019,9 @@ def __plot_cache_hit_vs_error_rate(
 
         df = vcache_local_data_frames[delta]
 
-        cache_hit_rate = compute_cache_hit_rate_score(
-            cache_hit_list=df["cache_hit_list"]
-        ) * 100
+        cache_hit_rate = (
+            compute_cache_hit_rate_score(cache_hit_list=df["cache_hit_list"]) * 100
+        )
         error_rate = compute_error_rate_score(fp=df["fp_list"]) * 100
 
         vcache_local_cache_hit_rates.append(cache_hit_rate)
@@ -1014,9 +1058,9 @@ def __plot_cache_hit_vs_error_rate(
     for delta in vcache_global_deltas:
         df = vcache_global_data_frames[delta]
 
-        cache_hit_rate = compute_cache_hit_rate_score(
-            cache_hit_list=df["cache_hit_list"]
-        ) * 100
+        cache_hit_rate = (
+            compute_cache_hit_rate_score(cache_hit_list=df["cache_hit_list"]) * 100
+        )
         error_rate = compute_error_rate_score(fp=df["fp_list"]) * 100
 
         vcache_global_cache_hit_rates.append(cache_hit_rate)
@@ -1048,18 +1092,18 @@ def __plot_cache_hit_vs_error_rate(
     berkeley_embedding_thresholds = sorted(berkeley_embedding_data_frames.keys())
     berkeley_embedding_cache_hit_rates = []
     berkeley_embedding_error_rates = []
-    
+
     for threshold in berkeley_embedding_thresholds:
-        df = berkeley_embedding_data_frames[threshold]  
-        
-        cache_hit_rate = compute_cache_hit_rate_score(
-            cache_hit_list=df["cache_hit_list"]
-        ) * 100
+        df = berkeley_embedding_data_frames[threshold]
+
+        cache_hit_rate = (
+            compute_cache_hit_rate_score(cache_hit_list=df["cache_hit_list"]) * 100
+        )
         error_rate = compute_error_rate_score(fp=df["fp_list"]) * 100
-        
+
         berkeley_embedding_cache_hit_rates.append(cache_hit_rate)
         berkeley_embedding_error_rates.append(error_rate)
-        
+
     if berkeley_embedding_thresholds:
         plt.plot(
             berkeley_embedding_error_rates,
@@ -1070,11 +1114,14 @@ def __plot_cache_hit_vs_error_rate(
             label="Berkeley Embedding",
             markersize=8,
         )
-        
+
         for i, threshold in enumerate(berkeley_embedding_thresholds):
             plt.annotate(
                 text="",
-                xy=(berkeley_embedding_error_rates[i], berkeley_embedding_cache_hit_rates[i]),
+                xy=(
+                    berkeley_embedding_error_rates[i],
+                    berkeley_embedding_cache_hit_rates[i],
+                ),
                 textcoords="offset points",
                 xytext=(0, 10),
                 ha="center",
@@ -1083,21 +1130,23 @@ def __plot_cache_hit_vs_error_rate(
 
     ############################################################
     ### vCache + Berkeley Embedding
-    vcache_berkeley_embedding_thresholds = sorted(vcache_berkeley_embedding_data_frames.keys())
+    vcache_berkeley_embedding_thresholds = sorted(
+        vcache_berkeley_embedding_data_frames.keys()
+    )
     vcache_berkeley_embedding_cache_hit_rates = []
     vcache_berkeley_embedding_error_rates = []
-    
+
     for delta in vcache_berkeley_embedding_thresholds:
         df = vcache_berkeley_embedding_data_frames[delta]
-        
-        cache_hit_rate = compute_cache_hit_rate_score(
-            cache_hit_list=df["cache_hit_list"]
-        ) * 100
+
+        cache_hit_rate = (
+            compute_cache_hit_rate_score(cache_hit_list=df["cache_hit_list"]) * 100
+        )
         error_rate = compute_error_rate_score(fp=df["fp_list"]) * 100
-        
+
         vcache_berkeley_embedding_cache_hit_rates.append(cache_hit_rate)
         vcache_berkeley_embedding_error_rates.append(error_rate)
-        
+
     if vcache_berkeley_embedding_thresholds:
         plt.plot(
             vcache_berkeley_embedding_error_rates,
@@ -1108,11 +1157,14 @@ def __plot_cache_hit_vs_error_rate(
             label="vCache + Berkeley Embedding",
             markersize=8,
         )
-        
+
         for i, delta in enumerate(vcache_berkeley_embedding_thresholds):
             plt.annotate(
                 text="",
-                xy=(vcache_berkeley_embedding_error_rates[i], vcache_berkeley_embedding_cache_hit_rates[i]),
+                xy=(
+                    vcache_berkeley_embedding_error_rates[i],
+                    vcache_berkeley_embedding_cache_hit_rates[i],
+                ),
                 textcoords="offset points",
                 xytext=(0, 10),
                 ha="center",
@@ -1156,9 +1208,11 @@ def __plot_cache_hit_vs_error_rate_vs_sample_size(
     for delta in target_deltas:
         if delta in vcache_local_data_frames and delta in vcache_global_data_frames:
             available_deltas.append(delta)
-    
+
     if not available_deltas:
-        print(f"No matching delta values found for generating cache hit vs error rate vs sample size plots")
+        print(
+            "No matching delta values found for generating cache hit vs error rate vs sample size plots"
+        )
         return
 
     # Baseline 1) VectorQ (Local)
@@ -1353,7 +1407,7 @@ def __plot_delta_accuracy(
         plt.ylabel("Error Rate", fontsize=font_size)
         plt.xticks(x_pos, delta_labels, fontsize=font_size - 2)
         plt.yticks(fontsize=font_size - 2)
-        
+
         yticks = plt.yticks()[0]
         if yticks[0] == 0.0:
             plt.yticks(yticks[1:])

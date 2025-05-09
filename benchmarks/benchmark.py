@@ -3,8 +3,8 @@ import logging
 import os
 import time
 import unittest
-from enum import Enum
 from datetime import datetime
+from enum import Enum
 from typing import Dict, List, Tuple
 
 import ijson
@@ -67,18 +67,21 @@ logging.basicConfig(
 ### Available Classes ##################################################################################################
 ########################################################################################################################
 
+
 class EmbeddingModel(Enum):
     GTE = ("emb_gte", "GteLargeENv1_5", "float32", 1024)
     GTE_FT = ("emb_gte_ft", "GteLargeENv1_5", "float32", 1024)
     E5_MISTRAL_7B = ("emb_e5_mistral_7b", "E5_Mistral_7B_Instruct", "float16", 4096)
     E5_LARGE_V2 = ("emb_e5_large_v2", "E5_Large_v2", "float16", 512)
     E5_LARGE_V2_FT = ("emb_e5_large_v2_ft", "E5_Large_v2", "float16", 512)
-    
+
+
 class LargeLanguageModel(Enum):
     LLAMA_3_8B = ("response_llama_3_8b", "Llama_3_8B_Instruct", "float16", None)
     LLAMA_3_70B = ("response_llama_3_70b", "Llama_3_70B_Instruct", "float16", None)
     GPT_4O_MINI = ("response_gpt-4o-mini", "GPT-4o-mini", "float16", None)
     GPT_4O_NANO = ("response_gpt-4.1-nano", "GPT-4.1-nano", "float16", None)
+
 
 class Baseline(Enum):
     GPTCache = "GPTCache"
@@ -88,6 +91,7 @@ class Baseline(Enum):
     VCacheBerkeleyEmbedding = "VCacheBerkeleyEmbedding"
     IID = "iid"
 
+
 class Dataset(Enum):
     SEM_BENCHMARK_CLASSIFICATION = "benchmark_classification"
     SEM_BENCHMARK_ARENA = "benchmark_arena"
@@ -95,7 +99,8 @@ class Dataset(Enum):
     COMMONSENSE_QA = "commonsense_qa"
     ECOMMERCE_DATASET = "ecommerce_dataset"
     SEMANTIC_PROMPT_CACHE_BENCHMARK = "semantic_prompt_cache_benchmark"
-    
+
+
 ########################################################################################################################
 ### Benchmark Config ###################################################################################################
 ########################################################################################################################
@@ -108,30 +113,25 @@ DISABLE_PROGRESS_BAR: bool = True
 
 RUN_COMBINATIONS: List[Tuple[EmbeddingModel, LargeLanguageModel]] = [
     (EmbeddingModel.GTE, LargeLanguageModel.LLAMA_3_8B),
-    (EmbeddingModel.E5_LARGE_V2, LargeLanguageModel.LLAMA_3_8B)
+    (EmbeddingModel.E5_LARGE_V2, LargeLanguageModel.LLAMA_3_8B),
 ]
-    
+
 BASELINES_TO_RUN: List[Baseline] = [
     Baseline.GPTCache,
     Baseline.VCacheLocal,
     Baseline.BerkeleyEmbedding,
-    Baseline.VCacheBerkeleyEmbedding
+    Baseline.VCacheBerkeleyEmbedding,
 ]
 
-DATASETS_TO_RUN: List[str] = [
-    Dataset.SEM_BENCHMARK_CLASSIFICATION
-]
+DATASETS_TO_RUN: List[str] = [Dataset.SEM_BENCHMARK_CLASSIFICATION]
 
-STATIC_THRESHOLDS: List[float] = [
-    0.76, 0.80, 0.84, 0.88, 0.92, 0.96
-]
+STATIC_THRESHOLDS: List[float] = [0.76, 0.80, 0.84, 0.88, 0.92, 0.96]
 
-DELTAS: List[float] = [
-    0.01, 0.02, 0.03, 0.04, 0.05, 0.06
-]
+DELTAS: List[float] = [0.01, 0.02, 0.03, 0.04, 0.05, 0.06]
 
 MAX_VECTOR_DB_CAPACITY: int = 100000
 PLOT_FONT_SIZE: int = 32
+
 
 ########################################################################################################################
 ### Benchmark Class ####################################################################################################
@@ -177,7 +177,11 @@ class Benchmark(unittest.TestCase):
             with open(self.filepath, "rb") as file:
                 data_entries = ijson.items(file, "item")
 
-                pbar = tqdm(total=MAX_SAMPLES, desc="Processing entries", disable=DISABLE_PROGRESS_BAR)
+                pbar = tqdm(
+                    total=MAX_SAMPLES,
+                    desc="Processing entries",
+                    disable=DISABLE_PROGRESS_BAR,
+                )
                 for idx, data_entry in enumerate(data_entries):
                     if idx >= MAX_SAMPLES:
                         break
@@ -530,9 +534,7 @@ def main():
                     )
 
                     __run_baseline(
-                        vectorq_policy=DynamicGlobalThresholdPolicy(
-                            delta=delta
-                        ),
+                        vectorq_policy=DynamicGlobalThresholdPolicy(delta=delta),
                         path=path,
                         dataset_file=dataset_file,
                         embedding_model=embedding_model.value,
@@ -541,23 +543,27 @@ def main():
                         delta=delta,
                         threshold=-1,
                     )
-                    
+
             #####################################################
             ### Baseline: Berkeley Embedding
             if Baseline.BerkeleyEmbedding in BASELINES_TO_RUN:
                 for threshold in STATIC_THRESHOLDS:
                     if embedding_model == EmbeddingModel.E5_MISTRAL_7B:
-                        logging.info(f"Skipping Berkeley Embedding for {embedding_model.value[1]}. No fine-tuned Berkeley Embedding for this model.")
+                        logging.info(
+                            f"Skipping Berkeley Embedding for {embedding_model.value[1]}. No fine-tuned Berkeley Embedding for this model."
+                        )
                         continue
-                    
+
                     if embedding_model == EmbeddingModel.GTE:
                         berkeley_embedding_model = EmbeddingModel.GTE_FT
                     elif embedding_model == EmbeddingModel.E5_LARGE_V2:
                         berkeley_embedding_model = EmbeddingModel.E5_LARGE_V2_FT
                     else:
-                        logging.info(f"Skipping Berkeley Embedding for {embedding_model.value[1]}. No fine-tuned Berkeley Embedding for this model.")
+                        logging.info(
+                            f"Skipping Berkeley Embedding for {embedding_model.value[1]}. No fine-tuned Berkeley Embedding for this model."
+                        )
                         continue
-                    
+
                     path = os.path.join(
                         results_dir,
                         dataset.value,
@@ -571,9 +577,7 @@ def main():
                     logging.info(f"Using static threshold: {threshold}")
 
                     __run_baseline(
-                        vectorq_policy=StaticGlobalThresholdPolicy(
-                            threshold=threshold
-                        ),
+                        vectorq_policy=StaticGlobalThresholdPolicy(threshold=threshold),
                         path=path,
                         dataset_file=dataset_file,
                         embedding_model=berkeley_embedding_model.value,
@@ -582,24 +586,28 @@ def main():
                         delta=-1,
                         threshold=threshold,
                     )
-                    
+
             #####################################################
             ### Baseline: vCache + Berkeley Embedding
             if Baseline.VCacheBerkeleyEmbedding in BASELINES_TO_RUN:
                 for delta in DELTAS:
                     for i in range(0, CONFIDENCE_INTERVALS_ITERATIONS):
                         if embedding_model == EmbeddingModel.E5_MISTRAL_7B:
-                            logging.info(f"Skipping Berkeley Embedding for {embedding_model.value[1]}. No fine-tuned Berkeley Embedding for this model.")
+                            logging.info(
+                                f"Skipping Berkeley Embedding for {embedding_model.value[1]}. No fine-tuned Berkeley Embedding for this model."
+                            )
                             continue
-                        
+
                         if embedding_model == EmbeddingModel.GTE:
                             berkeley_embedding_model = EmbeddingModel.GTE_FT
                         elif embedding_model == EmbeddingModel.E5_LARGE_V2:
                             berkeley_embedding_model = EmbeddingModel.E5_LARGE_V2_FT
                         else:
-                            logging.info(f"Skipping Berkeley Embedding for {embedding_model.value[1]}. No fine-tuned Berkeley Embedding for this model.")
+                            logging.info(
+                                f"Skipping Berkeley Embedding for {embedding_model.value[1]}. No fine-tuned Berkeley Embedding for this model."
+                            )
                             continue
-                            
+
                         path = os.path.join(
                             results_dir,
                             dataset.value,
@@ -672,9 +680,7 @@ def main():
                     logging.info(f"Using static threshold: {threshold}")
 
                     __run_baseline(
-                        vectorq_policy=StaticGlobalThresholdPolicy(
-                            threshold=threshold
-                        ),
+                        vectorq_policy=StaticGlobalThresholdPolicy(threshold=threshold),
                         path=path,
                         dataset_file=dataset_file,
                         embedding_model=embedding_model.value,
@@ -698,7 +704,7 @@ def main():
             logging.info(
                 f"LLM Model Time: {(end_time_embedding_model - start_time_llm_model) / 60:.2f} minutes, {(end_time_embedding_model - start_time_llm_model) / 3600:.4f} hours"
             )
-            
+
         end_time_dataset = time.time()
         logging.info(
             f"Dataset Time: {(end_time_dataset - start_time_dataset) / 60:.2f} minutes, {(end_time_dataset - start_time_dataset) / 3600:.4f} hours"
