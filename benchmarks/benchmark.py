@@ -107,12 +107,13 @@ class Dataset(Enum):
 
 
 MAX_SAMPLES: int = 45000
-CONFIDENCE_INTERVALS_ITERATIONS: int = 3
+CONFIDENCE_INTERVALS_ITERATIONS: int = 1
 IS_LLM_JUDGE_BENCHMARK: bool = False
 DISABLE_PROGRESS_BAR: bool = True
 
 RUN_COMBINATIONS: List[Tuple[EmbeddingModel, LargeLanguageModel]] = [
     (EmbeddingModel.GTE, LargeLanguageModel.LLAMA_3_8B),
+    (EmbeddingModel.GTE, LargeLanguageModel.LLAMA_3_70B),
     (EmbeddingModel.E5_LARGE_V2, LargeLanguageModel.LLAMA_3_8B),
 ]
 
@@ -126,22 +127,27 @@ BASELINES_TO_RUN: List[Baseline] = [
 DATASETS_TO_RUN: List[str] = [Dataset.SEM_BENCHMARK_CLASSIFICATION]
 
 STATIC_THRESHOLDS: List[float] = [
-    0.64,
-    0.72,
-    0.76,
-    0.80,
-    0.84,
-    0.88,
-    0.92,
-    0.94,
-    0.96,
-    0.98,
+    # 0.84,
+    # 0.85,
+    # 0.86,
+    # 0.87,
+    # 0.88,
+    # 0.89,
+    # 0.90,
+    # 0.91,
+    # 0.92,
+    # 0.93,
+    # 0.94,
+    # 0.95,
+    # 0.96,
+    # 0.97,
+    # 0.98,
 ]
 
-DELTAS: List[float] = [0.01, 0.015, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07]
+DELTAS: List[float] = []#0.01, 0.015, 0.02, 0.025,0.03, 0.035, 0.04, 0.05, 0.06, 0.07]
 
 MAX_VECTOR_DB_CAPACITY: int = 100000
-PLOT_FONT_SIZE: int = 32
+PLOT_FONT_SIZE: int = 50
 
 
 ########################################################################################################################

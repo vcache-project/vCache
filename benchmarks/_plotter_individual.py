@@ -65,7 +65,7 @@ def __plot_accuracy_precision_recall_f1_score(
         fn=df["fn_list"],
     )
 
-    fig, axes = plt.subplots(2, 2, figsize=(15, 10))
+    fig, axes = plt.subplots(2, 2, figsize=(25, 20))
     sample_index = range(1, len(accuracy_acc_list) + 1)
 
     # Plot Accuracy
@@ -135,7 +135,7 @@ def __plot_error_rate_cache_hit_rate_duration_avg_latency(
         latency_list=df["latency_direct_list"]
     )
 
-    fig, axes = plt.subplots(2, 2, figsize=(15, 10))
+    fig, axes = plt.subplots(2, 2, figsize=(25, 20))
     sample_index = range(1, len(error_rate_acc_list) + 1)
     sample_index_array = list(sample_index)
 
