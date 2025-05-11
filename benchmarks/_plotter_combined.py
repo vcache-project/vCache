@@ -295,7 +295,7 @@ def __plot_legend(
             Line2D(
                 [0],
                 [0],
-                color="blue",
+                color="#37A9EC",
                 linewidth=3,
                 linestyle="-",
                 marker="o",
@@ -309,7 +309,7 @@ def __plot_legend(
             Line2D(
                 [0],
                 [0],
-                color="green",
+                color="#8CBE94",
                 linewidth=3,
                 linestyle="-",
                 marker="o",
@@ -323,7 +323,7 @@ def __plot_legend(
             Line2D(
                 [0],
                 [0],
-                color="red",
+                color="#C23B48",
                 linewidth=3,
                 linestyle="-",
                 marker="o",
@@ -337,7 +337,7 @@ def __plot_legend(
             Line2D(
                 [0],
                 [0],
-                color="orange",
+                color="#EDBE24",
                 linewidth=3,
                 linestyle="-",
                 marker="o",
@@ -351,7 +351,7 @@ def __plot_legend(
             Line2D(
                 [0],
                 [0],
-                color="purple",
+                color="#3B686A",
                 linewidth=3,
                 linestyle="-",
                 marker="o",
@@ -359,6 +359,12 @@ def __plot_legend(
             )
         )
         labels.append("Fine-tuned Embedding")
+        
+    ax.legend(lines, labels, loc="center", ncol=2, fontsize=font_size, frameon=False)
+
+    legend_filename = results_dir + "/legend.pdf"
+    figlegend.savefig(legend_filename, format="pdf", bbox_inches="tight", transparent=True)
+    plt.close(figlegend)
 
     lines.append(Line2D([0], [0], color="grey", linewidth=3, linestyle="--", alpha=0.7))
     labels.append("Random Classifier")
@@ -368,7 +374,7 @@ def __plot_legend(
 
     ax.legend(lines, labels, loc="center", ncol=3, fontsize=font_size, frameon=False)
 
-    legend_filename = results_dir + "/legend.pdf"
+    legend_filename = results_dir + "/legend_w_rnd_class.pdf"
     figlegend.savefig(legend_filename, format="pdf", bbox_inches="tight", transparent=True)
     plt.close(figlegend)
 
@@ -415,7 +421,7 @@ def __plot_roc(
             gptcache_fpr_values,
             gptcache_tpr_values,
             "o-",
-            color="blue",
+            color="#37A9EC",
             linewidth=3,
             label="GPTCache",
             markersize=10,
@@ -451,7 +457,7 @@ def __plot_roc(
             vcache_local_fpr_values,
             vcache_local_tpr_values,
             "o-",
-            color="green",
+            color="#8CBE94",
             linewidth=3,
             label="vCache",
             markersize=10,
@@ -487,7 +493,7 @@ def __plot_roc(
             vcache_global_fpr_values,
             vcache_global_tpr_values,
             "o-",
-            color="red",
+            color="#C23B48",
             linewidth=3,
             label="vCache (Ablation)",
             markersize=10,
@@ -523,7 +529,7 @@ def __plot_roc(
             berkeley_embedding_fpr_values,
             berkeley_embedding_tpr_values,
             "o-",
-            color="purple",
+            color="#3B686A",
             linewidth=3,
             label="Fine-tuned Embedding",
             markersize=10,
@@ -561,7 +567,7 @@ def __plot_roc(
             vcache_berkeley_embedding_fpr_values,
             vcache_berkeley_embedding_tpr_values,
             "o-",
-            color="orange",
+            color="#EDBE24",
             linewidth=3,
             label="vCache + Fine-tuned Embedding",
             markersize=10,
@@ -631,7 +637,7 @@ def __plot_precision_vs_recall(
             gptcache_recall_values,
             gptcache_precision_values,
             "o-",
-            color="blue",
+            color="#37A9EC",
             linewidth=3,
             label="GPTCache",
             markersize=8,
@@ -666,7 +672,7 @@ def __plot_precision_vs_recall(
             vcache_local_recall_values,
             vcache_local_precision_values,
             "o-",
-            color="green",
+            color="#8CBE94",
             linewidth=3,
             label="vCache",
             markersize=8,
@@ -701,7 +707,7 @@ def __plot_precision_vs_recall(
             vcache_global_recall_values,
             vcache_global_precision_values,
             "o-",
-            color="red",
+            color="#C23B48",
             linewidth=3,
             label="vCache (Ablation)",
             markersize=8,
@@ -737,7 +743,7 @@ def __plot_precision_vs_recall(
             berkeley_embedding_recall_values,
             berkeley_embedding_precision_values,
             "o-",
-            color="purple",
+            color="#3B686A",
             linewidth=3,
             label="Fine-tuned Embedding",
             markersize=8,
@@ -778,7 +784,7 @@ def __plot_precision_vs_recall(
             vcache_berkeley_embedding_recall_values,
             vcache_berkeley_embedding_precision_values,
             "o-",
-            color="orange",
+            color="#EDBE24",
             linewidth=3,
             label="vCache + Fine-tuned Embedding",
             markersize=8,
@@ -858,7 +864,7 @@ def __plot_avg_latency_vs_error_rate(
             gptcache_latencies,
             gptcache_error_rates,
             "o-",
-            color="blue",
+            color="#37A9EC",
             linewidth=3,
             label="GPTCache",
             markersize=8,
@@ -919,7 +925,7 @@ def __plot_avg_latency_vs_error_rate(
             vcache_local_latencies,
             vcache_local_error_rates,
             "o-",
-            color="green",
+            color="#8CBE94",
             linewidth=3,
             label="vCache",
             markersize=8,
@@ -956,7 +962,7 @@ def __plot_avg_latency_vs_error_rate(
             vcache_global_latencies,
             vcache_global_error_rates,
             "o-",
-            color="red",
+            color="#C23B48",
             linewidth=3,
             label="vCache (Ablation)",
             markersize=8,
@@ -993,7 +999,7 @@ def __plot_avg_latency_vs_error_rate(
             berkeley_embedding_latencies,
             berkeley_embedding_error_rates,
             "o-",
-            color="purple",
+            color="#3B686A",
             linewidth=3,
             label="Fine-tuned Embedding",
             markersize=8,
@@ -1032,7 +1038,7 @@ def __plot_avg_latency_vs_error_rate(
             vcache_berkeley_embedding_latencies,
             vcache_berkeley_embedding_error_rates,
             "o-",
-            color="orange",
+            color="#EDBE24",
             linewidth=3,
             label="vCache + Fine-tuned Embedding",
             markersize=8,
@@ -1107,7 +1113,7 @@ def __plot_cache_hit_vs_error_rate(
             gptcache_error_rates,
             gptcache_cache_hit_rates,
             "o-",
-            color="blue",
+            color="#37A9EC",
             linewidth=3,
             label="GPTCache",
             markersize=10,
@@ -1146,7 +1152,7 @@ def __plot_cache_hit_vs_error_rate(
             vcache_local_error_rates,
             vcache_local_cache_hit_rates,
             "o-",
-            color="green",
+            color="#8CBE94",
             linewidth=3,
             label="vCache",
             markersize=10,
@@ -1184,7 +1190,7 @@ def __plot_cache_hit_vs_error_rate(
             vcache_global_error_rates,
             vcache_global_cache_hit_rates,
             "o-",
-            color="red",
+            color="#C23B48",
             linewidth=3,
             label="vCache (Ablation)",
             markersize=10,
@@ -1223,7 +1229,7 @@ def __plot_cache_hit_vs_error_rate(
             berkeley_embedding_error_rates,
             berkeley_embedding_cache_hit_rates,
             "o-",
-            color="purple",
+            color="#3B686A",
             linewidth=3,
             label="Fine-tuned Embedding",
             markersize=8,
@@ -1267,7 +1273,7 @@ def __plot_cache_hit_vs_error_rate(
             vcache_berkeley_embedding_error_rates,
             vcache_berkeley_embedding_cache_hit_rates,
             "o-",
-            color="orange",
+            color="#EDBE24",
             linewidth=3,
             label="vCache + Fine-tuned Embedding",
             markersize=8,
@@ -1408,19 +1414,19 @@ def __plot_cache_hit_vs_error_rate_vs_sample_size(
         
         # Plot 1: Error rates vs sample size
         plt.figure(figsize=(12, 11))
-        plt.plot(sample_sizes[::35], vcache_local_error_rates[::35], '-', color='blue', linewidth=4, label='vCache Local')
+        plt.plot(sample_sizes[::35], vcache_local_error_rates[::35], '-', color='#37A9EC', linewidth=4, label='vCache Local')
         
         if vcache_global_data_frames:
-            plt.plot(sample_sizes[::35], vcache_global_error_rates[::35], '-', color='green', linewidth=4, label='vCache Global')
+            plt.plot(sample_sizes[::35], vcache_global_error_rates[::35], '-', color='#8CBE94', linewidth=4, label='vCache Global')
             
         if gptcache_data_frames:
-            plt.plot(sample_sizes[::35], gptcache_error_rates[::35], '-', color='red', linewidth=4, label='GPTCache')
+            plt.plot(sample_sizes[::35], gptcache_error_rates[::35], '-', color='#C23B48', linewidth=4, label='GPTCache')
             
         if berkeley_embedding_data_frames:
-            plt.plot(sample_sizes[::35], berkeley_embedding_error_rates[::35], '-', color='purple', linewidth=4, label='Fine-tuned Embedding')
+            plt.plot(sample_sizes[::35], berkeley_embedding_error_rates[::35], '-', color='#3B686A', linewidth=4, label='Fine-tuned Embedding')
       
         if vcache_berkeley_embedding_data_frames:
-            plt.plot(sample_sizes[::35], vcache_berkeley_embedding_error_rates[::35], '-', color='orange', linewidth=4, label='vCache + Fine-tuned Embedding')
+            plt.plot(sample_sizes[::35], vcache_berkeley_embedding_error_rates[::35], '-', color='#EDBE24', linewidth=4, label='vCache + Fine-tuned Embedding')
            
         plt.xlabel('Sample Size', fontsize=font_size)
         plt.ylabel('Error Rate (%)', fontsize=font_size)
@@ -1436,19 +1442,19 @@ def __plot_cache_hit_vs_error_rate_vs_sample_size(
         
         # Plot 2: Cache hit rates vs sample size
         plt.figure(figsize=(12, 11))
-        plt.plot(sample_sizes[::5], vcache_local_cache_hit_rates[::5], '-', color='blue', linewidth=4, label='vCache Local')
+        plt.plot(sample_sizes[::5], vcache_local_cache_hit_rates[::5], '-', color='#37A9EC', linewidth=4, label='vCache Local')
       
         if vcache_global_data_frames:
-            plt.plot(sample_sizes[::5], vcache_global_cache_hit_rates[::5], '-', color='green', linewidth=4, label='vCache Global')
+            plt.plot(sample_sizes[::5], vcache_global_cache_hit_rates[::5], '-', color='#8CBE94', linewidth=4, label='vCache Global')
         
         if gptcache_data_frames:
-            plt.plot(sample_sizes[::5], gptcache_cache_hit_rates[::5], '-', color='red', linewidth=4, label='GPTCache')
+            plt.plot(sample_sizes[::5], gptcache_cache_hit_rates[::5], '-', color='#C23B48', linewidth=4, label='GPTCache')
           
         if berkeley_embedding_data_frames:
-            plt.plot(sample_sizes[::5], berkeley_embedding_cache_hit_rates[::5], '-', color='purple', linewidth=4, label='Fine-tuned Embedding')
+            plt.plot(sample_sizes[::5], berkeley_embedding_cache_hit_rates[::5], '-', color='#3B686A', linewidth=4, label='Fine-tuned Embedding')
             
         if vcache_berkeley_embedding_data_frames:
-            plt.plot(sample_sizes[::5], vcache_berkeley_embedding_cache_hit_rates[::5], '-', color='orange', linewidth=4, label='vCache + Fine-tuned Embedding')
+            plt.plot(sample_sizes[::5], vcache_berkeley_embedding_cache_hit_rates[::5], '-', color='#EDBE24', linewidth=4, label='vCache + Fine-tuned Embedding')
         
         plt.xlabel('Sample Size', fontsize=font_size)
         plt.ylabel('Cache Hit Rate (%)', fontsize=font_size)
@@ -1490,7 +1496,7 @@ def __plot_delta_accuracy(
         bar_width = 0.8
 
         plt.bar(
-            x_pos, error_rates, bar_width, color="skyblue", label="Actual Error Rate"
+            x_pos, error_rates, bar_width, color="#37A9EC", label="Actual Error Rate"
         )
 
         for i, delta in enumerate(vcache_local_deltas):
@@ -1498,14 +1504,14 @@ def __plot_delta_accuracy(
                 y=delta,
                 xmin=i - bar_width / 2,
                 xmax=i + bar_width / 2,
-                colors="red",
+                colors="#C23B48",
                 linestyles="dashed",
                 linewidth=3,
             )
 
         custom_lines = [
-            Line2D([0], [0], color="red", linestyle="dashed", lw=4),
-            Line2D([0], [0], color="skyblue", lw=4),
+            Line2D([0], [0], color="#C23B48", linestyle="dashed", lw=4),
+            Line2D([0], [0], color="#37A9EC", lw=4),
         ]
         plt.legend(
             custom_lines,
@@ -1558,7 +1564,7 @@ def __plot_delta_accuracy(
                 ha="center",
                 va="bottom",
                 fontsize=font_size - 2,
-                color="red",
+                color="#C23B48",
             )
 
         all_values = error_rates + vcache_local_deltas
