@@ -144,7 +144,7 @@ STATIC_THRESHOLDS: List[float] = [
     0.98,
 ]
 
-DELTAS: List[float] = [0.01, 0.015, 0.02, 0.025,0.03, 0.035, 0.04, 0.05, 0.06, 0.07] 
+DELTAS: List[float] = [0.01, 0.015, 0.02, 0.025, 0.03, 0.035, 0.04, 0.05, 0.06, 0.07]
 
 MAX_VECTOR_DB_CAPACITY: int = 100000
 PLOT_FONT_SIZE: int = 50
