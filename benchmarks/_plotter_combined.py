@@ -457,7 +457,7 @@ def __plot_roc(
             vcache_local_fpr_values,
             vcache_local_tpr_values,
             "o-",
-            color="#8CBE94",
+            color="#37A9EC",
             linewidth=3,
             label="vCache",
             markersize=10,
