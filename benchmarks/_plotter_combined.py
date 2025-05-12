@@ -21,31 +21,53 @@ from benchmarks._plotter_helper import (
 )
 
 
-# Module-level private helper functions
-def __wilson_score_interval(successes: float, n: float, z: float = 1.96):
-    """Computes the Wilson score interval for a binomial proportion."""
-    if n == 0:
-        return 0.0, 0.0
+def __calculate_mean_and_ci_from_runs(
+    per_run_values: List[float],
+    z: float = 1.96,
+    clamp_min: float | None = None,
+    clamp_max: float | None = None,
+):
+    """Calculates mean and confidence interval from a list of per-run metric values."""
+    if not per_run_values:
+        return 0.0, 0.0, 0.0
+    if len(per_run_values) == 1:
+        mean_val = per_run_values[0]
+        # Apply clamping even for single value if specified
+        if clamp_min is not None:
+            mean_val = max(clamp_min, mean_val)
+        if clamp_max is not None:
+            mean_val = min(clamp_max, mean_val)
+        return mean_val, mean_val, mean_val
 
-    p_hat = successes / n
+    mean_val = np.mean(per_run_values)
+    std_dev = np.std(per_run_values, ddof=1)
+    sem = std_dev / np.sqrt(len(per_run_values))
 
-    # Ensure p_hat is within [0, 1] to avoid domain errors with sqrt if successes > n or < 0
-    p_hat = max(0.0, min(1.0, p_hat))
+    ci_low = mean_val - z * sem
+    ci_up = mean_val + z * sem
 
-    denominator = 1 + z**2 / n
-    center = (p_hat + z**2 / (2 * n)) / denominator
+    if clamp_min is not None:
+        ci_low = max(clamp_min, ci_low)
+        mean_val = max(
+            clamp_min, mean_val
+        )  # Ensure mean is also clamped if interval is
+    if clamp_max is not None:
+        ci_up = min(clamp_max, ci_up)
+        mean_val = min(
+            clamp_max, mean_val
+        )  # Ensure mean is also clamped if interval is
 
-    sqrt_term_numerator = p_hat * (1 - p_hat) + (z**2 / (4 * n))
-    # Ensure the term under the square root is non-negative
-    if sqrt_term_numerator < 0:
-        sqrt_term_numerator = 0
+    # Ensure CI bounds don't cross after clamping if mean was outside clamp range initially
+    if clamp_min is not None and clamp_max is not None:
+        mean_val = max(clamp_min, min(clamp_max, mean_val))
+        ci_low = max(clamp_min, min(clamp_max, ci_low))
+        ci_up = max(clamp_min, min(clamp_max, ci_up))
+        if (
+            ci_low > ci_up
+        ):  # if clamping pushed lower bound above upper bound (e.g. very wide CI outside narrow clamp)
+            ci_low = ci_up = mean_val
 
-    width = (z * np.sqrt(sqrt_term_numerator / n)) / denominator
-
-    lower_bound = center - width
-    upper_bound = center + width
-
-    return max(0.0, lower_bound), min(1.0, upper_bound)
+    return mean_val, ci_low, ci_up
 
 
 def __collect_run_dirs_by_prefix_and_key(
@@ -170,13 +192,20 @@ def __draw_confidence_series(
 
 
 # Aggregation functions for different metrics
-def __aggregate_stats_for_roc(run_dirs: List[str]):
-    all_tp_values = []
-    all_fn_values = []
-    all_fp_values = []
-    all_tn_values = []
+def __aggregate_stats_for_roc(run_dirs: List[str], z: float = 1.96):
+    per_run_tpr_values = []
+    per_run_fpr_values = []
+
+    if not run_dirs:
+        return 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
 
     for rd_path in run_dirs:
+        run_total_tp = 0
+        run_total_fn = 0
+        run_total_fp = 0
+        run_total_tn = 0
+        has_data_for_run = False
+
         for file_name in os.listdir(rd_path):
             if file_name.startswith("results_") and file_name.endswith(".json"):
                 file_path = os.path.join(rd_path, file_name)
@@ -184,44 +213,56 @@ def __aggregate_stats_for_roc(run_dirs: List[str]):
                     with open(file_path, "r", encoding="utf-8") as f:
                         data = json.load(f)
                     df, _ = convert_to_dataframe_from_json_file(data)
-                    all_tp_values.extend(df["tp_list"])
-                    all_fn_values.extend(df["fn_list"])
-                    all_fp_values.extend(df["fp_list"])
-                    all_tn_values.extend(df["tn_list"])
+                    run_total_tp += np.sum(df["tp_list"])
+                    run_total_fn += np.sum(df["fn_list"])
+                    run_total_fp += np.sum(df["fp_list"])
+                    run_total_tn += np.sum(df["tn_list"])
+                    has_data_for_run = True
                 except Exception:
-                    # print(f"Warning: Error reading/processing {file_path} for ROC stats: {e}")
+                    # print(f"Warning: Error reading/processing {file_path} in __aggregate_stats_for_roc: {e}")
                     continue
 
-    total_tp = np.sum(all_tp_values)
-    total_fn = np.sum(all_fn_values)
-    total_fp = np.sum(all_fp_values)
-    total_tn = np.sum(all_tn_values)
+        if has_data_for_run:
+            current_run_tpr = (
+                run_total_tp / (run_total_tp + run_total_fn)
+                if (run_total_tp + run_total_fn) > 0
+                else 0.0
+            )
+            current_run_fpr = (
+                run_total_fp / (run_total_fp + run_total_tn)
+                if (run_total_fp + run_total_tn) > 0
+                else 0.0
+            )
+            per_run_tpr_values.append(current_run_tpr)
+            per_run_fpr_values.append(current_run_fpr)
 
-    tpr_successes = total_tp
-    tpr_n = total_tp + total_fn
-    if tpr_n == 0:
-        tpr_mean, tpr_ci_low, tpr_ci_up = 0.0, 0.0, 0.0
-    else:
-        tpr_mean = tpr_successes / tpr_n
-        tpr_ci_low, tpr_ci_up = __wilson_score_interval(tpr_successes, tpr_n)
+    # Calculate mean and CI for TPR
+    tpr_mean, tpr_ci_low, tpr_ci_up = __calculate_mean_and_ci_from_runs(
+        per_run_tpr_values, z, clamp_min=0.0, clamp_max=1.0
+    )
 
-    fpr_successes = total_fp
-    fpr_n = total_fp + total_tn
-    if fpr_n == 0:
-        fpr_mean, fpr_ci_low, fpr_ci_up = 0.0, 0.0, 0.0
-    else:
-        fpr_mean = fpr_successes / fpr_n
-        fpr_ci_low, fpr_ci_up = __wilson_score_interval(fpr_successes, fpr_n)
+    # Calculate mean and CI for FPR
+    fpr_mean, fpr_ci_low, fpr_ci_up = __calculate_mean_and_ci_from_runs(
+        per_run_fpr_values, z, clamp_min=0.0, clamp_max=1.0
+    )
 
     return tpr_mean, tpr_ci_low, tpr_ci_up, fpr_mean, fpr_ci_low, fpr_ci_up
 
 
 def __aggregate_stats_for_latency_error(run_dirs: List[str], z: float = 1.96):
-    all_fp_values = []
-    all_latency_values = []
-    num_samples_for_fp_calc = 0
+    per_run_error_rate_values = []
+    per_run_avg_latency_values = []
+
+    if not run_dirs:
+        return 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
 
     for rd_path in run_dirs:
+        run_total_fp = 0
+        run_num_samples_for_fp = 0
+        run_total_latency = 0.0
+        run_num_latency_samples = 0
+        has_data_for_run = False
+
         for file_name in os.listdir(rd_path):
             if file_name.startswith("results_") and file_name.endswith(".json"):
                 file_path = os.path.join(rd_path, file_name)
@@ -229,63 +270,45 @@ def __aggregate_stats_for_latency_error(run_dirs: List[str], z: float = 1.96):
                     with open(file_path, "r", encoding="utf-8") as f:
                         data = json.load(f)
                     df, _ = convert_to_dataframe_from_json_file(data)
-                    all_fp_values.extend(df["fp_list"])
-                    all_latency_values.extend(df["latency_vectorq_list"])
-                    num_samples_for_fp_calc += len(df["fp_list"])
+
+                    run_total_fp += np.sum(df["fp_list"])
+                    run_num_samples_for_fp += len(df["fp_list"])
+
+                    run_total_latency += np.sum(df["latency_vectorq_list"])
+                    run_num_latency_samples += len(df["latency_vectorq_list"])
+                    has_data_for_run = True
                 except Exception:
-                    # print(f"Warning: Error reading/processing {file_path} for Latency/Error stats: {e}")
+                    # print(f"Warning: Error reading/processing {file_path} in __aggregate_stats_for_latency_error: {e}")
                     continue
 
-    total_fp = np.sum(all_fp_values)
-    if num_samples_for_fp_calc == 0:
-        err_mean, err_ci_low, err_ci_up = 0.0, 0.0, 0.0
-    else:
-        err_mean = total_fp / num_samples_for_fp_calc
-        err_ci_low, err_ci_up = __wilson_score_interval(
-            total_fp, num_samples_for_fp_calc
-        )
+        if has_data_for_run:
+            if run_num_samples_for_fp > 0:
+                current_run_error_rate = run_total_fp / run_num_samples_for_fp
+                per_run_error_rate_values.append(current_run_error_rate)
 
-    if not all_latency_values:
-        lat_mean, lat_ci_low, lat_ci_up = 0.0, 0.0, 0.0
-    else:
-        latencies_np = np.array(all_latency_values)
-        lat_mean = np.mean(latencies_np)
-        num_lat_samples = len(latencies_np)
-        if num_lat_samples <= 1:
-            lat_ci_low, lat_ci_up = lat_mean, lat_mean
-        else:
-            lat_std_dev = np.std(latencies_np, ddof=1)
-            lat_sem = lat_std_dev / np.sqrt(num_lat_samples)
-            ci_half_width = z * lat_sem
-            lat_ci_low = lat_mean - ci_half_width
-            lat_ci_up = lat_mean + ci_half_width
+            if run_num_latency_samples > 0:
+                current_run_avg_latency = run_total_latency / run_num_latency_samples
+                per_run_avg_latency_values.append(current_run_avg_latency)
+
+    # Calculate mean and CI for Error Rate
+    err_mean, err_ci_low, err_ci_up = __calculate_mean_and_ci_from_runs(
+        per_run_error_rate_values, z, clamp_min=0.0, clamp_max=1.0
+    )
+
+    # Calculate mean and CI for Latency
+    lat_mean, lat_ci_low, lat_ci_up = __calculate_mean_and_ci_from_runs(
+        per_run_avg_latency_values, z, clamp_min=0.0
+    )
 
     return err_mean, err_ci_low, err_ci_up, lat_mean, lat_ci_low, lat_ci_up
 
 
-def __aggregate_stats_for_cache_hit_error_rate(run_dirs: List[str]):
-    total_samples = 0
-    total_cache_hits = 0
-    total_fp = 0
+def __aggregate_stats_for_cache_hit_error_rate(run_dirs: List[str], z: float = 1.96):
+    per_run_cache_hit_rate_values = []
+    per_run_error_rate_values = []
 
-    for rd in run_dirs:
-        for f_name in os.listdir(rd):
-            if not (f_name.startswith("results_") and f_name.endswith(".json")):
-                continue
-            file_path = os.path.join(rd, f_name)
-            try:
-                with open(file_path, "r", encoding="utf-8") as fp_file:
-                    data = json.load(fp_file)
-                df, _ = convert_to_dataframe_from_json_file(data)
-                total_samples += len(df)
-                total_cache_hits += int(np.sum(df["cache_hit_list"]))
-                total_fp += int(np.sum(df["fp_list"]))
-            except Exception:
-                # print(f"Warning: Error reading/processing {file_path} for CacheHit/Error stats: {e}")
-                continue
-
-    if total_samples == 0:
-        return {  # Return structure with zeros if no data
+    if not run_dirs:
+        return {
             "cache_hit_rate_mean": 0.0,
             "cache_hit_rate_ci_low": 0.0,
             "cache_hit_rate_ci_up": 0.0,
@@ -294,11 +317,51 @@ def __aggregate_stats_for_cache_hit_error_rate(run_dirs: List[str]):
             "error_rate_ci_up": 0.0,
         }
 
-    ch_mean = total_cache_hits / total_samples
-    ch_ci_low, ch_ci_up = __wilson_score_interval(total_cache_hits, total_samples)
+    for rd_path in run_dirs:
+        run_total_samples_ch = 0
+        run_total_cache_hits = 0
+        run_total_samples_er = 0
+        run_total_fp = 0
+        has_data_for_run = False
 
-    er_mean = total_fp / total_samples
-    er_ci_low, er_ci_up = __wilson_score_interval(total_fp, total_samples)
+        for file_name in os.listdir(rd_path):
+            if file_name.startswith("results_") and file_name.endswith(".json"):
+                file_path = os.path.join(rd_path, file_name)
+                try:
+                    with open(file_path, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    df, _ = convert_to_dataframe_from_json_file(data)
+
+                    run_total_samples_ch += len(
+                        df["cache_hit_list"]
+                    )  # Or len(df) if more appropriate
+                    run_total_cache_hits += int(np.sum(df["cache_hit_list"]))
+
+                    run_total_samples_er += len(df["fp_list"])  # Or len(df)
+                    run_total_fp += int(np.sum(df["fp_list"]))
+                    has_data_for_run = True
+                except Exception:
+                    # print(f"Warning: Error reading/processing {file_path} in __aggregate_stats_for_cache_hit_error_rate: {e}")
+                    continue
+
+        if has_data_for_run:
+            if run_total_samples_ch > 0:
+                current_run_ch_rate = run_total_cache_hits / run_total_samples_ch
+                per_run_cache_hit_rate_values.append(current_run_ch_rate)
+
+            if run_total_samples_er > 0:
+                current_run_er_rate = run_total_fp / run_total_samples_er
+                per_run_error_rate_values.append(current_run_er_rate)
+
+    # Calculate mean and CI for Cache Hit Rate
+    ch_mean, ch_ci_low, ch_ci_up = __calculate_mean_and_ci_from_runs(
+        per_run_cache_hit_rate_values, z, clamp_min=0.0, clamp_max=1.0
+    )
+
+    # Calculate mean and CI for Error Rate
+    er_mean, er_ci_low, er_ci_up = __calculate_mean_and_ci_from_runs(
+        per_run_error_rate_values, z, clamp_min=0.0, clamp_max=1.0
+    )
 
     return {
         "cache_hit_rate_mean": ch_mean,
@@ -1938,7 +2001,7 @@ def __plot_delta_accuracy(
             color="#37A9EC",
             label="Actual Error Rate",
             yerr=y_errors_for_plot_transposed,
-            capsize=7.5,  # Add cap to error bars
+            capsize=10,
         )
 
         for i, delta_target_val in enumerate(vcache_local_deltas_sorted):
