@@ -389,25 +389,27 @@ def __get_result_files(results_dir: str):
 
     for d in os.listdir(results_dir):
         # Process GPTCache (static threshold) directories
-        if (d.startswith("gptcache_") or d.startswith("static_")) and os.path.isdir(os.path.join(results_dir, d)):
+        if (d.startswith("gptcache_") or d.startswith("static_")) and os.path.isdir(
+            os.path.join(results_dir, d)
+        ):
             dir_path: str = os.path.join(results_dir, d)
             for file in os.listdir(dir_path):
                 if file.startswith("results_") and file.endswith(".json"):
                     gptcache_files.append(os.path.join(dir_path, file))
 
         # Process vCache local directories
-        elif (d.startswith("vcache_local_") or d.startswith("vectorq_local_")) and os.path.isdir(
-            os.path.join(results_dir, d)
-        ):
+        elif (
+            d.startswith("vcache_local_") or d.startswith("vectorq_local_")
+        ) and os.path.isdir(os.path.join(results_dir, d)):
             dir_path: str = os.path.join(results_dir, d)
             for file in os.listdir(dir_path):
                 if file.startswith("results_") and file.endswith(".json"):
                     vcache_local_files.append(os.path.join(dir_path, file))
 
         # Process vCache global directories
-        elif (d.startswith("vcache_global_") or d.startswith("vectorq_global_")) and os.path.isdir(
-            os.path.join(results_dir, d)
-        ):
+        elif (
+            d.startswith("vcache_global_") or d.startswith("vectorq_global_")
+        ) and os.path.isdir(os.path.join(results_dir, d)):
             dir_path: str = os.path.join(results_dir, d)
             for file in os.listdir(dir_path):
                 if file.startswith("results_") and file.endswith(".json"):
@@ -1685,45 +1687,200 @@ def __plot_cache_hit_vs_error_rate_vs_sample_size(
     target_deltas = [0.015, 0.03]
     target_error_rates = [2, 3.5]
 
+    # Collect all run directories once
+    gptcache_run_dirs_map = __collect_run_dirs_by_prefix_and_key(
+        results_dir, "gptcache_"
+    )
+    vcache_local_run_dirs_map = __collect_run_dirs_by_prefix_and_key(
+        results_dir, "vcache_local_"
+    )
+    vcache_global_run_dirs_map = __collect_run_dirs_by_prefix_and_key(
+        results_dir, "vcache_global_"
+    )
+    berkeley_embedding_run_dirs_map = __collect_run_dirs_by_prefix_and_key(
+        results_dir, "berkeley_embedding_"
+    )
+    vcache_berkeley_embedding_run_dirs_map = __collect_run_dirs_by_prefix_and_key(
+        results_dir, "vcache_berkeley_embedding_"
+    )
+
+    # Helper function to compute cumulative metrics with confidence intervals
+    def compute_cumulative_metrics_with_ci(run_dirs, delta_key_str, z=1.96):
+        per_run_fps = []
+        per_run_cache_hits = []
+
+        # First collect fps and cache_hits for each run
+        for rd_path in run_dirs:
+            run_fps = []
+            run_cache_hits = []
+
+            for file_name in os.listdir(rd_path):
+                if file_name.startswith("results_") and file_name.endswith(".json"):
+                    file_path = os.path.join(rd_path, file_name)
+                    try:
+                        with open(file_path, "r", encoding="utf-8") as f:
+                            data = json.load(f)
+                        df, _ = convert_to_dataframe_from_json_file(data)
+                        run_fps.extend(df["fp_list"])
+                        run_cache_hits.extend(df["cache_hit_list"])
+                    except Exception:
+                        continue
+
+            if run_fps:
+                per_run_fps.append(run_fps)
+
+            if run_cache_hits:
+                per_run_cache_hits.append(run_cache_hits)
+
+        # Ensure all runs have the same length by truncating to the minimum length
+        if per_run_fps:
+            min_len = min(len(fps) for fps in per_run_fps)
+            per_run_fps = [fps[:min_len] for fps in per_run_fps]
+
+            # Calculate cumulative sums and rates for each run
+            per_run_cumulative_error_rates = []
+            for fps in per_run_fps:
+                cum_sum = np.cumsum(fps)
+                indices = np.arange(1, len(fps) + 1)
+                cum_rates = cum_sum / indices
+                per_run_cumulative_error_rates.append(cum_rates)
+
+            # Calculate mean and CI at each position
+            error_means = []
+            error_ci_lows = []
+            error_ci_ups = []
+
+            for i in range(min_len):
+                values = [rates[i] for rates in per_run_cumulative_error_rates]
+                mean, ci_low, ci_up = __calculate_mean_and_ci_from_runs(
+                    values, z, clamp_min=0.0, clamp_max=1.0
+                )
+                error_means.append(mean * 100)  # Convert to percentage
+                error_ci_lows.append((mean - ci_low) * 100)
+                error_ci_ups.append((ci_up - mean) * 100)
+        else:
+            error_means, error_ci_lows, error_ci_ups = [], [], []
+            min_len = 0
+
+        if per_run_cache_hits:
+            min_len_ch = min(len(hits) for hits in per_run_cache_hits)
+            min_len = min_len_ch if not min_len else min(min_len, min_len_ch)
+            per_run_cache_hits = [hits[:min_len] for hits in per_run_cache_hits]
+
+            # Calculate cumulative sums and rates for each run
+            per_run_cumulative_cache_hit_rates = []
+            for hits in per_run_cache_hits:
+                cum_sum = np.cumsum(hits)
+                indices = np.arange(1, len(hits) + 1)
+                cum_rates = cum_sum / indices
+                per_run_cumulative_cache_hit_rates.append(cum_rates)
+
+            # Calculate mean and CI at each position
+            cache_hit_means = []
+            cache_hit_ci_lows = []
+            cache_hit_ci_ups = []
+
+            for i in range(min_len):
+                values = [rates[i] for rates in per_run_cumulative_cache_hit_rates]
+                mean, ci_low, ci_up = __calculate_mean_and_ci_from_runs(
+                    values, z, clamp_min=0.0, clamp_max=1.0
+                )
+                cache_hit_means.append(mean * 100)  # Convert to percentage
+                cache_hit_ci_lows.append((mean - ci_low) * 100)
+                cache_hit_ci_ups.append((ci_up - mean) * 100)
+        else:
+            cache_hit_means, cache_hit_ci_lows, cache_hit_ci_ups = [], [], []
+
+        return (
+            error_means,
+            error_ci_lows,
+            error_ci_ups,
+            cache_hit_means,
+            cache_hit_ci_lows,
+            cache_hit_ci_ups,
+            min_len,
+        )
+
     for target_delta, target_error_rate in zip(target_deltas, target_error_rates):
         ############################################################
         ### Baseline: vCache Local
         vcache_local_df = vcache_local_data_frames[target_delta]
-        vcache_local_error_rates = [
-            rate * 100
-            for rate in compute_error_rate_cumulative_list(
-                fp=vcache_local_df["fp_list"]
-            )
-        ]
-        vcache_local_cache_hit_rates = [
-            rate * 100
-            for rate in compute_cache_hit_rate_cumulative_list(
-                cache_hit_list=vcache_local_df["cache_hit_list"]
-            )
-        ]
+        delta_key_str = f"{target_delta:.3f}".rstrip("0").rstrip(".")
+        if not delta_key_str and target_delta == 0:
+            delta_key_str = "0"
+
+        local_run_dirs = vcache_local_run_dirs_map.get(delta_key_str, [])
+
+        if len(local_run_dirs) > 1:
+            (
+                vcache_local_error_rates,
+                vcache_local_error_ci_lows,
+                vcache_local_error_ci_ups,
+                vcache_local_cache_hit_rates,
+                vcache_local_cache_hit_ci_lows,
+                vcache_local_cache_hit_ci_ups,
+                vcache_local_samples,
+            ) = compute_cumulative_metrics_with_ci(local_run_dirs, delta_key_str)
+        else:
+            vcache_local_error_rates = [
+                rate * 100
+                for rate in compute_error_rate_cumulative_list(
+                    fp=vcache_local_df["fp_list"]
+                )
+            ]
+            vcache_local_cache_hit_rates = [
+                rate * 100
+                for rate in compute_cache_hit_rate_cumulative_list(
+                    cache_hit_list=vcache_local_df["cache_hit_list"]
+                )
+            ]
+            vcache_local_samples = len(vcache_local_error_rates)
+            vcache_local_error_ci_lows = [0] * vcache_local_samples
+            vcache_local_error_ci_ups = [0] * vcache_local_samples
+            vcache_local_cache_hit_ci_lows = [0] * vcache_local_samples
+            vcache_local_cache_hit_ci_ups = [0] * vcache_local_samples
 
         ############################################################
         ### Baseline: vCache Global
-        if vcache_global_data_frames:
+        if vcache_global_data_frames and target_delta in vcache_global_data_frames:
             vcache_global_df = vcache_global_data_frames[target_delta]
-            vcache_global_error_rates = [
-                rate * 100
-                for rate in compute_error_rate_cumulative_list(
-                    fp=vcache_global_df["fp_list"]
-                )
-            ]
-            vcache_global_cache_hit_rates = [
-                rate * 100
-                for rate in compute_cache_hit_rate_cumulative_list(
-                    cache_hit_list=vcache_global_df["cache_hit_list"]
-                )
-            ]
+            global_run_dirs = vcache_global_run_dirs_map.get(delta_key_str, [])
+
+            if len(global_run_dirs) > 1:
+                (
+                    vcache_global_error_rates,
+                    vcache_global_error_ci_lows,
+                    vcache_global_error_ci_ups,
+                    vcache_global_cache_hit_rates,
+                    vcache_global_cache_hit_ci_lows,
+                    vcache_global_cache_hit_ci_ups,
+                    vcache_global_samples,
+                ) = compute_cumulative_metrics_with_ci(global_run_dirs, delta_key_str)
+            else:
+                vcache_global_error_rates = [
+                    rate * 100
+                    for rate in compute_error_rate_cumulative_list(
+                        fp=vcache_global_df["fp_list"]
+                    )
+                ]
+                vcache_global_cache_hit_rates = [
+                    rate * 100
+                    for rate in compute_cache_hit_rate_cumulative_list(
+                        cache_hit_list=vcache_global_df["cache_hit_list"]
+                    )
+                ]
+                vcache_global_samples = len(vcache_global_error_rates)
+                vcache_global_error_ci_lows = [0] * vcache_global_samples
+                vcache_global_error_ci_ups = [0] * vcache_global_samples
+                vcache_global_cache_hit_ci_lows = [0] * vcache_global_samples
+                vcache_global_cache_hit_ci_ups = [0] * vcache_global_samples
 
         ############################################################
         ### Baseline: GPTCache
         if gptcache_data_frames:
             gptcache_thresholds = sorted(gptcache_data_frames.keys())
             gptcache_closest_error_rate_diff = float("inf")
+            gptcache_closest_threshold = None
             gptcache_df = None
 
             for threshold in gptcache_thresholds:
@@ -1733,20 +1890,48 @@ def __plot_cache_hit_vs_error_rate_vs_sample_size(
 
                 if error_rate_diff < gptcache_closest_error_rate_diff:
                     gptcache_closest_error_rate_diff = error_rate_diff
+                    gptcache_closest_threshold = threshold
                     gptcache_df = df
 
-            gptcache_error_rates = [
-                rate * 100
-                for rate in compute_error_rate_cumulative_list(
-                    fp=gptcache_df["fp_list"]
-                )
-            ]
-            gptcache_cache_hit_rates = [
-                rate * 100
-                for rate in compute_cache_hit_rate_cumulative_list(
-                    cache_hit_list=gptcache_df["cache_hit_list"]
-                )
-            ]
+            if gptcache_closest_threshold is not None:
+                threshold_key_str = f"{gptcache_closest_threshold:.3f}".rstrip(
+                    "0"
+                ).rstrip(".")
+                if not threshold_key_str and gptcache_closest_threshold == 0:
+                    threshold_key_str = "0"
+
+                gptcache_run_dirs = gptcache_run_dirs_map.get(threshold_key_str, [])
+
+                if len(gptcache_run_dirs) > 1:
+                    (
+                        gptcache_error_rates,
+                        gptcache_error_ci_lows,
+                        gptcache_error_ci_ups,
+                        gptcache_cache_hit_rates,
+                        gptcache_cache_hit_ci_lows,
+                        gptcache_cache_hit_ci_ups,
+                        gptcache_samples,
+                    ) = compute_cumulative_metrics_with_ci(
+                        gptcache_run_dirs, threshold_key_str
+                    )
+                else:
+                    gptcache_error_rates = [
+                        rate * 100
+                        for rate in compute_error_rate_cumulative_list(
+                            fp=gptcache_df["fp_list"]
+                        )
+                    ]
+                    gptcache_cache_hit_rates = [
+                        rate * 100
+                        for rate in compute_cache_hit_rate_cumulative_list(
+                            cache_hit_list=gptcache_df["cache_hit_list"]
+                        )
+                    ]
+                    gptcache_samples = len(gptcache_error_rates)
+                    gptcache_error_ci_lows = [0] * gptcache_samples
+                    gptcache_error_ci_ups = [0] * gptcache_samples
+                    gptcache_cache_hit_ci_lows = [0] * gptcache_samples
+                    gptcache_cache_hit_ci_ups = [0] * gptcache_samples
 
         ############################################################
         ### Baseline: Berkeley Embedding
@@ -1755,6 +1940,7 @@ def __plot_cache_hit_vs_error_rate_vs_sample_size(
                 berkeley_embedding_data_frames.keys()
             )
             berkeley_embedding_closest_error_rate_diff = float("inf")
+            berkeley_embedding_closest_threshold = None
             berkeley_embedding_df = None
 
             for threshold in berkeley_embedding_thresholds:
@@ -1764,91 +1950,217 @@ def __plot_cache_hit_vs_error_rate_vs_sample_size(
 
                 if error_rate_diff < berkeley_embedding_closest_error_rate_diff:
                     berkeley_embedding_closest_error_rate_diff = error_rate_diff
+                    berkeley_embedding_closest_threshold = threshold
                     berkeley_embedding_df = df
 
-            berkeley_embedding_error_rates = [
-                rate * 100
-                for rate in compute_error_rate_cumulative_list(
-                    fp=berkeley_embedding_df["fp_list"]
+            if berkeley_embedding_closest_threshold is not None:
+                threshold_key_str = (
+                    f"{berkeley_embedding_closest_threshold:.3f}".rstrip("0").rstrip(
+                        "."
+                    )
                 )
-            ]
-            berkeley_embedding_cache_hit_rates = [
-                rate * 100
-                for rate in compute_cache_hit_rate_cumulative_list(
-                    cache_hit_list=berkeley_embedding_df["cache_hit_list"]
+                if not threshold_key_str and berkeley_embedding_closest_threshold == 0:
+                    threshold_key_str = "0"
+
+                berkeley_embedding_run_dirs = berkeley_embedding_run_dirs_map.get(
+                    threshold_key_str, []
                 )
-            ]
+
+                if len(berkeley_embedding_run_dirs) > 1:
+                    (
+                        berkeley_embedding_error_rates,
+                        berkeley_embedding_error_ci_lows,
+                        berkeley_embedding_error_ci_ups,
+                        berkeley_embedding_cache_hit_rates,
+                        berkeley_embedding_cache_hit_ci_lows,
+                        berkeley_embedding_cache_hit_ci_ups,
+                        berkeley_embedding_samples,
+                    ) = compute_cumulative_metrics_with_ci(
+                        berkeley_embedding_run_dirs, threshold_key_str
+                    )
+                else:
+                    berkeley_embedding_error_rates = [
+                        rate * 100
+                        for rate in compute_error_rate_cumulative_list(
+                            fp=berkeley_embedding_df["fp_list"]
+                        )
+                    ]
+                    berkeley_embedding_cache_hit_rates = [
+                        rate * 100
+                        for rate in compute_cache_hit_rate_cumulative_list(
+                            cache_hit_list=berkeley_embedding_df["cache_hit_list"]
+                        )
+                    ]
+                    berkeley_embedding_samples = len(berkeley_embedding_error_rates)
+                    berkeley_embedding_error_ci_lows = [0] * berkeley_embedding_samples
+                    berkeley_embedding_error_ci_ups = [0] * berkeley_embedding_samples
+                    berkeley_embedding_cache_hit_ci_lows = [
+                        0
+                    ] * berkeley_embedding_samples
+                    berkeley_embedding_cache_hit_ci_ups = [
+                        0
+                    ] * berkeley_embedding_samples
 
         ############################################################
         ### vCache + Berkeley Embedding
-        if vcache_berkeley_embedding_data_frames:
+        if (
+            vcache_berkeley_embedding_data_frames
+            and target_delta in vcache_berkeley_embedding_data_frames
+        ):
             vcache_berkeley_embedding_df = vcache_berkeley_embedding_data_frames[
                 target_delta
             ]
-            vcache_berkeley_embedding_error_rates = [
-                rate * 100
-                for rate in compute_error_rate_cumulative_list(
-                    fp=vcache_berkeley_embedding_df["fp_list"]
+            vcache_berkeley_run_dirs = vcache_berkeley_embedding_run_dirs_map.get(
+                delta_key_str, []
+            )
+
+            if len(vcache_berkeley_run_dirs) > 1:
+                (
+                    vcache_berkeley_embedding_error_rates,
+                    vcache_berkeley_embedding_error_ci_lows,
+                    vcache_berkeley_embedding_error_ci_ups,
+                    vcache_berkeley_embedding_cache_hit_rates,
+                    vcache_berkeley_embedding_cache_hit_ci_lows,
+                    vcache_berkeley_embedding_cache_hit_ci_ups,
+                    vcache_berkeley_embedding_samples,
+                ) = compute_cumulative_metrics_with_ci(
+                    vcache_berkeley_run_dirs, delta_key_str
                 )
-            ]
-            vcache_berkeley_embedding_cache_hit_rates = [
-                rate * 100
-                for rate in compute_cache_hit_rate_cumulative_list(
-                    cache_hit_list=vcache_berkeley_embedding_df["cache_hit_list"]
+            else:
+                vcache_berkeley_embedding_error_rates = [
+                    rate * 100
+                    for rate in compute_error_rate_cumulative_list(
+                        fp=vcache_berkeley_embedding_df["fp_list"]
+                    )
+                ]
+                vcache_berkeley_embedding_cache_hit_rates = [
+                    rate * 100
+                    for rate in compute_cache_hit_rate_cumulative_list(
+                        cache_hit_list=vcache_berkeley_embedding_df["cache_hit_list"]
+                    )
+                ]
+                vcache_berkeley_embedding_samples = len(
+                    vcache_berkeley_embedding_error_rates
                 )
-            ]
+                vcache_berkeley_embedding_error_ci_lows = [
+                    0
+                ] * vcache_berkeley_embedding_samples
+                vcache_berkeley_embedding_error_ci_ups = [
+                    0
+                ] * vcache_berkeley_embedding_samples
+                vcache_berkeley_embedding_cache_hit_ci_lows = [
+                    0
+                ] * vcache_berkeley_embedding_samples
+                vcache_berkeley_embedding_cache_hit_ci_ups = [
+                    0
+                ] * vcache_berkeley_embedding_samples
 
         sample_sizes = np.arange(1, len(vcache_local_error_rates) + 1)
 
         # Plot 1: Error rates vs sample size
         plt.figure(figsize=(12, 11))
+
+        # Helper to add confidence band
+        def add_confidence_band(x, y, y_low, y_up, color, alpha=0.2):
+            if any(y_low) or any(y_up):  # Only add if there are actual CI values
+                plt.fill_between(
+                    x,
+                    [max(0, y[i] - y_low[i]) for i in range(len(y))],
+                    [min(100, y[i] + y_up[i]) for i in range(len(y))],
+                    color=color,
+                    alpha=alpha,
+                )
+
+        # vCache Local
         plt.plot(
             sample_sizes[::45],
             vcache_local_error_rates[::45],
             "-",
             color="#37A9EC",
-            linewidth=4,
+            linewidth=2,
             label="vCache",
         )
+        add_confidence_band(
+            sample_sizes[::45],
+            vcache_local_error_rates[::45],
+            vcache_local_error_ci_lows[::45],
+            vcache_local_error_ci_ups[::45],
+            "#37A9EC",
+        )
 
-        if vcache_global_data_frames:
+        # vCache Global
+        if vcache_global_data_frames and target_delta in vcache_global_data_frames:
             plt.plot(
                 sample_sizes[::45],
                 vcache_global_error_rates[::45],
                 "-",
                 color="#8CBE94",
-                linewidth=4,
+                linewidth=2,
                 label="vCache (Ablation)",
             )
+            add_confidence_band(
+                sample_sizes[::45],
+                vcache_global_error_rates[::45],
+                vcache_global_error_ci_lows[::45],
+                vcache_global_error_ci_ups[::45],
+                "#8CBE94",
+            )
 
-        if gptcache_data_frames:
+        # GPTCache
+        if gptcache_data_frames and gptcache_df is not None:
             plt.plot(
                 sample_sizes[::45],
                 gptcache_error_rates[::45],
                 "-",
                 color="#C23B48",
-                linewidth=4,
+                linewidth=2,
                 label="GPTCache",
             )
+            add_confidence_band(
+                sample_sizes[::45],
+                gptcache_error_rates[::45],
+                gptcache_error_ci_lows[::45],
+                gptcache_error_ci_ups[::45],
+                "#C23B48",
+            )
 
-        if berkeley_embedding_data_frames:
+        # Berkeley Embedding
+        if berkeley_embedding_data_frames and berkeley_embedding_df is not None:
             plt.plot(
                 sample_sizes[::45],
                 berkeley_embedding_error_rates[::45],
                 "-",
                 color="#3B686A",
-                linewidth=4,
+                linewidth=2,
                 label="Fine-tuned Embedding",
             )
+            add_confidence_band(
+                sample_sizes[::45],
+                berkeley_embedding_error_rates[::45],
+                berkeley_embedding_error_ci_lows[::45],
+                berkeley_embedding_error_ci_ups[::45],
+                "#3B686A",
+            )
 
-        if vcache_berkeley_embedding_data_frames:
+        # vCache + Berkeley Embedding
+        if (
+            vcache_berkeley_embedding_data_frames
+            and target_delta in vcache_berkeley_embedding_data_frames
+        ):
             plt.plot(
                 sample_sizes[::45],
                 vcache_berkeley_embedding_error_rates[::45],
                 "-",
                 color="#EDBE24",
-                linewidth=4,
+                linewidth=2,
                 label="vCache + Fine-tuned Embedding",
+            )
+            add_confidence_band(
+                sample_sizes[::45],
+                vcache_berkeley_embedding_error_rates[::45],
+                vcache_berkeley_embedding_error_ci_lows[::45],
+                vcache_berkeley_embedding_error_ci_ups[::45],
+                "#EDBE24",
             )
 
         plt.xlabel("Sample Size", fontsize=font_size)
@@ -1866,53 +2178,97 @@ def __plot_cache_hit_vs_error_rate_vs_sample_size(
 
         # Plot 2: Cache hit rates vs sample size
         plt.figure(figsize=(12, 11))
+
+        # vCache Local
         plt.plot(
             sample_sizes[::5],
             vcache_local_cache_hit_rates[::5],
             "-",
             color="#37A9EC",
-            linewidth=4,
+            linewidth=2,
             label="vCache Local",
         )
+        add_confidence_band(
+            sample_sizes[::5],
+            vcache_local_cache_hit_rates[::5],
+            vcache_local_cache_hit_ci_lows[::5],
+            vcache_local_cache_hit_ci_ups[::5],
+            "#37A9EC",
+        )
 
-        if vcache_global_data_frames:
+        # vCache Global
+        if vcache_global_data_frames and target_delta in vcache_global_data_frames:
             plt.plot(
                 sample_sizes[::5],
                 vcache_global_cache_hit_rates[::5],
                 "-",
                 color="#8CBE94",
-                linewidth=4,
+                linewidth=2,
                 label="vCache Global",
             )
+            add_confidence_band(
+                sample_sizes[::5],
+                vcache_global_cache_hit_rates[::5],
+                vcache_global_cache_hit_ci_lows[::5],
+                vcache_global_cache_hit_ci_ups[::5],
+                "#8CBE94",
+            )
 
-        if gptcache_data_frames:
+        # GPTCache
+        if gptcache_data_frames and gptcache_df is not None:
             plt.plot(
                 sample_sizes[::5],
                 gptcache_cache_hit_rates[::5],
                 "-",
                 color="#C23B48",
-                linewidth=4,
+                linewidth=2,
                 label="GPTCache",
             )
+            add_confidence_band(
+                sample_sizes[::5],
+                gptcache_cache_hit_rates[::5],
+                gptcache_cache_hit_ci_lows[::5],
+                gptcache_cache_hit_ci_ups[::5],
+                "#C23B48",
+            )
 
-        if berkeley_embedding_data_frames:
+        # Berkeley Embedding
+        if berkeley_embedding_data_frames and berkeley_embedding_df is not None:
             plt.plot(
                 sample_sizes[::5],
                 berkeley_embedding_cache_hit_rates[::5],
                 "-",
                 color="#3B686A",
-                linewidth=4,
+                linewidth=2,
                 label="Fine-tuned Embedding",
             )
+            add_confidence_band(
+                sample_sizes[::5],
+                berkeley_embedding_cache_hit_rates[::5],
+                berkeley_embedding_cache_hit_ci_lows[::5],
+                berkeley_embedding_cache_hit_ci_ups[::5],
+                "#3B686A",
+            )
 
-        if vcache_berkeley_embedding_data_frames:
+        # vCache + Berkeley Embedding
+        if (
+            vcache_berkeley_embedding_data_frames
+            and target_delta in vcache_berkeley_embedding_data_frames
+        ):
             plt.plot(
                 sample_sizes[::5],
                 vcache_berkeley_embedding_cache_hit_rates[::5],
                 "-",
                 color="#EDBE24",
-                linewidth=4,
+                linewidth=2,
                 label="vCache + Fine-tuned Embedding",
+            )
+            add_confidence_band(
+                sample_sizes[::5],
+                vcache_berkeley_embedding_cache_hit_rates[::5],
+                vcache_berkeley_embedding_cache_hit_ci_lows[::5],
+                vcache_berkeley_embedding_cache_hit_ci_ups[::5],
+                "#EDBE24",
             )
 
         plt.xlabel("Sample Size", fontsize=font_size)
