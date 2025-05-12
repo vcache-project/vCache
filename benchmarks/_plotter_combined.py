@@ -389,14 +389,14 @@ def __get_result_files(results_dir: str):
 
     for d in os.listdir(results_dir):
         # Process GPTCache (static threshold) directories
-        if d.startswith("gptcache_") and os.path.isdir(os.path.join(results_dir, d)):
+        if (d.startswith("gptcache_") or d.startswith("static_")) and os.path.isdir(os.path.join(results_dir, d)):
             dir_path: str = os.path.join(results_dir, d)
             for file in os.listdir(dir_path):
                 if file.startswith("results_") and file.endswith(".json"):
                     gptcache_files.append(os.path.join(dir_path, file))
 
         # Process vCache local directories
-        elif d.startswith("vcache_local_") and os.path.isdir(
+        elif (d.startswith("vcache_local_") or d.startswith("vectorq_local_")) and os.path.isdir(
             os.path.join(results_dir, d)
         ):
             dir_path: str = os.path.join(results_dir, d)
@@ -405,7 +405,7 @@ def __get_result_files(results_dir: str):
                     vcache_local_files.append(os.path.join(dir_path, file))
 
         # Process vCache global directories
-        elif d.startswith("vcache_global_") and os.path.isdir(
+        elif (d.startswith("vcache_global_") or d.startswith("vectorq_global_")) and os.path.isdir(
             os.path.join(results_dir, d)
         ):
             dir_path: str = os.path.join(results_dir, d)

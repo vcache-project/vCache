@@ -124,7 +124,7 @@ BASELINES_TO_RUN: List[Baseline] = [
     Baseline.VCacheBerkeleyEmbedding,
 ]
 
-DATASETS_TO_RUN: List[str] = [Dataset.SEM_BENCHMARK_CLASSIFICATION]
+DATASETS_TO_RUN: List[str] = [Dataset.SEM_BENCHMARK_CLASSIFICATION, Dataset.SEM_BENCHMARK_ARENA]
 
 STATIC_THRESHOLDS: List[float] = [
     0.84,
