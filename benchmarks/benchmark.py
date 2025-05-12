@@ -127,6 +127,10 @@ BASELINES_TO_RUN: List[Baseline] = [
 DATASETS_TO_RUN: List[str] = [Dataset.SEM_BENCHMARK_CLASSIFICATION]
 
 STATIC_THRESHOLDS: List[float] = [
+    0.80,
+    0.81,
+    0.82,
+    0.83,
     0.84,
     0.85,
     0.86,
