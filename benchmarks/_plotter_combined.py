@@ -1875,30 +1875,75 @@ def __plot_delta_accuracy(
 ):
     plt.figure(figsize=(12, 8))
 
-    vcache_local_deltas = sorted(vcache_local_data_frames.keys())
+    vcache_local_run_dirs_map = __collect_run_dirs_by_prefix_and_key(
+        results_dir, "vcache_local_"
+    )
 
-    if vcache_local_deltas:
-        error_rates = []
+    vcache_local_deltas_sorted = sorted(vcache_local_data_frames.keys())
+
+    if vcache_local_deltas_sorted:
+        error_rate_means = []
+        error_rate_cis_lower_err = []  # error from mean to lower bound
+        error_rate_cis_upper_err = []  # error from mean to upper bound
         delta_labels = []
+        is_multi_run_list = []
 
-        for delta in vcache_local_deltas:
-            df = vcache_local_data_frames[delta]
+        for delta_val in vcache_local_deltas_sorted:
+            delta_key_str = f"{delta_val:.3f}".rstrip("0").rstrip(".")
+            if not delta_key_str and delta_val == 0:
+                delta_key_str = "0"
 
-            error_rate = compute_error_rate_score(fp=df["fp_list"])
+            current_run_dirs = vcache_local_run_dirs_map.get(delta_key_str, [])
 
-            error_rates.append(error_rate)
-            delta_labels.append(f".{int(delta * 1000):03d}")
+            if len(current_run_dirs) > 1:  # Multi-run
+                # We only need error rate stats from this function
+                er_mean, er_ci_low, er_ci_up, _, _, _ = (
+                    __aggregate_stats_for_latency_error(current_run_dirs)
+                )
+                error_rate_means.append(er_mean)
+                error_rate_cis_lower_err.append(max(0, er_mean - er_ci_low))
+                error_rate_cis_upper_err.append(max(0, er_ci_up - er_mean))
+                is_multi_run_list.append(True)
+            else:  # Single run
+                df = vcache_local_data_frames[delta_val]
+                er_mean_single = compute_error_rate_score(fp=df["fp_list"])
+                error_rate_means.append(er_mean_single)
+                error_rate_cis_lower_err.append(0)
+                error_rate_cis_upper_err.append(0)
+                is_multi_run_list.append(False)
 
-        x_pos = np.arange(len(vcache_local_deltas))
+            delta_labels.append(f".{int(delta_val * 1000):03d}")
+
+        x_pos = np.arange(len(vcache_local_deltas_sorted))
         bar_width = 0.8
 
+        # Prepare yerr for plt.bar. It needs to be a 2xN array for asymmetric error bars.
+        actual_errors_for_bar = [
+            list(z) for z in zip(error_rate_cis_lower_err, error_rate_cis_upper_err)
+        ]
+        # Only include error bars where is_multi_run is True, otherwise pass 0 for that bar
+        y_errors_for_plot = []
+        for i in range(len(is_multi_run_list)):
+            if is_multi_run_list[i]:
+                y_errors_for_plot.append(actual_errors_for_bar[i])
+            else:
+                y_errors_for_plot.append([0, 0])  # No error bar for single runs
+
+        y_errors_for_plot_transposed = np.array(y_errors_for_plot).T
+
         plt.bar(
-            x_pos, error_rates, bar_width, color="#37A9EC", label="Actual Error Rate"
+            x_pos,
+            error_rate_means,
+            bar_width,
+            color="#37A9EC",
+            label="Actual Error Rate",
+            yerr=y_errors_for_plot_transposed,
+            capsize=7.5,  # Add cap to error bars
         )
 
-        for i, delta in enumerate(vcache_local_deltas):
+        for i, delta_target_val in enumerate(vcache_local_deltas_sorted):
             plt.hlines(
-                y=delta,
+                y=delta_target_val,
                 xmin=i - bar_width / 2,
                 xmax=i + bar_width / 2,
                 colors="#EDBE24",
@@ -1913,31 +1958,42 @@ def __plot_delta_accuracy(
         plt.legend(
             custom_lines,
             ["$\delta$ Target", "Actual Error"],
-            fontsize=font_size - 6,
-            handlelength=1.1,
+            fontsize=font_size - 2,  # Adjusted for potentially more space needed
+            handlelength=1.5,  # Adjusted handle length
+            loc="upper left",  # Ensure legend doesn't overlap much
         )
 
         plt.xlabel("$\delta$ Values", fontsize=font_size)
-        plt.xticks(rotation=40)
+        plt.xticks(rotation=45, ha="right")  # Rotate for better readability
         plt.ylabel("Error Rate", fontsize=font_size)
-        plt.xticks(x_pos, delta_labels, fontsize=font_size - 2)
+        plt.xticks(x_pos, delta_labels, fontsize=font_size)
         plt.yticks(fontsize=font_size - 2)
 
         yticks = plt.yticks()[0]
-        if yticks[0] == 0.0:
-            plt.yticks(yticks[1:])
+        # Ensure y-axis starts at 0, if 0 is not already the first tick.
+        # And if y_ticks has values, check the first one.
+        if len(yticks) > 0 and yticks[0] != 0.0:
+            if 0.0 not in yticks:
+                # Create new ticks that include 0 and maintain reasonable spacing
+                new_yticks = np.linspace(0, yticks[-1], len(yticks))
+                plt.yticks(new_yticks)
+        elif not len(yticks):
+            plt.yticks([0, 0.1, 0.2])  # Default if no ticks
 
         def format_tick(x, pos):
-            if x <= 0:
+            if x < 1e-9 and x > -1e-9:  # handles almost zero
                 return "0"
-            s = f"{x:.3f}"
-            after_decimal = s.split(".")[1].rstrip("0")
-            after_decimal = (
-                after_decimal.lstrip("0")
-                if len(after_decimal.lstrip("0")) > 0
-                else after_decimal[-1]
-            )
-            return f".{after_decimal}"
+            s = f"{x:.3f}"  # Use .3f to get some precision
+            parts = s.split(".")
+            if len(parts) == 1:  # Integer or number like "0"
+                return parts[0]
+            integer_part, decimal_part = parts
+            decimal_part = decimal_part.rstrip("0")
+            if not decimal_part:  # was like .000
+                return integer_part
+            if integer_part == "0":  # like 0.123 -> .123
+                return f".{decimal_part}"
+            return f"{integer_part}.{decimal_part}"  # like 1.123
 
         formatter = plt.FuncFormatter(format_tick)
         plt.gca().yaxis.set_major_formatter(formatter)
@@ -1947,32 +2003,22 @@ def __plot_delta_accuracy(
         plt.gca().spines["bottom"].set_linewidth(1)
         plt.gca().spines["left"].set_linewidth(1)
 
-        for i, err in enumerate(error_rates):
-            plt.text(
-                x_pos[i],
-                err + 0.003,
-                # f"{err:.3f}",
-                "",
-                ha="center",
-                va="bottom",
-                fontsize=font_size - 2,
-            )
-
-            plt.text(
-                x_pos[i],
-                vcache_local_deltas[i] + 0.002,
-                "",
-                ha="center",
-                va="bottom",
-                fontsize=font_size - 2,
-                color="#C23B48",
-            )
-
-        all_values = error_rates + vcache_local_deltas
-        if all_values:
+        all_plot_values = (
+            error_rate_means
+            + [
+                er + ci_u
+                for er, ci_u in zip(error_rate_means, error_rate_cis_upper_err)
+            ]
+            + vcache_local_deltas_sorted
+        )
+        if all_plot_values:
             y_min = 0
-            y_max = max(all_values) * 1.15
+            y_max = max(all_plot_values) * 1.15
+            if y_max < 0.08:
+                y_max = 0.08  # Ensure a minimum sensible y_max
             plt.ylim(y_min, y_max)
+        else:
+            plt.ylim(0, 0.08)  # Default if no values
 
     filename = results_dir + "/delta_accuracy.pdf"
     plt.savefig(filename, format="pdf", bbox_inches="tight", transparent=True)
