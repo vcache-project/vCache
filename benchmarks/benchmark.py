@@ -69,13 +69,13 @@ CONFIDENCE_INTERVALS_ITERATIONS: int = 4
 IS_LLM_JUDGE_BENCHMARK: bool = True
 
 EMBEDDING_MODEL_1 = (
-    "e5_large_v2",
+    "emb_e5_large_v2",
     "E5_Large_v2",
     "float32",
     1024,
 )  # 'Alibaba-NLP/gte-large-en-v1.5'
 EMBEDDING_MODEL_1_FT = (
-    "e5_large_v2_ft",
+    "emb_e5_large_v2_ft",
     "E5_Large_v2_FT",
     "float32",
     1024,
@@ -94,13 +94,13 @@ EMBEDDING_MODEL_2_FT = (
 )  # 'intfloat/e5-mistral-7b-instruct'
 LARGE_LANGUAGE_MODEL_1 = (
     "response_gpt-4o-mini",
-    "Llama_3_8B_Instruct",
+    "GPT_4o_mini",
     "float16",
     None,
 )  # 'meta-llama/Meta-Llama-3-8B-Instruct'
 LARGE_LANGUAGE_MODEL_2 = (
-    "response_2",
-    "Llama_3_70B_Instruct",
+    "response_llama_3_8b",
+    "Llama_3_8B_Instruct",
     "float16",
     None,
 )  # 'meta-llama/Meta-Llama-3-70B-Instruct'
@@ -125,7 +125,7 @@ embedding_models: List[Tuple[str, str, str, int]] = [
 ]
 llm_models: List[Tuple[str, str, str, int]] = [
     LARGE_LANGUAGE_MODEL_1,
-    #LARGE_LANGUAGE_MODEL_2,
+    LARGE_LANGUAGE_MODEL_2,
 ]
 candidate_strategy: str = SIMILARITY_STRATEGY[0]
 
