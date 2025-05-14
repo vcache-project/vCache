@@ -99,6 +99,7 @@ class Dataset(Enum):
     COMMONSENSE_QA = "commonsense_qa"
     ECOMMERCE_DATASET = "ecommerce_dataset"
     SEMANTIC_PROMPT_CACHE_BENCHMARK = "semantic_prompt_cache_benchmark"
+    SEMANTIC_BENCHMARK_SEARCH_QUERIES = "sem_benchmark_search_queries"
 
 
 ########################################################################################################################
@@ -106,25 +107,28 @@ class Dataset(Enum):
 ########################################################################################################################
 
 
-MAX_SAMPLES: int = 45000
+MAX_SAMPLES: int = 60000
 CONFIDENCE_INTERVALS_ITERATIONS: int = 5
 IS_LLM_JUDGE_BENCHMARK: bool = False
 DISABLE_PROGRESS_BAR: bool = True
 
 RUN_COMBINATIONS: List[Tuple[EmbeddingModel, LargeLanguageModel]] = [
-    (EmbeddingModel.GTE, LargeLanguageModel.LLAMA_3_8B),
-    (EmbeddingModel.GTE, LargeLanguageModel.LLAMA_3_70B),
-    (EmbeddingModel.E5_LARGE_V2, LargeLanguageModel.LLAMA_3_8B),
+    # (EmbeddingModel.GTE, LargeLanguageModel.LLAMA_3_8B),
+    # (EmbeddingModel.GTE, LargeLanguageModel.LLAMA_3_70B),
+    # (EmbeddingModel.GTE, LargeLanguageModel.GPT_4O_MINI),
+    # (EmbeddingModel.E5_LARGE_V2, LargeLanguageModel.LLAMA_3_8B),
+    (EmbeddingModel.E5_LARGE_V2, LargeLanguageModel.GPT_4O_MINI),
 ]
 
 BASELINES_TO_RUN: List[Baseline] = [
-    Baseline.GPTCache,
-    Baseline.VCacheLocal,
-    Baseline.BerkeleyEmbedding,
-    Baseline.VCacheBerkeleyEmbedding,
+    Baseline.IID,
+    # Baseline.GPTCache,
+    # Baseline.VCacheLocal,
+    # Baseline.BerkeleyEmbedding,
+    # Baseline.VCacheBerkeleyEmbedding,
 ]
 
-DATASETS_TO_RUN: List[str] = [Dataset.SEM_BENCHMARK_CLASSIFICATION]
+DATASETS_TO_RUN: List[str] = [Dataset.SEMANTIC_BENCHMARK_SEARCH_QUERIES]
 
 STATIC_THRESHOLDS: List[float] = [
     0.80,
@@ -148,7 +152,7 @@ STATIC_THRESHOLDS: List[float] = [
     0.98,
 ]
 
-DELTAS: List[float] = [0.01, 0.015, 0.02, 0.025,0.03, 0.035, 0.04, 0.05, 0.06, 0.07] 
+DELTAS: List[float] = [0.01, 0.015, 0.02, 0.025, 0.03, 0.035, 0.04, 0.05, 0.06, 0.07]
 
 MAX_VECTOR_DB_CAPACITY: int = 100000
 PLOT_FONT_SIZE: int = 50
@@ -209,12 +213,19 @@ class Benchmark(unittest.TestCase):
 
                     # 1) Get Data
                     task = data_entry["task"]
-                    system_prompt = data_entry["output_format"]
-                    review_text = data_entry["text"]
+                    system_prompt = data_entry.get("output_format", "")
+                    review_text = data_entry.get("text", "")
 
-                    emb_generation_latency: float = float(
-                        data_entry[self.embedding_model[0] + "_lat"]
-                    )
+                    # TODO Hacked: Needs to be fixed in benchmark arena json file
+                    if self.embedding_model[0] == "emb_e5_large_v2_ft":
+                        emb_generation_latency: float = float(
+                            data_entry["emb_e5_large_v2_lat"]
+                        )
+                    else:
+                        emb_generation_latency: float = float(
+                            data_entry[self.embedding_model[0] + "_lat"]
+                        )
+
                     llm_generation_latency: float = float(
                         data_entry[self.llm_model[0] + "_lat"]
                     )
@@ -258,10 +269,10 @@ class Benchmark(unittest.TestCase):
 
         except FileNotFoundError as e:
             logging.error(f"Benchmark dataset file not found: {e}")
-            raise e
+            return
         except Exception as e:
             logging.error(f"Error processing benchmark: {e}")
-            raise e
+            return
 
         self.dump_results_to_json()
         generate_individual_plots(
@@ -478,7 +489,10 @@ def __run_baseline(
     benchmark.output_folder_path = path
 
     benchmark.stats_set_up()
-    benchmark.test_run_benchmark()
+    try:
+        benchmark.test_run_benchmark()
+    except Exception as e:
+        logging.error(f"Error running benchmark: {e}")
 
 
 ########################################################################################################################
