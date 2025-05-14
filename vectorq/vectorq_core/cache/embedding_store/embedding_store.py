@@ -18,11 +18,12 @@ class EmbeddingStore:
         self.vector_db = vector_db
         self.embedding_metadata_storage = embedding_metadata_storage
 
-    def add_embedding(self, embedding: List[float], response: str) -> int:
+    def add_embedding(self, embedding: List[float], response: str, set_id: str) -> int:
         embedding_id = self.vector_db.add(embedding)
         metadata = EmbeddingMetadataObj(
             embedding_id=embedding_id,
             response=response,
+            set_id=set_id,
         )
         self.embedding_metadata_storage.add_metadata(
             embedding_id=embedding_id, metadata=metadata
@@ -47,7 +48,7 @@ class EmbeddingStore:
     def get_metadata(self, embedding_id: int) -> "EmbeddingMetadataObj":
         return self.embedding_metadata_storage.get_metadata(embedding_id)
 
-    def update_metadata(
+    def update_metadata(    
         self, embedding_id: int, metadata: "EmbeddingMetadataObj"
     ) -> "EmbeddingMetadataObj":
         return self.embedding_metadata_storage.update_metadata(embedding_id, metadata)

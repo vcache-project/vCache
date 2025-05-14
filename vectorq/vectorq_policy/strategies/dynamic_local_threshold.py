@@ -50,25 +50,24 @@ class DynamicLocalThresholdPolicy(VectorQPolicy):
 
     @override
     def process_request(
-        self, prompt: str, system_prompt: Optional[str]
-    ) -> tuple[bool, str, str]:
+        self, prompt: str, system_prompt: Optional[str], set_id: Optional[str]
+    ) -> tuple[bool, str, str, str, str]:
         """
         Args
             prompt: str - The prompt to check for cache hit
             system_prompt: Optional[str] - The optional system prompt to use for the response. It will override the system prompt in the VectorQConfig if provided.
         Returns
-            tuple[bool, str, str] - [is_cache_hit, actual_response, nn_response]
+            tuple[bool, str, str, str, str] - [is_cache_hit, actual_response, nn_response, cache_response_set_id, nn_response_set_id]
         """
         if self.inference_engine is None or self.cache is None:
             raise ValueError("Policy has not been setup")
-
         knn = self.cache.get_knn(prompt=prompt, k=1)
         if not knn:
             response = self.inference_engine.create(
                 prompt=prompt, system_prompt=system_prompt
             )
-            self.cache.add(prompt=prompt, response=response)
-            return False, response, ""
+            self.cache.add(prompt=prompt, response=response, set_id=set_id)
+            return False, response, "", set_id, -1
 
         similarity_score, embedding_id = knn[0]
         metadata = self.cache.get_metadata(embedding_id=embedding_id)
@@ -78,13 +77,13 @@ class DynamicLocalThresholdPolicy(VectorQPolicy):
 
         match action:
             case _Action.EXPLOIT:
-                return True, metadata.response, metadata.response
+                return True, metadata.response, metadata.response, metadata.set_id, metadata.set_id
             case _Action.EXPLORE:
                 response = self.inference_engine.create(
                     prompt=prompt, system_prompt=system_prompt
                 )
                 should_have_exploited = self.similarity_evaluator.answers_similar(
-                    a=response, b=metadata.response
+                    a=set_id, b=metadata.set_id
                 )
                 self.bayesian.update_metadata(
                     similarity_score=similarity_score,
@@ -92,11 +91,11 @@ class DynamicLocalThresholdPolicy(VectorQPolicy):
                     metadata=metadata,
                 )
                 if not should_have_exploited:
-                    self.cache.add(prompt=prompt, response=response)
+                    self.cache.add(prompt=prompt, response=response, set_id=set_id)
                 self.cache.update_metadata(
                     embedding_id=embedding_id, embedding_metadata=metadata
                 )
-                return False, response, metadata.response
+                return False, response, metadata.response, set_id, metadata.set_id
 
 
 class _Action(Enum):
@@ -189,7 +188,7 @@ class _Bayesian:
         similarities: np.ndarray = np.array([obs[0] for obs in metadata.observations])
         labels: np.ndarray = np.array([obs[1] for obs in metadata.observations])
 
-        if len(similarities) < 6 or len(labels) < 6:
+        if len(similarities) < 5 or len(labels) < 5:
             return _Action.EXPLORE
 
         t_hat, gamma, var_t = self._estimate_parameters(

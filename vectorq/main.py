@@ -41,19 +41,20 @@ class VectorQ:
         self,
         prompt: str,
         system_prompt: Optional[str] = None,
-    ) -> Tuple[bool, str, str]:
+        set_id: Optional[str] = None,
+    ) -> Tuple[bool, str, str, str, str]:
         """
         Infer a response from the cache and return the cache hit status, the response, and the nearest neighbor response.
         Args
             prompt: str - The prompt to create a response for.
             system_prompt: Optional[str] - The optional system prompt to use for the response. It will override the system prompt in the VectorQConfig if provided.
         Returns
-            Tuple[bool, str, str] - [is_cache_hit, response, nn_response] (the response is the one supposed to be used by the user, the nn_response is for benchmarking purposes)
+            Tuple[bool, str, str, str, str] - [is_cache_hit, response, nn_response, cache_response_set_id, nn_response_set_id] (the response is the one supposed to be used by the user, the nn_response is for benchmarking purposes)
         """
         if system_prompt is None:
             system_prompt = self.vectorq_config.system_prompt
 
-        return self.vectorq_policy.process_request(prompt, system_prompt)
+        return self.vectorq_policy.process_request(prompt, system_prompt, set_id)
 
     def import_data(self, data: List[str]) -> bool:
         # TODO

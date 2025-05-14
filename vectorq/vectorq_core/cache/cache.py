@@ -19,14 +19,14 @@ class Cache:
         self.embedding_engine = embedding_engine
         self.eviction_policy = eviction_policy
 
-    def add(self, prompt: str, response: str) -> int:
+    def add(self, prompt: str, response: str, set_id: str) -> int:
         """
         prompt: str - The prompt to add to the cache
         response: str - The response to add to the cache
         returns: int - The id of the embedding
         """
         embedding = self.embedding_engine.get_embedding(prompt)
-        self.embedding_store.add_embedding(embedding, response)
+        self.embedding_store.add_embedding(embedding, response, set_id)
 
     def remove(self, embedding_id: int) -> int:
         """

@@ -4,7 +4,7 @@ import os
 import time
 import unittest
 from datetime import datetime
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import ijson
 import numpy as np
@@ -64,24 +64,36 @@ logging.basicConfig(
 ########################################################################################################################
 
 # Benchmark Config
-MAX_SAMPLES: int = 5000
-CONFIDENCE_INTERVALS_ITERATIONS: int = 3
-IS_LLM_JUDGE_BENCHMARK: bool = False
+MAX_SAMPLES: int = 60000
+CONFIDENCE_INTERVALS_ITERATIONS: int = 4
+IS_LLM_JUDGE_BENCHMARK: bool = True
 
 EMBEDDING_MODEL_1 = (
-    "embedding_1",
-    "GteLargeENv1_5",
+    "e5_large_v2",
+    "E5_Large_v2",
     "float32",
     1024,
 )  # 'Alibaba-NLP/gte-large-en-v1.5'
+EMBEDDING_MODEL_1_FT = (
+    "e5_large_v2_ft",
+    "E5_Large_v2_FT",
+    "float32",
+    1024,
+)
 EMBEDDING_MODEL_2 = (
-    "embedding_2",
+    "emb_gte",
+    "E5_Mistral_7B_Instruct",
+    "float16",
+    4096,
+)  # 'intfloat/e5-mistral-7b-instruct'
+EMBEDDING_MODEL_2_FT = (
+    "emb_gte_ft",
     "E5_Mistral_7B_Instruct",
     "float16",
     4096,
 )  # 'intfloat/e5-mistral-7b-instruct'
 LARGE_LANGUAGE_MODEL_1 = (
-    "response_1",
+    "response_gpt-4o-mini",
     "Llama_3_8B_Instruct",
     "float16",
     None,
@@ -103,8 +115,9 @@ DATASETS: List[str] = [
     "commonsense_qa.json",
     "ecommerce_dataset.json",
     "semantic_prompt_cache_benchmark.json",
+    "sem_benchmark_search_queries.json"
 ]
-DATASETS_TO_EXCLUDE: List[str] = [DATASETS[0], DATASETS[2], DATASETS[3]]
+DATASETS_TO_EXCLUDE: List[str] = [DATASETS[0], DATASETS[1], DATASETS[2], DATASETS[3]]
 
 embedding_models: List[Tuple[str, str, str, int]] = [
     EMBEDDING_MODEL_1,
@@ -112,21 +125,21 @@ embedding_models: List[Tuple[str, str, str, int]] = [
 ]
 llm_models: List[Tuple[str, str, str, int]] = [
     LARGE_LANGUAGE_MODEL_1,
-    LARGE_LANGUAGE_MODEL_2,
+    #LARGE_LANGUAGE_MODEL_2,
 ]
 candidate_strategy: str = SIMILARITY_STRATEGY[0]
 
 static_thresholds = np.array(
-    [0.76, 0.78, 0.80, 0.82, 0.84, 0.86, 0.88, 0.90, 0.92, 0.94, 0.96]
+    [0.84, 0.86, 0.89, 0.90, 0.91, 0.92, 0.93, 0.94, 0.95, 0.96, 0.97, 0.98, 0.985, 0.99, 0.995, 0.9975, 1.0]
 )
-deltas = np.array([0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1])
+deltas = np.array([0.01, 0.0125, 0.015, 0.0175, 0.02, 0.025,0.03, 0.035, 0.04, 0.05, 0.06, 0.07, 0.08]) #np.array([0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1])
 
 # VectorQ Config
 MAX_VECTOR_DB_CAPACITY: int = 100000
 PLOT_FONT_SIZE: int = 24
 
-SYSTEM_TYPES: List[str] = ["static", "dynamic_local", "dynamic_global", "all"]
-SYSTEM_TYPE: str = SYSTEM_TYPES[3]
+SYSTEM_TYPES: List[str] = ["static", "dynamic_local", "dynamic_global", "berkeley_embedding", "vcache_berkeley_embedding", "all"]
+SYSTEM_TYPE: str = SYSTEM_TYPES[5]
 
 
 ########################################################################################################################
@@ -170,22 +183,29 @@ class Benchmark(unittest.TestCase):
             )
 
         try:
+            extra_time = 0
             with open(self.filepath, "rb") as file:
                 data_entries = ijson.items(file, "item")
 
-                pbar = tqdm(total=MAX_SAMPLES, desc="Processing entries")
+                pbar = tqdm(total=MAX_SAMPLES, desc="Processing entries", disable=True)
                 for idx, data_entry in enumerate(data_entries):
                     if idx >= MAX_SAMPLES:
                         break
 
                     # 1) Get Data
                     task = data_entry["task"]
-                    system_prompt = data_entry["output_format"]
-                    review_text = data_entry["text"]
+                    system_prompt = data_entry.get("output_format", "")
+                    review_text = data_entry.get("text", "")
 
-                    emb_generation_latency: float = float(
-                        data_entry[self.embedding_model[0] + "_lat"]
-                    )
+                    if self.embedding_model[0] == "emb_e5_large_v2_ft":
+                        emb_generation_latency: float = float(
+                            data_entry["emb_e5_large_v2_lat"]
+                        )
+                    else:
+                        emb_generation_latency: float = float(
+                            data_entry[self.embedding_model[0] + "_lat"]
+                        )
+
                     llm_generation_latency: float = float(
                         data_entry[self.llm_model[0] + "_lat"]
                     )
@@ -193,18 +213,24 @@ class Benchmark(unittest.TestCase):
                     # 2.1) Direct Inference (No Cache)
                     label_response: str = data_entry[self.llm_model[0]]
                     latency_direct: float = llm_generation_latency
+                    try:
+                        label_set_id = data_entry["ID_Set"]
+                    except:
+                        label_set_id = data_entry["id_set"]
 
                     # 2.2) VectorQ Inference (With Cache)
                     candidate_embedding: List[float] = data_entry[
                         self.embedding_model[0]
                     ]
-                    is_cache_hit, cache_response, nn_response, latency_vectorq_logic = (
+                    # has to return cache_response_set_id and nn_response_set_id (this has to be stored in the EmbeddingMetadataObj of the NN)
+                    is_cache_hit, cache_response, nn_response, latency_vectorq_logic, cache_response_set_id, nn_response_set_id = (
                         self.get_vectorQ_answer(
                             task=task,
                             review_text=review_text,
                             candidate_embedding=candidate_embedding,
                             label_response=label_response,
                             system_prompt=system_prompt,
+                            label_set_id=label_set_id,
                         )
                     )
                     latency_vectorq: float = (
@@ -214,18 +240,25 @@ class Benchmark(unittest.TestCase):
                         latency_vectorq += llm_generation_latency
 
                     # 3) Update Stats
-                    self.update_stats(
+                    # Pass the two set ids
+                    extra_time += self.update_stats(
+                        task=task,
                         is_cache_hit=is_cache_hit,
                         label_response=label_response,
                         cache_response=cache_response,
                         nn_response=nn_response,
                         latency_direct=latency_direct,
                         latency_vectorq=latency_vectorq,
+                        label_set_id=label_set_id,
+                        cache_response_set_id=cache_response_set_id,
+                        nn_response_set_id=nn_response_set_id,
                     )
 
                     pbar.update(1)
 
                 pbar.close()
+
+            print(f"Total extra time: {extra_time}")
 
         except Exception as e:
             logging.error(f"Error processing benchmark: {e}")
@@ -238,25 +271,42 @@ class Benchmark(unittest.TestCase):
             is_static=self.is_static_threshold,
             parameter=self.threshold if self.is_static_threshold else self.delta,
         )
+        return extra_time
 
     ########################################################################################################################
     ### Class Helper Functions #############################################################################################
     ########################################################################################################################
     def update_stats(
         self,
+        task: str,
         is_cache_hit: bool,
         label_response: str,
         cache_response: str,
         nn_response: str,
         latency_direct: float,
         latency_vectorq: float,
+        label_set_id: str,
+        cache_response_set_id: str,
+        nn_response_set_id: str,
     ):
-        if is_cache_hit:  # If cache hit, the actual response is the nearest neighbor response (cache_response == nn_response)
+        start_time = time.time()
+        if is_cache_hit:  # If cache hit, the actual response is the nearest neighbor response (cache_response == nn_response) 
             self.cache_hit_list.append(1)
             self.cache_miss_list.append(0)
-            cache_response_correct: bool = answers_have_same_meaning_static(
-                label_response, cache_response
-            )
+            if IS_LLM_JUDGE_BENCHMARK:
+                #cache_response_correct: bool = answers_have_same_meaning_static(
+                #    label_response, cache_response
+                #)
+                cache_response_correct: bool = label_set_id == cache_response_set_id
+            else:
+                cache_response_correct: bool = answers_have_same_meaning_static(
+                    label_response, cache_response
+                )
+            #print(f"\n\n>Task: {task}")
+            #print(f"> Cached response: \n{cache_response} \n")
+            #print(f"> NN response: \n{nn_response} \n")
+            #print(f"> Label response: \n{label_response} \n")
+            #print(f"> Cache correct: {cache_response_correct}")
             if cache_response_correct:
                 self.tp_list.append(1)
                 self.fp_list.append(0)
@@ -271,6 +321,15 @@ class Benchmark(unittest.TestCase):
             nn_response_correct: bool = answers_have_same_meaning_static(
                 label_response, nn_response
             )
+            if IS_LLM_JUDGE_BENCHMARK:
+                #cache_response_correct: bool = answers_have_same_meaning_llm(
+                #    label_response, nn_response
+                #)
+                cache_response_correct: bool = label_set_id == nn_response_set_id
+            else:
+                nn_response_correct: bool = answers_have_same_meaning_static(
+                    label_response, nn_response
+                )
             if nn_response_correct:
                 self.fn_list.append(1)
                 self.tn_list.append(0)
@@ -282,6 +341,7 @@ class Benchmark(unittest.TestCase):
 
         self.latency_direct_list.append(latency_direct)
         self.latency_vectorq_list.append(latency_vectorq)
+        return time.time() - start_time
 
     def get_vectorQ_answer(
         self,
@@ -290,7 +350,8 @@ class Benchmark(unittest.TestCase):
         candidate_embedding: List[float],
         label_response: str,
         system_prompt: str,
-    ) -> Tuple[bool, str, str, float]:
+        label_set_id: str,
+    ) -> Tuple[bool, str, str, float, str, str]:
         """
         Returns: Tuple[bool, str, str, float] - [is_cache_hit, cache_response, nn_response, latency_vectorq_logic]
         """
@@ -298,6 +359,16 @@ class Benchmark(unittest.TestCase):
             candidate_embedding = candidate_embedding.tolist()
         elif isinstance(candidate_embedding, np.ndarray):
             candidate_embedding = candidate_embedding.tolist()
+        elif isinstance(candidate_embedding, str):
+            # Handle case where embedding is a string representation of a list
+            try:
+                # Remove brackets and split by commas
+                if candidate_embedding.startswith('[') and candidate_embedding.endswith(']'):
+                    candidate_embedding = candidate_embedding[1:-1]
+                candidate_embedding = [float(x.strip()) for x in candidate_embedding.split(',')]
+            except Exception as e:
+                logging.error(f"Error converting string embedding to list: {e}")
+                raise ValueError(f"Could not convert string embedding to list of floats: {candidate_embedding[:100]}...")
 
         if isinstance(candidate_embedding, list):
             candidate_embedding = [
@@ -313,10 +384,11 @@ class Benchmark(unittest.TestCase):
         vectorQ_prompt = f"{task} {review_text}"
         latency_vectorq_logic: float = time.time()
         try:
-            is_cache_hit, cache_response, nn_response = (
+            is_cache_hit, cache_response, nn_response, cache_response_set_id, nn_response_set_id = (
                 self.vectorq.infer_with_cache_info(
                     prompt=vectorQ_prompt,
                     system_prompt=system_prompt,
+                    set_id=label_set_id,
                 )
             )
         except Exception as e:
@@ -326,7 +398,7 @@ class Benchmark(unittest.TestCase):
             raise e
 
         latency_vectorq_logic = time.time() - latency_vectorq_logic
-        return is_cache_hit, cache_response, nn_response, latency_vectorq_logic
+        return is_cache_hit, cache_response, nn_response, latency_vectorq_logic, cache_response_set_id, nn_response_set_id
 
     def dump_results_to_json(self):
         observations_dict = {}
@@ -373,9 +445,9 @@ class Benchmark(unittest.TestCase):
             "config": {
                 "filepath": self.filepath,
                 "embedding_model": self.embedding_model,
-                "is_static_threshold": self.is_static_threshold,
-                "threshold": self.threshold,
-                "delta": self.delta,
+                "is_static_threshold": bool(self.is_static_threshold),
+                "threshold": float(self.threshold) if self.threshold is not None else None,
+                "delta": float(self.delta) if self.delta is not None else None,
             },
             "cache_hit_list": self.cache_hit_list,
             "cache_miss_list": self.cache_miss_list,
@@ -446,7 +518,8 @@ def __run_baseline(
     benchmark.output_folder_path = path
 
     benchmark.stats_set_up()
-    benchmark.test_run_benchmark()
+    extra_time = benchmark.test_run_benchmark()
+    return extra_time
 
 
 ########################################################################################################################
@@ -462,6 +535,7 @@ def main():
         print(f"Created directory: {datasets_dir}")
 
     datasets_dir = datasets_dir + "/"
+    print(f"Datasets directory: {datasets_dir}")
     datasets = [
         f.split(".")[0]
         for f in os.listdir(datasets_dir)
@@ -475,18 +549,20 @@ def main():
         dataset_file = f"{datasets_dir}{dataset}.json"
         logging.info(f"Running benchmark for dataset: {dataset}\n\n\n")
         start_time_dataset = time.time()
-
+        total_extra_time = 0
+        
         for embedding_model in embedding_models:
             logging.info(
                 f"Running benchmark for dataset: {dataset}, embedding model: {embedding_model[1]}\n\n"
             )
             start_time_embedding_model = time.time()
-
+            embedding_model_extra_time = 0
             for llm_model in llm_models:
                 logging.info(
                     f"Running benchmark for dataset: {dataset}, embedding model: {embedding_model[1]}, LLM model: {llm_model[1]}\n"
                 )
                 start_time_llm_model = time.time()
+                llm_model_extra_time = 0
 
                 # Baseline 1) Dynamic thresholds (VectorQ, Local)
                 if SYSTEM_TYPE in ["dynamic_local", "all"]:
@@ -506,7 +582,7 @@ def main():
                                 f"Using dynamic threshold with delta: {delta}. Run {i + 1} of {CONFIDENCE_INTERVALS_ITERATIONS}"
                             )
 
-                            __run_baseline(
+                            extra_time = __run_baseline(
                                 vectorq_policy=DynamicLocalThresholdPolicy(delta=delta),
                                 path=path,
                                 dataset_file=dataset_file,
@@ -516,8 +592,9 @@ def main():
                                 delta=delta,
                                 threshold=-1,
                             )
-
+                            llm_model_extra_time += extra_time
                 # Baseline 2) Dynamic thresholds (VectorQ, Global)
+                """
                 if SYSTEM_TYPE in ["dynamic_global", "all"]:
                     for delta in deltas:
                         for i in range(0, CONFIDENCE_INTERVALS_ITERATIONS):
@@ -535,7 +612,7 @@ def main():
                                 f"Using dynamic threshold with delta: {delta}. Run {i + 1} of {CONFIDENCE_INTERVALS_ITERATIONS}"
                             )
 
-                            __run_baseline(
+                            extra_time = __run_baseline(
                                 vectorq_policy=DynamicGlobalThresholdPolicy(
                                     delta=delta
                                 ),
@@ -547,6 +624,8 @@ def main():
                                 delta=delta,
                                 threshold=-1,
                             )
+                            llm_model_extra_time += extra_time
+                """
 
                 # Baseline 3) Static thresholds
                 if SYSTEM_TYPE in ["static", "all"]:
@@ -563,7 +642,7 @@ def main():
 
                         logging.info(f"Using static threshold: {threshold}")
 
-                        __run_baseline(
+                        extra_time = __run_baseline(
                             vectorq_policy=StaticGlobalThresholdPolicy(
                                 threshold=threshold
                             ),
@@ -575,6 +654,82 @@ def main():
                             delta=-1,
                             threshold=threshold,
                         )
+                        llm_model_extra_time += extra_time
+                        
+                # Baseline 4) Berkely Embedding
+                if SYSTEM_TYPE in ["berkeley_embedding", "all"]:
+                    for threshold in static_thresholds:
+                        if embedding_model[0] == "emb_gte":
+                            berkeley_embedding_model = EMBEDDING_MODEL_2_FT
+                        elif embedding_model[0] == "emb_e5_large_v2" or embedding_model[0] == "e5_large_v2":
+                            berkeley_embedding_model = EMBEDDING_MODEL_1_FT
+                        else:
+                            print(f"Skipping {embedding_model[0]} for berkeley embedding. Not supported.")
+                            continue
+                        
+                        path = os.path.join(
+                            results_dir,
+                            dataset,
+                            embedding_model[1],
+                            llm_model[1],
+                            f"berkeley_embedding_{threshold}",
+                        )
+                        if os.path.exists(path) and os.listdir(path):
+                            continue
+
+                        logging.info(f"Using static threshold for berkeley embedding: {threshold}")
+
+                        extra_time = __run_baseline(
+                            vectorq_policy=StaticGlobalThresholdPolicy(
+                                threshold=threshold
+                            ),
+                            path=path,
+                            dataset_file=dataset_file,
+                            embedding_model=berkeley_embedding_model,
+                            llm_model=llm_model,
+                            timestamp=timestamp,
+                            delta=-1,
+                            threshold=threshold,
+                        )
+                        llm_model_extra_time += extra_time
+                        
+                # Baseline 5) VectorQ with Berkely Embedding
+                if SYSTEM_TYPE in ["vcache_berkeley_embedding", "all"]:
+                    for delta in deltas:
+                        for i in range(0, CONFIDENCE_INTERVALS_ITERATIONS):
+                            if embedding_model[0] == "emb_gte":
+                                berkeley_embedding_model = EMBEDDING_MODEL_2_FT
+                            elif embedding_model[0] == "emb_e5_large_v2" or embedding_model[0] == "e5_large_v2":
+                                berkeley_embedding_model = EMBEDDING_MODEL_1_FT
+                            else:
+                                print(f"Skipping {embedding_model[0]} for berkeley embedding. Not supported.")
+                                continue
+                        
+                            path = os.path.join(
+                                results_dir,
+                                dataset,
+                                embedding_model[1],
+                                llm_model[1],
+                                f"vcache_berkeley_embedding_{delta}_run_{i + 1}",
+                            )
+                            if os.path.exists(path) and os.listdir(path):
+                                continue
+
+                            logging.info(
+                                f"Using dynamic threshold with berkeley embedding and delta: {delta}. Run {i + 1} of {CONFIDENCE_INTERVALS_ITERATIONS}"
+                            )
+
+                            extra_time = __run_baseline(
+                                vectorq_policy=DynamicLocalThresholdPolicy(delta=delta),
+                                path=path,
+                                dataset_file=dataset_file,
+                                embedding_model=berkeley_embedding_model,
+                                llm_model=llm_model,
+                                timestamp=timestamp,
+                                delta=delta,
+                                threshold=-1,
+                            )
+                            llm_model_extra_time += extra_time
 
                 if SYSTEM_TYPE == "all":
                     generate_combined_plots(
@@ -585,16 +740,17 @@ def main():
                         timestamp=timestamp,
                         font_size=PLOT_FONT_SIZE,
                     )
-
-                end_time_llm_model = time.time()
+                embedding_model_extra_time += llm_model_extra_time
+                end_time_llm_model = time.time() - llm_model_extra_time
                 logging.info(
                     f"LLM Model Time: {(end_time_llm_model - start_time_llm_model) / 60:.2f} minutes, {(end_time_llm_model - start_time_llm_model) / 3600:.4f} hours"
                 )
-            end_time_embedding_model = time.time()
+            total_extra_time += embedding_model_extra_time
+            end_time_embedding_model = time.time() - embedding_model_extra_time
             logging.info(
                 f"Embedding Model Time: {(end_time_embedding_model - start_time_embedding_model) / 60:.2f} minutes, {(end_time_embedding_model - start_time_embedding_model) / 3600:.4f} hours"
             )
-        end_time_dataset = time.time()
+        end_time_dataset = time.time() - total_extra_time
         logging.info(
             f"Dataset Time: {(end_time_dataset - start_time_dataset) / 60:.2f} minutes, {(end_time_dataset - start_time_dataset) / 3600:.4f} hours"
         )

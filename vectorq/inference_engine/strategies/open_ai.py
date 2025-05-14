@@ -8,8 +8,8 @@ from vectorq.inference_engine.inference_engine import InferenceEngine
 class OpenAIInferenceEngine(InferenceEngine):
     def __init__(
         self,
-        model_name: str = "gpt-4.1-nano",
-        temperature: float = 1,
+        model_name: str = "gpt-4.1-nano-2025-04-14",
+        temperature: float = 0,
         api_key: Optional[str] = None,
     ):
         super().__init__()

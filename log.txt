@@ -1,0 +1,15 @@
+Datasets directory: /data/acuadron/VectorQ/benchmarks/data/large_scale/
+Datasets to be processed: ['semantic_benchmark_shuffled']
+> /data/acuadron/VectorQ/benchmarks/benchmark.py(198)test_run_benchmark()
+-> label_set_id = data_entry["Set_Id"]
+(Pdb) --KeyboardInterrupt--
+(Pdb) --KeyboardInterrupt--
+(Pdb) --KeyboardInterrupt--
+(Pdb) --KeyboardInterrupt--
+(Pdb) --KeyboardInterrupt--
+(Pdb) --KeyboardInterrupt--
+(Pdb) --KeyboardInterrupt--
+(Pdb) --KeyboardInterrupt--
+(Pdb) --KeyboardInterrupt--
+(Pdb) --KeyboardInterrupt--
+(Pdb) 

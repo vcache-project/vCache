@@ -53,7 +53,7 @@ class DynamicGlobalThresholdPolicy(VectorQPolicy):
 
     @override
     def process_request(
-        self, prompt: str, system_prompt: Optional[str]
+        self, prompt: str, system_prompt: Optional[str], set_id: Optional[str]
     ) -> tuple[bool, str, str]:
         """
         Args
@@ -87,7 +87,7 @@ class DynamicGlobalThresholdPolicy(VectorQPolicy):
                     prompt=prompt, system_prompt=system_prompt
                 )
                 should_have_exploited = self.similarity_evaluator.answers_similar(
-                    a=response, b=metadata.response
+                    a=set_id, b=metadata.set_id
                 )
                 self.bayesian.update_metadata(
                     similarity_score=similarity_score,

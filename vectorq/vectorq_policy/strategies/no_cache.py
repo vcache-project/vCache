@@ -19,7 +19,7 @@ class NoCachePolicy(VectorQPolicy):
 
     @override
     def process_request(
-        self, prompt: str, system_prompt: Optional[str]
+        self, prompt: str, system_prompt: Optional[str], set_id: Optional[str]
     ) -> tuple[bool, str, str]:
         """
         Args

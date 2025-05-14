@@ -15,11 +15,11 @@ class VectorQPolicy(ABC):
 
     @abstractmethod
     def process_request(
-        self, prompt: str, system_prompt: Optional[str]
-    ) -> tuple[bool, str, str]:
+        self, prompt: str, system_prompt: Optional[str], set_id: Optional[str]
+    ) -> tuple[bool, str, str, str, str]:
         """
         prompt: str - The prompt to check for cache hit
         system_prompt: Optional[str] - The optional system prompt to use for the response. It will override the system prompt in the VectorQConfig if provided.
-        returns: tuple[bool, str, str] - [is_cache_hit, actual_response, nn_response]
+        returns: tuple[bool, str, str, str, str] - [is_cache_hit, actual_response, nn_response, cache_response_set_id, nn_response_set_id]
         """
         pass

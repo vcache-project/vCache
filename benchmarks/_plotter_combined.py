@@ -137,14 +137,19 @@ def generate_combined_plots(
         timestamp=timestamp,
         font_size=font_size,
     )
-    __plot_cache_hit_vs_error_rate_vs_sample_size(
-        static_data_frames=static_data_frames,
-        vectorq_local_data_frames=vectorq_local_data_frames,
-        vectorq_global_data_frames=vectorq_global_data_frames,
-        results_dir=results_dir,
-        timestamp=timestamp,
-        font_size=font_size,
-    )
+    
+    try:
+        __plot_cache_hit_vs_error_rate_vs_sample_size(
+            static_data_frames=static_data_frames,
+            vectorq_local_data_frames=vectorq_local_data_frames,
+            vectorq_global_data_frames=vectorq_global_data_frames,
+            results_dir=results_dir,
+            timestamp=timestamp,
+            font_size=font_size,
+        )
+    except Exception as e:
+        print(f"Error plotting cache hit vs error rate vs sample size: {e}")
+
     __plot_delta_accuracy(
         vectorq_local_data_frames=vectorq_local_data_frames,
         vectorq_global_data_frames=vectorq_global_data_frames,

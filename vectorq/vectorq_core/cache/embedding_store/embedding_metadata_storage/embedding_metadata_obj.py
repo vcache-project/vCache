@@ -13,11 +13,12 @@ class EmbeddingMetadataObj:
         posterior: np.ndarray = None,
         region_reject: List[str] = None,
         last_accessed: datetime = None,
+        set_id: str = None,
     ):
         self.embedding_id: int = embedding_id
         self.response: str = response
         self.last_accessed: datetime = last_accessed
-
+        self.set_id: str = set_id
         # VectorQ Bayesian Policy ########################
         self.observations: List[Tuple[float, int]] = []  # (similarity, label)
         self.observations.append((0.0, 0))
@@ -26,8 +27,6 @@ class EmbeddingMetadataObj:
         self.t_hat: float = None
         self.t_prime: float = None
         self.var_t: float = None
-        self.observations.append((0.0, 0))
-        self.observations.append((1.0, 1))
         self.gamma: float = None
         self.t_hat: float = None
         ##################################################
