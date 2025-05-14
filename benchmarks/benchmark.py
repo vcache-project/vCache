@@ -113,19 +113,19 @@ IS_LLM_JUDGE_BENCHMARK: bool = False
 DISABLE_PROGRESS_BAR: bool = True
 
 RUN_COMBINATIONS: List[Tuple[EmbeddingModel, LargeLanguageModel]] = [
-    #(EmbeddingModel.GTE, LargeLanguageModel.LLAMA_3_8B),
-    #(EmbeddingModel.GTE, LargeLanguageModel.LLAMA_3_70B),
-    #(EmbeddingModel.GTE, LargeLanguageModel.GPT_4O_MINI),
-    #(EmbeddingModel.E5_LARGE_V2, LargeLanguageModel.LLAMA_3_8B),
+    # (EmbeddingModel.GTE, LargeLanguageModel.LLAMA_3_8B),
+    # (EmbeddingModel.GTE, LargeLanguageModel.LLAMA_3_70B),
+    # (EmbeddingModel.GTE, LargeLanguageModel.GPT_4O_MINI),
+    # (EmbeddingModel.E5_LARGE_V2, LargeLanguageModel.LLAMA_3_8B),
     (EmbeddingModel.E5_LARGE_V2, LargeLanguageModel.GPT_4O_MINI),
 ]
 
 BASELINES_TO_RUN: List[Baseline] = [
     Baseline.IID,
-    #Baseline.GPTCache,
-    #Baseline.VCacheLocal,
-    #Baseline.BerkeleyEmbedding,
-    #Baseline.VCacheBerkeleyEmbedding,
+    # Baseline.GPTCache,
+    # Baseline.VCacheLocal,
+    # Baseline.BerkeleyEmbedding,
+    # Baseline.VCacheBerkeleyEmbedding,
 ]
 
 DATASETS_TO_RUN: List[str] = [Dataset.SEMANTIC_BENCHMARK_SEARCH_QUERIES]
