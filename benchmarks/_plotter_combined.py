@@ -2384,20 +2384,21 @@ def __plot_delta_accuracy(
 
         plt.xlabel("$\delta$ Values", fontsize=font_size)
         plt.xticks(rotation=45, ha="right")  # Rotate for better readability
-        plt.ylabel("Error Rate", fontsize=font_size)
+        plt.ylabel("Error Rate (%)", fontsize=font_size)
         plt.xticks(x_pos, delta_labels, fontsize=font_size)
         plt.yticks(fontsize=font_size - 2)
 
-        yticks = plt.yticks()[0]
-        # Ensure y-axis starts at 0, if 0 is not already the first tick.
-        # And if y_ticks has values, check the first one.
-        if len(yticks) > 0 and yticks[0] != 0.0:
-            if 0.0 not in yticks:
-                # Create new ticks that include 0 and maintain reasonable spacing
-                new_yticks = np.linspace(0, yticks[-1], len(yticks))
-                plt.yticks(new_yticks)
-        elif not len(yticks):
-            plt.yticks([0, 0.1, 0.2])  # Default if no ticks
+        plt.yticks()
+        # yticks = plt.yticks()[0]
+        # # Ensure y-axis starts at 0, if 0 is not already the first tick.
+        # # And if y_ticks has values, check the first one.
+        # if len(yticks) > 0 and yticks[0] != 0.0:
+        #     if 0.0 not in yticks:
+        #         # Create new ticks that include 0 and maintain reasonable spacing
+        #         new_yticks = np.linspace(0, yticks[-1], len(yticks))
+        #         plt.yticks(new_yticks)
+        # elif not len(yticks):
+        #     plt.yticks([0, 0.1, 0.2])  # Default if no ticks
 
         def format_tick(x, pos):
             if x < 1e-9 and x > -1e-9:  # handles almost zero
