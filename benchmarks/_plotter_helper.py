@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Tuple
 
 import numpy as np
 import pandas as pd
@@ -31,7 +31,7 @@ def convert_to_dataframe_from_benchmark(benchmark: "Benchmark") -> tuple:
     return df, metadata
 
 
-def convert_to_dataframe_from_json_file(json_data: Any, keep_split: int = 100) -> tuple:
+def convert_to_dataframe_from_json_file(json_data: Any, keep_split: int = 100) -> Tuple[pd.DataFrame, dict, int]:
     """
     Convert the json data to a dataframe.
     Args:
@@ -42,7 +42,9 @@ def convert_to_dataframe_from_json_file(json_data: Any, keep_split: int = 100) -
     Returns:
         df: pd.DataFrame - The dataframe.
         metadata: dict - The metadata.
+        chopped_index: int - The index of the data that was chopped.
     """
+    
     cache_hit_list = json_data["cache_hit_list"]
     cache_miss_list = json_data["cache_miss_list"]
     tp_list = json_data["tp_list"]
@@ -52,16 +54,17 @@ def convert_to_dataframe_from_json_file(json_data: Any, keep_split: int = 100) -
     latency_direct_list = json_data["latency_direct_list"]
     latency_vectorq_list = json_data["latency_vectorq_list"]
     
+    chopped_index = 0
     if keep_split > 0 and keep_split < 100:
-        split_index = int(len(cache_hit_list) * keep_split / 100)
-        cache_hit_list = cache_hit_list[-split_index:]
-        cache_miss_list = cache_miss_list[-split_index:]
-        tp_list = tp_list[-split_index:]
-        fp_list = fp_list[-split_index:]
-        tn_list = tn_list[-split_index:]
-        fn_list = fn_list[-split_index:]
-        latency_direct_list = latency_direct_list[-split_index:]
-        latency_vectorq_list = latency_vectorq_list[-split_index:]
+        chopped_index = int(len(cache_hit_list) * (100 - keep_split) / 100)
+        cache_hit_list = cache_hit_list[chopped_index:]
+        cache_miss_list = cache_miss_list[chopped_index:]
+        tp_list = tp_list[chopped_index:]
+        fp_list = fp_list[chopped_index:]
+        tn_list = tn_list[chopped_index:]
+        fn_list = fn_list[chopped_index:]
+        latency_direct_list = latency_direct_list[chopped_index:]
+        latency_vectorq_list = latency_vectorq_list[chopped_index:]
     
     data = {
         "cache_hit_list": cache_hit_list,
@@ -80,7 +83,7 @@ def convert_to_dataframe_from_json_file(json_data: Any, keep_split: int = 100) -
         "gammas_dict": json_data["gammas_dict"],
     }
 
-    return df, metadata
+    return df, metadata, chopped_index
 
 
 ###################################################################################

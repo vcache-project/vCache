@@ -212,7 +212,7 @@ def __aggregate_stats_for_roc(run_dirs: List[str], keep_split: int, z: float = 1
                 try:
                     with open(file_path, "r", encoding="utf-8") as f:
                         data = json.load(f)
-                    df, _ = convert_to_dataframe_from_json_file(
+                    df, _, _ = convert_to_dataframe_from_json_file(
                         json_data=data, keep_split=keep_split
                     )
                     run_total_tp += np.sum(df["tp_list"])
@@ -271,7 +271,7 @@ def __aggregate_stats_for_latency_error(run_dirs: List[str], z: float = 1.96):
                 try:
                     with open(file_path, "r", encoding="utf-8") as f:
                         data = json.load(f)
-                    df, _ = convert_to_dataframe_from_json_file(data)
+                    df, _, _= convert_to_dataframe_from_json_file(data)
 
                     run_total_fp += np.sum(df["fp_list"])
                     run_num_samples_for_fp += len(df["fp_list"])
@@ -332,7 +332,7 @@ def __aggregate_stats_for_cache_hit_error_rate(run_dirs: List[str], z: float = 1
                 try:
                     with open(file_path, "r", encoding="utf-8") as f:
                         data = json.load(f)
-                    df, _ = convert_to_dataframe_from_json_file(data)
+                    df, _, _ = convert_to_dataframe_from_json_file(data)
 
                     run_total_samples_ch += len(
                         df["cache_hit_list"]
@@ -478,27 +478,39 @@ def generate_combined_plots(
         )
         return
 
+    chopped_index = None
+
     ############################################################
     ### Baseline: GPTCache
     gptcache_data_frames: Dict[float, pd.DataFrame] = {}
     for gptcache_file_path in gptcache_files:
-        with open(gptcache_file_path, "r") as f:
-            data: Any = json.load(f)
-            dataframe, _ = convert_to_dataframe_from_json_file(
-                json_data=data, keep_split=keep_split
-            )
-            threshold: float = data["config"]["threshold"]
-            gptcache_data_frames[threshold] = dataframe
+        try:
+            with open(gptcache_file_path, "r") as f:
+                data: Any = json.load(f)
+                dataframe, _, chopped_index = convert_to_dataframe_from_json_file(
+                    json_data=data, keep_split=keep_split
+                )
+                threshold: float = data["config"]["threshold"]
+                gptcache_data_frames[threshold] = dataframe
+                chopped_index = chopped_index
+        except Exception as e:
+            print(f"Error loading {gptcache_file_path}: {e}")
+            continue
 
     ############################################################
     ### Baseline: vCache Local
     vcache_local_data_frames: Dict[float, pd.DataFrame] = {}
     for vcache_local_file_path in vcache_local_files:
-        with open(vcache_local_file_path, "r") as f:
-            data: Any = json.load(f)
-            dataframe, _ = convert_to_dataframe_from_json_file(json_data=data, keep_split=keep_split)
-            delta: float = data["config"]["delta"]
-            vcache_local_data_frames[delta] = dataframe
+        try:
+            with open(vcache_local_file_path, "r") as f:
+                data: Any = json.load(f)
+                dataframe, _, chopped_index = convert_to_dataframe_from_json_file(json_data=data, keep_split=keep_split)
+                delta: float = data["config"]["delta"]
+                vcache_local_data_frames[delta] = dataframe
+                chopped_index = chopped_index
+        except Exception as e:
+            print(f"Error loading {vcache_local_file_path}: {e}")
+            continue
 
     ############################################################
     ### Baseline: vCache Global
@@ -507,9 +519,10 @@ def generate_combined_plots(
         with open(vcache_global_file_path, "r") as f:
             try:
                 data: Any = json.load(f)
-                dataframe, _ = convert_to_dataframe_from_json_file(json_data=data, keep_split=keep_split)
+                dataframe, _, chopped_index = convert_to_dataframe_from_json_file(json_data=data, keep_split=keep_split)
                 delta: float = data["config"]["delta"]
                 vcache_global_data_frames[delta] = dataframe
+                chopped_index = chopped_index
             except Exception as e:
                 print(f"Error loading {vcache_global_file_path}: {e}")
                 continue
@@ -521,9 +534,10 @@ def generate_combined_plots(
         with open(berkeley_embedding_file_path, "r") as f:
             try:
                 data: Any = json.load(f)
-                dataframe, _ = convert_to_dataframe_from_json_file(json_data=data, keep_split=keep_split)
+                dataframe, _, chopped_index = convert_to_dataframe_from_json_file(json_data=data, keep_split=keep_split)
                 threshold: float = data["config"]["threshold"]
                 berkeley_embedding_data_frames[threshold] = dataframe
+                chopped_index = chopped_index
             except Exception as e:
                 print(f"Error loading {berkeley_embedding_file_path}: {e}")
                 continue
@@ -535,12 +549,17 @@ def generate_combined_plots(
         with open(vcache_berkeley_embedding_file_path, "r") as f:
             try:
                 data: Any = json.load(f)
-                dataframe, _ = convert_to_dataframe_from_json_file(json_data=data, keep_split=keep_split)
+                dataframe, _, chopped_index = convert_to_dataframe_from_json_file(json_data=data, keep_split=keep_split)
                 delta: float = data["config"]["delta"]
                 vcache_berkeley_embedding_data_frames[delta] = dataframe
+                chopped_index = chopped_index
             except Exception as e:
                 print(f"Error loading {vcache_berkeley_embedding_file_path}: {e}")
                 continue
+
+    if chopped_index is None:
+        print(f"No data found for {dataset}, {embedding_model_name}, {llm_model_name} in {results_dir}")
+        return
 
     __plot_legend(
         gptcache_data_frames=gptcache_data_frames,
@@ -564,6 +583,7 @@ def generate_combined_plots(
             timestamp=timestamp,
             font_size=font_size,
             keep_split=keep_split,
+            chopped_index=chopped_index,
         )
     except Exception as e:
         print(f"Error plotting ROC: {e}")
@@ -578,6 +598,7 @@ def generate_combined_plots(
             results_dir=results_dir,
             timestamp=timestamp,
             font_size=font_size,
+            chopped_index=chopped_index,
         )
     except Exception as e:
         print(f"Error plotting precision vs recall: {e}")
@@ -592,6 +613,7 @@ def generate_combined_plots(
             results_dir=results_dir,
             timestamp=timestamp,
             font_size=font_size,
+            chopped_index=chopped_index,
         )
     except Exception as e:
         print(f"Error plotting avg latency vs error rate: {e}")
@@ -606,6 +628,7 @@ def generate_combined_plots(
             results_dir=results_dir,
             timestamp=timestamp,
             font_size=font_size,
+            chopped_index=chopped_index,
         )
     except Exception as e:
         print(f"Error plotting cache hit vs error rate: {e}")
@@ -621,6 +644,7 @@ def generate_combined_plots(
             timestamp=timestamp,
             font_size=font_size,
             keep_split=keep_split,
+            chopped_index=chopped_index,
         )
     except Exception as e:
         print(f"Error plotting cache hit vs error rate vs sample size: {e}")
@@ -633,6 +657,7 @@ def generate_combined_plots(
             results_dir=results_dir,
             timestamp=timestamp,
             font_size=font_size,
+            chopped_index=chopped_index,
         )
     except Exception as e:
         print(f"Error plotting delta accuracy: {e}")
@@ -758,6 +783,7 @@ def __plot_roc(
     timestamp: str,
     font_size: int,
     keep_split: int,
+    chopped_index: int
 ):
     plt.figure(figsize=(12, 10))
 
@@ -994,6 +1020,7 @@ def __plot_precision_vs_recall(
     results_dir: str,
     timestamp: str,
     font_size: int,
+    chopped_index: int
 ):
     plt.figure(figsize=(12, 8))
 
@@ -1211,6 +1238,7 @@ def __plot_avg_latency_vs_error_rate(
     results_dir: str,
     timestamp: str,
     font_size: int,
+    chopped_index: int
 ):
     plt.figure(figsize=(12, 10))
     ERROR_RATE_UPPER_BOUND = 6  # 6%
@@ -1473,6 +1501,7 @@ def __plot_cache_hit_vs_error_rate(
     results_dir: str,
     timestamp: str,
     font_size: int,
+    chopped_index: int
 ):
     plt.figure(figsize=(12, 10))
     ERROR_RATE_UPPER_BOUND = 6  # 6%
@@ -1705,6 +1734,7 @@ def __plot_cache_hit_vs_error_rate_vs_sample_size(
     timestamp: str,
     font_size: int,
     keep_split: int,
+    chopped_index: int
 ):
     target_deltas = [0.015, 0.03]
     target_error_rates = [2, 3.5]
@@ -1742,7 +1772,7 @@ def __plot_cache_hit_vs_error_rate_vs_sample_size(
                     try:
                         with open(file_path, "r", encoding="utf-8") as f:
                             data = json.load(f)
-                        df, _ = convert_to_dataframe_from_json_file(json_data=data, keep_split=keep_split)
+                        df, _, _ = convert_to_dataframe_from_json_file(json_data=data, keep_split=keep_split)
                         run_fps.extend(df["fp_list"])
                         run_cache_hits.extend(df["cache_hit_list"])
                     except Exception:
@@ -2077,7 +2107,9 @@ def __plot_cache_hit_vs_error_rate_vs_sample_size(
                     0
                 ] * vcache_berkeley_embedding_samples
 
-        sample_sizes = np.arange(1, len(vcache_local_error_rates) + 1)
+        # Adjust sample sizes to account for chopped_index
+        # This shifts the x-axis to start from the actual sample index after chopping
+        sample_sizes = np.arange(chopped_index + 1, chopped_index + len(vcache_local_error_rates) + 1)
 
         # Plot 1: Error rates vs sample size
         plt.figure(figsize=(12, 11))
@@ -2324,6 +2356,7 @@ def __plot_delta_accuracy(
     results_dir: str,
     timestamp: str,
     font_size: int,
+    chopped_index: int
 ):
     plt.figure(figsize=(12, 8))
 
