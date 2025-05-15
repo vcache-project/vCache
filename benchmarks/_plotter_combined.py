@@ -192,7 +192,7 @@ def __draw_confidence_series(
 
 
 # Aggregation functions for different metrics
-def __aggregate_stats_for_roc(run_dirs: List[str], z: float = 1.96):
+def __aggregate_stats_for_roc(run_dirs: List[str], keep_split: int, z: float = 1.96):
     per_run_tpr_values = []
     per_run_fpr_values = []
 
@@ -212,7 +212,9 @@ def __aggregate_stats_for_roc(run_dirs: List[str], z: float = 1.96):
                 try:
                     with open(file_path, "r", encoding="utf-8") as f:
                         data = json.load(f)
-                    df, _ = convert_to_dataframe_from_json_file(data)
+                    df, _, _ = convert_to_dataframe_from_json_file(
+                        json_data=data, keep_split=keep_split
+                    )
                     run_total_tp += np.sum(df["tp_list"])
                     run_total_fn += np.sum(df["fn_list"])
                     run_total_fp += np.sum(df["fp_list"])
@@ -269,7 +271,7 @@ def __aggregate_stats_for_latency_error(run_dirs: List[str], z: float = 1.96):
                 try:
                     with open(file_path, "r", encoding="utf-8") as f:
                         data = json.load(f)
-                    df, _ = convert_to_dataframe_from_json_file(data)
+                    df, _, _ = convert_to_dataframe_from_json_file(data)
 
                     run_total_fp += np.sum(df["fp_list"])
                     run_num_samples_for_fp += len(df["fp_list"])
@@ -330,7 +332,7 @@ def __aggregate_stats_for_cache_hit_error_rate(run_dirs: List[str], z: float = 1
                 try:
                     with open(file_path, "r", encoding="utf-8") as f:
                         data = json.load(f)
-                    df, _ = convert_to_dataframe_from_json_file(data)
+                    df, _, _ = convert_to_dataframe_from_json_file(data)
 
                     run_total_samples_ch += len(
                         df["cache_hit_list"]
@@ -449,6 +451,7 @@ def generate_combined_plots(
     results_dir: str,
     timestamp: str,
     font_size: int,
+    keep_split: int = 100,
 ):
     results_dir: str = (
         f"{results_dir}/{dataset}/{embedding_model_name}/{llm_model_name}/"
@@ -475,25 +478,41 @@ def generate_combined_plots(
         )
         return
 
+    chopped_index = None
+
     ############################################################
     ### Baseline: GPTCache
     gptcache_data_frames: Dict[float, pd.DataFrame] = {}
     for gptcache_file_path in gptcache_files:
-        with open(gptcache_file_path, "r") as f:
-            data: Any = json.load(f)
-            dataframe, _ = convert_to_dataframe_from_json_file(data)
-            threshold: float = data["config"]["threshold"]
-            gptcache_data_frames[threshold] = dataframe
+        try:
+            with open(gptcache_file_path, "r") as f:
+                data: Any = json.load(f)
+                dataframe, _, chopped_index = convert_to_dataframe_from_json_file(
+                    json_data=data, keep_split=keep_split
+                )
+                threshold: float = data["config"]["threshold"]
+                gptcache_data_frames[threshold] = dataframe
+                chopped_index = chopped_index
+        except Exception as e:
+            print(f"Error loading {gptcache_file_path}: {e}")
+            continue
 
     ############################################################
     ### Baseline: vCache Local
     vcache_local_data_frames: Dict[float, pd.DataFrame] = {}
     for vcache_local_file_path in vcache_local_files:
-        with open(vcache_local_file_path, "r") as f:
-            data: Any = json.load(f)
-            dataframe, _ = convert_to_dataframe_from_json_file(data)
-            delta: float = data["config"]["delta"]
-            vcache_local_data_frames[delta] = dataframe
+        try:
+            with open(vcache_local_file_path, "r") as f:
+                data: Any = json.load(f)
+                dataframe, _, chopped_index = convert_to_dataframe_from_json_file(
+                    json_data=data, keep_split=keep_split
+                )
+                delta: float = data["config"]["delta"]
+                vcache_local_data_frames[delta] = dataframe
+                chopped_index = chopped_index
+        except Exception as e:
+            print(f"Error loading {vcache_local_file_path}: {e}")
+            continue
 
     ############################################################
     ### Baseline: vCache Global
@@ -502,9 +521,12 @@ def generate_combined_plots(
         with open(vcache_global_file_path, "r") as f:
             try:
                 data: Any = json.load(f)
-                dataframe, _ = convert_to_dataframe_from_json_file(data)
+                dataframe, _, chopped_index = convert_to_dataframe_from_json_file(
+                    json_data=data, keep_split=keep_split
+                )
                 delta: float = data["config"]["delta"]
                 vcache_global_data_frames[delta] = dataframe
+                chopped_index = chopped_index
             except Exception as e:
                 print(f"Error loading {vcache_global_file_path}: {e}")
                 continue
@@ -516,9 +538,12 @@ def generate_combined_plots(
         with open(berkeley_embedding_file_path, "r") as f:
             try:
                 data: Any = json.load(f)
-                dataframe, _ = convert_to_dataframe_from_json_file(data)
+                dataframe, _, chopped_index = convert_to_dataframe_from_json_file(
+                    json_data=data, keep_split=keep_split
+                )
                 threshold: float = data["config"]["threshold"]
                 berkeley_embedding_data_frames[threshold] = dataframe
+                chopped_index = chopped_index
             except Exception as e:
                 print(f"Error loading {berkeley_embedding_file_path}: {e}")
                 continue
@@ -530,12 +555,21 @@ def generate_combined_plots(
         with open(vcache_berkeley_embedding_file_path, "r") as f:
             try:
                 data: Any = json.load(f)
-                dataframe, _ = convert_to_dataframe_from_json_file(data)
+                dataframe, _, chopped_index = convert_to_dataframe_from_json_file(
+                    json_data=data, keep_split=keep_split
+                )
                 delta: float = data["config"]["delta"]
                 vcache_berkeley_embedding_data_frames[delta] = dataframe
+                chopped_index = chopped_index
             except Exception as e:
                 print(f"Error loading {vcache_berkeley_embedding_file_path}: {e}")
                 continue
+
+    if chopped_index is None:
+        print(
+            f"No data found for {dataset}, {embedding_model_name}, {llm_model_name} in {results_dir}"
+        )
+        return
 
     __plot_legend(
         gptcache_data_frames=gptcache_data_frames,
@@ -558,6 +592,8 @@ def generate_combined_plots(
             results_dir=results_dir,
             timestamp=timestamp,
             font_size=font_size,
+            keep_split=keep_split,
+            chopped_index=chopped_index,
         )
     except Exception as e:
         print(f"Error plotting ROC: {e}")
@@ -572,6 +608,7 @@ def generate_combined_plots(
             results_dir=results_dir,
             timestamp=timestamp,
             font_size=font_size,
+            chopped_index=chopped_index,
         )
     except Exception as e:
         print(f"Error plotting precision vs recall: {e}")
@@ -586,6 +623,7 @@ def generate_combined_plots(
             results_dir=results_dir,
             timestamp=timestamp,
             font_size=font_size,
+            chopped_index=chopped_index,
         )
     except Exception as e:
         print(f"Error plotting avg latency vs error rate: {e}")
@@ -600,23 +638,26 @@ def generate_combined_plots(
             results_dir=results_dir,
             timestamp=timestamp,
             font_size=font_size,
+            chopped_index=chopped_index,
         )
     except Exception as e:
         print(f"Error plotting cache hit vs error rate: {e}")
 
-    # try:
-    __plot_cache_hit_vs_error_rate_vs_sample_size(
-        gptcache_data_frames=gptcache_data_frames,
-        vcache_local_data_frames=vcache_local_data_frames,
-        vcache_global_data_frames=vcache_global_data_frames,
-        berkeley_embedding_data_frames=berkeley_embedding_data_frames,
-        vcache_berkeley_embedding_data_frames=vcache_berkeley_embedding_data_frames,
-        results_dir=results_dir,
-        timestamp=timestamp,
-        font_size=font_size,
-    )
-    # except Exception as e:
-    #     print(f"Error plotting cache hit vs error rate vs sample size: {e}")
+    try:
+        __plot_cache_hit_vs_error_rate_vs_sample_size(
+            gptcache_data_frames=gptcache_data_frames,
+            vcache_local_data_frames=vcache_local_data_frames,
+            vcache_global_data_frames=vcache_global_data_frames,
+            berkeley_embedding_data_frames=berkeley_embedding_data_frames,
+            vcache_berkeley_embedding_data_frames=vcache_berkeley_embedding_data_frames,
+            results_dir=results_dir,
+            timestamp=timestamp,
+            font_size=font_size,
+            keep_split=keep_split,
+            chopped_index=chopped_index,
+        )
+    except Exception as e:
+        print(f"Error plotting cache hit vs error rate vs sample size: {e}")
 
     try:
         __plot_delta_accuracy(
@@ -626,6 +667,7 @@ def generate_combined_plots(
             results_dir=results_dir,
             timestamp=timestamp,
             font_size=font_size,
+            chopped_index=chopped_index,
         )
     except Exception as e:
         print(f"Error plotting delta accuracy: {e}")
@@ -750,6 +792,8 @@ def __plot_roc(
     results_dir: str,
     timestamp: str,
     font_size: int,
+    keep_split: int,
+    chopped_index: int,
 ):
     plt.figure(figsize=(12, 10))
 
@@ -785,7 +829,7 @@ def __plot_roc(
     )
 
     # Helper to prepare data for a series
-    def prepare_roc_series_data(data_frames, run_dirs_map_for_series):
+    def prepare_roc_series_data(data_frames, run_dirs_map_for_series, keep_split: int):
         thresholds_or_deltas = sorted(data_frames.keys())
         tpr_means, fpr_means = [], []
         tpr_low_err, tpr_up_err = [], []
@@ -801,7 +845,7 @@ def __plot_roc(
 
             if len(current_run_dirs) > 1:  # Multi-run
                 tpr_m, tpr_l, tpr_u, fpr_m, fpr_l, fpr_u = __aggregate_stats_for_roc(
-                    current_run_dirs
+                    run_dirs=current_run_dirs, keep_split=keep_split
                 )
                 tpr_means.append(tpr_m)
                 fpr_means.append(fpr_m)
@@ -846,7 +890,11 @@ def __plot_roc(
     ### Baseline: GPTCache
     if gptcache_data_frames:
         gpt_fpr, gpt_tpr, gpt_fpr_le, gpt_fpr_ue, gpt_tpr_le, gpt_tpr_ue, gpt_multi = (
-            prepare_roc_series_data(gptcache_data_frames, gptcache_run_dirs_map)
+            prepare_roc_series_data(
+                data_frames=gptcache_data_frames,
+                run_dirs_map_for_series=gptcache_run_dirs_map,
+                keep_split=keep_split,
+            )
         )
         __draw_confidence_series(
             gpt_fpr,
@@ -865,7 +913,11 @@ def __plot_roc(
     ### Baseline: vCache Local
     if vcache_local_data_frames:
         vl_fpr, vl_tpr, vl_fpr_le, vl_fpr_ue, vl_tpr_le, vl_tpr_ue, vl_multi = (
-            prepare_roc_series_data(vcache_local_data_frames, vcache_local_run_dirs_map)
+            prepare_roc_series_data(
+                data_frames=vcache_local_data_frames,
+                run_dirs_map_for_series=vcache_local_run_dirs_map,
+                keep_split=keep_split,
+            )
         )
         __draw_confidence_series(
             vl_fpr,
@@ -885,7 +937,9 @@ def __plot_roc(
     if vcache_global_data_frames:
         vg_fpr, vg_tpr, vg_fpr_le, vg_fpr_ue, vg_tpr_le, vg_tpr_ue, vg_multi = (
             prepare_roc_series_data(
-                vcache_global_data_frames, vcache_global_run_dirs_map
+                data_frames=vcache_global_data_frames,
+                run_dirs_map_for_series=vcache_global_run_dirs_map,
+                keep_split=keep_split,
             )
         )
         __draw_confidence_series(
@@ -906,7 +960,9 @@ def __plot_roc(
     if berkeley_embedding_data_frames:
         be_fpr, be_tpr, be_fpr_le, be_fpr_ue, be_tpr_le, be_tpr_ue, be_multi = (
             prepare_roc_series_data(
-                berkeley_embedding_data_frames, berkeley_embedding_run_dirs_map
+                data_frames=berkeley_embedding_data_frames,
+                run_dirs_map_for_series=berkeley_embedding_run_dirs_map,
+                keep_split=keep_split,
             )
         )
         __draw_confidence_series(
@@ -927,8 +983,9 @@ def __plot_roc(
     if vcache_berkeley_embedding_data_frames:
         vb_fpr, vb_tpr, vb_fpr_le, vb_fpr_ue, vb_tpr_le, vb_tpr_ue, vb_multi = (
             prepare_roc_series_data(
-                vcache_berkeley_embedding_data_frames,
-                vcache_berkeley_embedding_run_dirs_map,
+                data_frames=vcache_berkeley_embedding_data_frames,
+                run_dirs_map_for_series=vcache_berkeley_embedding_run_dirs_map,
+                keep_split=keep_split,
             )
         )
         __draw_confidence_series(
@@ -959,7 +1016,7 @@ def __plot_roc(
     plt.gca().spines["bottom"].set_linewidth(1)
     plt.gca().spines["left"].set_linewidth(1)
 
-    filename = results_dir + "/roc.pdf"
+    filename = results_dir + f"/roc_{chopped_index}.pdf"
     plt.savefig(filename, format="pdf", bbox_inches="tight", transparent=True)
     plt.close()
 
@@ -973,6 +1030,7 @@ def __plot_precision_vs_recall(
     results_dir: str,
     timestamp: str,
     font_size: int,
+    chopped_index: int,
 ):
     plt.figure(figsize=(12, 8))
 
@@ -1176,7 +1234,7 @@ def __plot_precision_vs_recall(
     plt.gca().spines["bottom"].set_linewidth(1)
     plt.gca().spines["left"].set_linewidth(1)
 
-    filename = results_dir + "/precision_vs_recall.pdf"
+    filename = results_dir + f"/precision_vs_recall_{chopped_index}.pdf"
     plt.savefig(filename, format="pdf", bbox_inches="tight", transparent=True)
     plt.close()
 
@@ -1190,6 +1248,7 @@ def __plot_avg_latency_vs_error_rate(
     results_dir: str,
     timestamp: str,
     font_size: int,
+    chopped_index: int,
 ):
     plt.figure(figsize=(12, 10))
     ERROR_RATE_UPPER_BOUND = 6  # 6%
@@ -1438,7 +1497,7 @@ def __plot_avg_latency_vs_error_rate(
     plt.gca().spines["bottom"].set_linewidth(1)
     plt.gca().spines["left"].set_linewidth(1)
 
-    filename = results_dir + "/avg_latency_vs_error_rate.pdf"
+    filename = results_dir + f"/avg_latency_vs_error_rate_{chopped_index}.pdf"
     plt.savefig(filename, format="pdf", bbox_inches="tight", transparent=True)
     plt.close()
 
@@ -1452,9 +1511,10 @@ def __plot_cache_hit_vs_error_rate(
     results_dir: str,
     timestamp: str,
     font_size: int,
+    chopped_index: int,
 ):
     plt.figure(figsize=(12, 10))
-    ERROR_RATE_UPPER_BOUND = 6  # 6%
+    ERROR_RATE_UPPER_BOUND = 8  # 6%
 
     # Collect run directories for each type
     gptcache_run_dirs_map = __collect_run_dirs_by_prefix_and_key(
@@ -1669,7 +1729,7 @@ def __plot_cache_hit_vs_error_rate(
     for spine in ["top", "right", "bottom", "left"]:
         plt.gca().spines[spine].set_linewidth(1)
 
-    filename = results_dir + "/cache_hit_vs_error_rate.pdf"
+    filename = results_dir + f"/cache_hit_vs_error_rate_{chopped_index}.pdf"
     plt.savefig(filename, format="pdf", bbox_inches="tight", transparent=True)
     plt.close()
 
@@ -1683,9 +1743,11 @@ def __plot_cache_hit_vs_error_rate_vs_sample_size(
     results_dir: str,
     timestamp: str,
     font_size: int,
+    keep_split: int,
+    chopped_index: int,
 ):
-    target_deltas = [0.015, 0.03]
-    target_error_rates = [2, 3.5]
+    target_deltas = [0.015, 0.02, 0.02, 0.03, 0.03, 0.03]
+    target_error_rates = [2, 2, 2.5, 2.5, 3, 3.5]
 
     # Collect all run directories once
     gptcache_run_dirs_map = __collect_run_dirs_by_prefix_and_key(
@@ -1720,7 +1782,9 @@ def __plot_cache_hit_vs_error_rate_vs_sample_size(
                     try:
                         with open(file_path, "r", encoding="utf-8") as f:
                             data = json.load(f)
-                        df, _ = convert_to_dataframe_from_json_file(data)
+                        df, _, _ = convert_to_dataframe_from_json_file(
+                            json_data=data, keep_split=keep_split
+                        )
                         run_fps.extend(df["fp_list"])
                         run_cache_hits.extend(df["cache_hit_list"])
                     except Exception:
@@ -2055,7 +2119,11 @@ def __plot_cache_hit_vs_error_rate_vs_sample_size(
                     0
                 ] * vcache_berkeley_embedding_samples
 
-        sample_sizes = np.arange(1, len(vcache_local_error_rates) + 1)
+        # Adjust sample sizes to account for chopped_index
+        # This shifts the x-axis to start from the actual sample index after chopping
+        sample_sizes = np.arange(
+            chopped_index + 1, chopped_index + len(vcache_local_error_rates) + 1
+        )
 
         # Plot 1: Error rates vs sample size
         plt.figure(figsize=(12, 11))
@@ -2078,7 +2146,8 @@ def __plot_cache_hit_vs_error_rate_vs_sample_size(
             "-",
             color="#37A9EC",
             linewidth=2,
-            label="vCache",
+            label=f"vCache (δ={target_delta})",
+            markersize=1,
         )
         add_confidence_band(
             sample_sizes[::45],
@@ -2096,7 +2165,8 @@ def __plot_cache_hit_vs_error_rate_vs_sample_size(
                 "-",
                 color="#8CBE94",
                 linewidth=2,
-                label="vCache (Ablation)",
+                label=f"vCache (Ablation) (δ={target_delta})",
+                markersize=1,
             )
             add_confidence_band(
                 sample_sizes[::45],
@@ -2114,7 +2184,8 @@ def __plot_cache_hit_vs_error_rate_vs_sample_size(
                 "-",
                 color="#C23B48",
                 linewidth=2,
-                label="GPTCache",
+                label=f"GPTCache (t={gptcache_closest_threshold})",
+                markersize=1,
             )
             add_confidence_band(
                 sample_sizes[::45],
@@ -2132,7 +2203,8 @@ def __plot_cache_hit_vs_error_rate_vs_sample_size(
                 "-",
                 color="#3B686A",
                 linewidth=2,
-                label="Fine-tuned Embedding",
+                label=f"FT Emb (t={berkeley_embedding_closest_threshold})",
+                markersize=1,
             )
             add_confidence_band(
                 sample_sizes[::45],
@@ -2153,7 +2225,8 @@ def __plot_cache_hit_vs_error_rate_vs_sample_size(
                 "-",
                 color="#EDBE24",
                 linewidth=2,
-                label="vCache + Fine-tuned Embedding",
+                label=f"vCache+FT (δ={target_delta})",
+                markersize=1,
             )
             add_confidence_band(
                 sample_sizes[::45],
@@ -2165,11 +2238,12 @@ def __plot_cache_hit_vs_error_rate_vs_sample_size(
 
         plt.xlabel("Sample Size", fontsize=font_size)
         plt.ylabel("Error Rate (%)", fontsize=font_size)
-
         plt.tick_params(axis="both", labelsize=font_size - 2)
+        plt.legend(fontsize=font_size - 10, handlelength=0.5)
 
         error_rate_filename = (
-            results_dir + f"/error_rate_vs_sample_size_delta_{target_delta:.3f}.pdf"
+            results_dir
+            + f"/error_rate_vs_sample_size_delta_{target_delta:.3f}_{chopped_index}.pdf"
         )
         plt.savefig(
             error_rate_filename, format="pdf", bbox_inches="tight", transparent=True
@@ -2186,7 +2260,8 @@ def __plot_cache_hit_vs_error_rate_vs_sample_size(
             "-",
             color="#37A9EC",
             linewidth=2,
-            label="vCache Local",
+            label=f"vCache (δ={target_delta})",
+            markersize=1,
         )
         add_confidence_band(
             sample_sizes[::5],
@@ -2204,7 +2279,8 @@ def __plot_cache_hit_vs_error_rate_vs_sample_size(
                 "-",
                 color="#8CBE94",
                 linewidth=2,
-                label="vCache Global",
+                label=f"vCache (Ablation) (δ={target_delta})",
+                markersize=1,
             )
             add_confidence_band(
                 sample_sizes[::5],
@@ -2222,7 +2298,8 @@ def __plot_cache_hit_vs_error_rate_vs_sample_size(
                 "-",
                 color="#C23B48",
                 linewidth=2,
-                label="GPTCache",
+                label=f"GPTCache (t={gptcache_closest_threshold})",
+                markersize=1,
             )
             add_confidence_band(
                 sample_sizes[::5],
@@ -2240,7 +2317,8 @@ def __plot_cache_hit_vs_error_rate_vs_sample_size(
                 "-",
                 color="#3B686A",
                 linewidth=2,
-                label="Fine-tuned Embedding",
+                label=f"FT Embedding (t={berkeley_embedding_closest_threshold})",
+                markersize=1,
             )
             add_confidence_band(
                 sample_sizes[::5],
@@ -2261,7 +2339,8 @@ def __plot_cache_hit_vs_error_rate_vs_sample_size(
                 "-",
                 color="#EDBE24",
                 linewidth=2,
-                label="vCache + Fine-tuned Embedding",
+                label=f"vCache + FT Embedding (δ={target_delta})",
+                markersize=1,
             )
             add_confidence_band(
                 sample_sizes[::5],
@@ -2274,9 +2353,11 @@ def __plot_cache_hit_vs_error_rate_vs_sample_size(
         plt.xlabel("Sample Size", fontsize=font_size)
         plt.ylabel("Cache Hit Rate (%)", fontsize=font_size)
         plt.tick_params(axis="both", labelsize=font_size - 2)
+        plt.legend(fontsize=font_size - 10, handlelength=0.5)
 
         cache_hit_filename = (
-            results_dir + f"/cache_hit_rate_vs_sample_size_delta_{target_delta:.3f}.pdf"
+            results_dir
+            + f"/cache_hit_rate_vs_sample_size_delta_{target_delta:.3f}_{chopped_index}.pdf"
         )
         plt.savefig(
             cache_hit_filename, format="pdf", bbox_inches="tight", transparent=True
@@ -2291,6 +2372,7 @@ def __plot_delta_accuracy(
     results_dir: str,
     timestamp: str,
     font_size: int,
+    chopped_index: int,
 ):
     plt.figure(figsize=(12, 8))
 
@@ -2319,19 +2401,23 @@ def __plot_delta_accuracy(
                 er_mean, er_ci_low, er_ci_up, _, _, _ = (
                     __aggregate_stats_for_latency_error(current_run_dirs)
                 )
-                error_rate_means.append(er_mean)
-                error_rate_cis_lower_err.append(max(0, er_mean - er_ci_low))
-                error_rate_cis_upper_err.append(max(0, er_ci_up - er_mean))
+                error_rate_means.append(er_mean * 100)  # Convert to percentage scale
+                error_rate_cis_lower_err.append(max(0, (er_mean - er_ci_low) * 100))
+                error_rate_cis_upper_err.append(max(0, (er_ci_up - er_mean) * 100))
                 is_multi_run_list.append(True)
             else:  # Single run
                 df = vcache_local_data_frames[delta_val]
-                er_mean_single = compute_error_rate_score(fp=df["fp_list"])
+                er_mean_single = (
+                    compute_error_rate_score(fp=df["fp_list"]) * 100
+                )  # Convert to percentage scale
                 error_rate_means.append(er_mean_single)
                 error_rate_cis_lower_err.append(0)
                 error_rate_cis_upper_err.append(0)
                 is_multi_run_list.append(False)
 
-            delta_labels.append(f".{int(delta_val * 1000):03d}")
+            delta_labels.append(
+                f"{(delta_val * 100):.2f}"
+            )  # Format to 2 decimal places
 
         x_pos = np.arange(len(vcache_local_deltas_sorted))
         bar_width = 0.8
@@ -2362,7 +2448,7 @@ def __plot_delta_accuracy(
 
         for i, delta_target_val in enumerate(vcache_local_deltas_sorted):
             plt.hlines(
-                y=delta_target_val,
+                y=delta_target_val * 100,  # Convert to percentage scale
                 xmin=i - bar_width / 2,
                 xmax=i + bar_width / 2,
                 colors="#EDBE24",
@@ -2388,35 +2474,8 @@ def __plot_delta_accuracy(
         plt.xticks(x_pos, delta_labels, fontsize=font_size)
         plt.yticks(fontsize=font_size - 2)
 
-        plt.yticks()
-        # yticks = plt.yticks()[0]
-        # # Ensure y-axis starts at 0, if 0 is not already the first tick.
-        # # And if y_ticks has values, check the first one.
-        # if len(yticks) > 0 and yticks[0] != 0.0:
-        #     if 0.0 not in yticks:
-        #         # Create new ticks that include 0 and maintain reasonable spacing
-        #         new_yticks = np.linspace(0, yticks[-1], len(yticks))
-        #         plt.yticks(new_yticks)
-        # elif not len(yticks):
-        #     plt.yticks([0, 0.1, 0.2])  # Default if no ticks
-
-        def format_tick(x, pos):
-            if x < 1e-9 and x > -1e-9:  # handles almost zero
-                return "0"
-            s = f"{x:.3f}"  # Use .3f to get some precision
-            parts = s.split(".")
-            if len(parts) == 1:  # Integer or number like "0"
-                return parts[0]
-            integer_part, decimal_part = parts
-            decimal_part = decimal_part.rstrip("0")
-            if not decimal_part:  # was like .000
-                return integer_part
-            if integer_part == "0":  # like 0.123 -> .123
-                return f".{decimal_part}"
-            return f"{integer_part}.{decimal_part}"  # like 1.123
-
-        formatter = plt.FuncFormatter(format_tick)
-        plt.gca().yaxis.set_major_formatter(formatter)
+        # Format y-ticks to show 2 decimal places
+        plt.gca().yaxis.set_major_formatter(plt.FormatStrFormatter("%.2f"))
 
         plt.gca().spines["top"].set_linewidth(1)
         plt.gca().spines["right"].set_linewidth(1)
@@ -2429,17 +2488,19 @@ def __plot_delta_accuracy(
                 er + ci_u
                 for er, ci_u in zip(error_rate_means, error_rate_cis_upper_err)
             ]
-            + vcache_local_deltas_sorted
+            + [
+                delta * 100 for delta in vcache_local_deltas_sorted
+            ]  # Convert to percentage scale
         )
         if all_plot_values:
             y_min = 0
             y_max = max(all_plot_values) * 1.15
-            if y_max < 0.08:
-                y_max = 0.08  # Ensure a minimum sensible y_max
+            if y_max < 8.0:  # Adjusted for percentage scale
+                y_max = 8.0  # Ensure a minimum sensible y_max
             plt.ylim(y_min, y_max)
         else:
-            plt.ylim(0, 0.08)  # Default if no values
+            plt.ylim(0, 8.0)  # Default if no values, adjusted for percentage scale
 
-    filename = results_dir + "/delta_accuracy.pdf"
+    filename = results_dir + f"/delta_accuracy_{chopped_index}.pdf"
     plt.savefig(filename, format="pdf", bbox_inches="tight", transparent=True)
     plt.close()

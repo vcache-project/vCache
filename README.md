@@ -4,7 +4,7 @@
     <source media="(prefers-color-scheme: dark)" srcset="./docs/vCache_Logo_For_Dark_Background.png">
     <source media="(prefers-color-scheme: light)" srcset="./docs/vCache_Logo_For_Light_Background.png">
     <!-- Fallback -->
-    <img alt="vLLM" src="./docs/vCache_Logo_For_Dark_Background.png" width="55%">
+    <img alt="vCache" src="./docs/vCache_Logo_For_Dark_Background.png" width="55%">
   </picture>
 </p>
 
@@ -15,7 +15,7 @@ Reliable and Efficient Semantic Prompt Caching
 <br>
 
 
-**vCache** is an adaptive semantic caching framework for large language models (LLMs) that reduces inference cost and latency by reusing responses for semantically similar prompts. Unlike traditional caches, vCache learns embedding-specific similarity thresholds to ensure response correctness and avoid unnecessary LLM calls. It integrates with vector databases and popular LLMs out of the box.
+**vCache** is the first verified semantic cache with user-defined failure rate guarantees. It employs an online learning algorithm to estimate an optimal threshold for each cached prompt, enabling reliable cache responses without additional training.
 
 ## Quick Install
 
@@ -38,6 +38,29 @@ response, cache_hit = vcache.create("Is the sky blue?")
 
 print(f"Response: {response}")
 ```
+
+## Advanced Configuration
+
+vCache offers extensive configuration options to customize its behavior according to your specific needs:
+
+```python
+from vcache.main import vCache
+from vcache.vcache_core import *
+
+    vCache_config: vCacheConfig = vCacheConfig(
+        inference_engine=OpenAIInferenceEngine(),
+        embedding_engine=SelfHostedEmbeddingEngine(),
+        vector_db=HNSWLibVectorDB(
+            similarity_metric_type=SimilarityMetricType.COSINE,
+            max_capacity=10000,
+        ),
+        embedding_metadata_storage=InMemoryEmbeddingMetadataStorage(),
+        similarity_evaluator=LLMComparisonSimilarityEvaluator(),
+    )
+    vCache: vCache = vCache(vCache_config, vCache_policy)
+```
+
+You can also customize the eviction policy, embedding model, and more through the configuration options.
 
 ## Development Setup
 
@@ -74,35 +97,8 @@ poetry run pre-commit run --all-files
 ```
 
 ## Semantic Prompt Caches
-Semantic Prompt Caches are layered between your application server and inference server to reduce latency and cost by reusing cached responses for semantically similar prompts.
-
-<img src="docs/vectorq_semantic_prompt_cache_workflow.png" alt="vCache Workflow" width="60%"/>
-
-Unlike traditional caches, which only reuse responses for exact matches, semantic prompt caches generalize to prompts with similar meaning. For example:
-
-For example:
-- Prompt 1: Where was Roger Federer born?
-- Prompt 2: In which town did Roger Federer grow up?
-
-Both expect the same answer (Basel, Switzerland), but a traditional cache would miss this match. Semantic caches embed prompts as vectors, enabling similarity-based retrieval beyond exact string comparisons.
-
-<img src="docs/vectorq_semantic_prompt_cache_architecture.png" alt="vCache Architecture" width="40%"/>
-
-vCache improves semantic caching by learning embedding-specific similarity thresholds. This ensures cached responses are reused only when likely to be correct, avoiding incorrect hits and improving reliability over time.
+Semantic caches return cached LLM-generated responses for semantically similar prompts to reduce inference latency and cost. They embed cached prompts and store them alongside their response in a vector database. Embedding similarity metrics assign a numerical score to quantify the similarity between a request and its nearest neighbor prompt from the cache.
 
 ## Benchmarking vCache
 
 vCache includes a benchmarking framework to evaluate performance metrics such as cache hit rates, error rates, and latency improvements. For detailed instructions on running benchmarks, see the [Benchmarking Documentation](benchmarks/README.md).
-
-## Citation
-
-If you use vCache for your research, please cite our [paper](https://arxiv.org/abs/2502.03771).
-
-```bibtex
-@article{schroeder2025adaptive,
-  title={Adaptive Semantic Prompt Caching with VectorQ},
-  author={Schroeder, Luis Gaspar and Liu, Shu and Cuadron, Alejandro and Zhao, Mark and Krusche, Stephan and Kemper, Alfons and Zaharia, Matei and Gonzalez, Joseph E},
-  journal={arXiv preprint arXiv:2502.03771},
-  year={2025}
-}
-```

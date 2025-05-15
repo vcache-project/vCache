@@ -95,11 +95,15 @@ class Baseline(Enum):
 class Dataset(Enum):
     SEM_BENCHMARK_CLASSIFICATION = "benchmark_classification"
     SEM_BENCHMARK_ARENA = "benchmark_arena"
+    SEM_BENCHMARK_SEARCH_QUERIES = "sem_benchmark_search_queries_150k"
     AMAZON_INSTANT_VIDEO = "amazon_instant_video"
     COMMONSENSE_QA = "commonsense_qa"
     ECOMMERCE_DATASET = "ecommerce_dataset"
-    SEMANTIC_PROMPT_CACHE_BENCHMARK = "semantic_prompt_cache_benchmark"
-    SEMANTIC_BENCHMARK_SEARCH_QUERIES = "sem_benchmark_search_queries"
+
+
+class GenerateResultsOnly(Enum):
+    YES = True
+    NO = False
 
 
 ########################################################################################################################
@@ -111,24 +115,58 @@ MAX_SAMPLES: int = 60000
 CONFIDENCE_INTERVALS_ITERATIONS: int = 5
 IS_LLM_JUDGE_BENCHMARK: bool = False
 DISABLE_PROGRESS_BAR: bool = True
+KEEP_SPLIT: int = 100
 
-RUN_COMBINATIONS: List[Tuple[EmbeddingModel, LargeLanguageModel]] = [
-    # (EmbeddingModel.GTE, LargeLanguageModel.LLAMA_3_8B),
-    # (EmbeddingModel.GTE, LargeLanguageModel.LLAMA_3_70B),
-    # (EmbeddingModel.GTE, LargeLanguageModel.GPT_4O_MINI),
-    # (EmbeddingModel.E5_LARGE_V2, LargeLanguageModel.LLAMA_3_8B),
-    (EmbeddingModel.E5_LARGE_V2, LargeLanguageModel.GPT_4O_MINI),
+RUN_COMBINATIONS: List[
+    Tuple[EmbeddingModel, LargeLanguageModel, Dataset, GenerateResultsOnly]
+] = [
+    (
+        EmbeddingModel.GTE,
+        LargeLanguageModel.LLAMA_3_8B,
+        Dataset.SEM_BENCHMARK_SEARCH_QUERIES,
+        GenerateResultsOnly.YES,
+    ),
+    (
+        EmbeddingModel.GTE,
+        LargeLanguageModel.GPT_4O_MINI,
+        Dataset.SEM_BENCHMARK_ARENA,
+        GenerateResultsOnly.YES,
+    ),
+    (
+        EmbeddingModel.E5_LARGE_V2,
+        LargeLanguageModel.GPT_4O_MINI,
+        Dataset.SEM_BENCHMARK_ARENA,
+        GenerateResultsOnly.YES,
+    ),
+    (
+        EmbeddingModel.E5_LARGE_V2,
+        LargeLanguageModel.LLAMA_3_8B,
+        Dataset.SEM_BENCHMARK_CLASSIFICATION,
+        GenerateResultsOnly.YES,
+    ),
+    (
+        EmbeddingModel.GTE,
+        LargeLanguageModel.LLAMA_3_8B,
+        Dataset.SEM_BENCHMARK_CLASSIFICATION,
+        GenerateResultsOnly.YES,
+    ),
+    (
+        EmbeddingModel.GTE,
+        LargeLanguageModel.LLAMA_3_70B,
+        Dataset.SEM_BENCHMARK_CLASSIFICATION,
+        GenerateResultsOnly.YES,
+    ),
 ]
 
 BASELINES_TO_RUN: List[Baseline] = [
-    Baseline.IID,
+    # Baseline.IID,
     # Baseline.GPTCache,
     # Baseline.VCacheLocal,
     # Baseline.BerkeleyEmbedding,
     # Baseline.VCacheBerkeleyEmbedding,
 ]
 
-DATASETS_TO_RUN: List[str] = [Dataset.SEMANTIC_BENCHMARK_SEARCH_QUERIES]
+DATASETS_TO_RUN: List[str] = [Dataset.SEM_BENCHMARK_SEARCH_QUERIES]
 
 STATIC_THRESHOLDS: List[float] = [
     0.80,
@@ -509,12 +547,9 @@ def main():
 
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
 
-    for dataset in DATASETS_TO_RUN:
-        dataset_file = os.path.join(datasets_dir, f"{dataset.value}.json")
-        logging.info(f"Running benchmark for dataset: {dataset}\n\n")
-        start_time_dataset = time.time()
-
-        for embedding_model, llm_model in RUN_COMBINATIONS:
+    for embedding_model, llm_model, dataset, generate_results_only in RUN_COMBINATIONS:
+        try:
+            dataset_file = os.path.join(datasets_dir, f"{dataset.value}.json")
             logging.info(
                 f"Running benchmark for dataset: {dataset}, embedding model: {embedding_model.value[1]}, LLM model: {llm_model.value[1]}\n"
             )
@@ -522,7 +557,7 @@ def main():
 
             #####################################################
             ### Baseline: vCache Local
-            if Baseline.VCacheLocal in BASELINES_TO_RUN:
+            if Baseline.VCacheLocal in BASELINES_TO_RUN and not generate_results_only:
                 for delta in DELTAS:
                     for i in range(0, CONFIDENCE_INTERVALS_ITERATIONS):
                         path = os.path.join(
@@ -552,7 +587,7 @@ def main():
 
             #####################################################
             ### Baseline: vCache Global
-            if Baseline.VCacheGlobal in BASELINES_TO_RUN:
+            if Baseline.VCacheGlobal in BASELINES_TO_RUN and not generate_results_only:
                 for delta in DELTAS:
                     path = os.path.join(
                         results_dir,
@@ -581,7 +616,10 @@ def main():
 
             #####################################################
             ### Baseline: Berkeley Embedding
-            if Baseline.BerkeleyEmbedding in BASELINES_TO_RUN:
+            if (
+                Baseline.BerkeleyEmbedding in BASELINES_TO_RUN
+                and not generate_results_only
+            ):
                 for threshold in STATIC_THRESHOLDS:
                     if embedding_model == EmbeddingModel.E5_MISTRAL_7B:
                         logging.info(
@@ -624,7 +662,10 @@ def main():
 
             #####################################################
             ### Baseline: vCache + Berkeley Embedding
-            if Baseline.VCacheBerkeleyEmbedding in BASELINES_TO_RUN:
+            if (
+                Baseline.VCacheBerkeleyEmbedding in BASELINES_TO_RUN
+                and not generate_results_only
+            ):
                 for delta in DELTAS:
                     for i in range(0, CONFIDENCE_INTERVALS_ITERATIONS):
                         if embedding_model == EmbeddingModel.E5_MISTRAL_7B:
@@ -670,7 +711,7 @@ def main():
 
             #####################################################
             ### Baseline: IID Local
-            if Baseline.IID in BASELINES_TO_RUN:
+            if Baseline.IID in BASELINES_TO_RUN and not generate_results_only:
                 for delta in DELTAS:
                     for i in range(0, CONFIDENCE_INTERVALS_ITERATIONS):
                         path = os.path.join(
@@ -700,7 +741,7 @@ def main():
 
             #####################################################
             ### Baseline: GPTCache
-            if Baseline.GPTCache in BASELINES_TO_RUN:
+            if Baseline.GPTCache in BASELINES_TO_RUN and not generate_results_only:
                 for threshold in STATIC_THRESHOLDS:
                     path = os.path.join(
                         results_dir,
@@ -733,6 +774,7 @@ def main():
                 results_dir=results_dir,
                 timestamp=timestamp,
                 font_size=PLOT_FONT_SIZE,
+                keep_split=KEEP_SPLIT,
             )
 
             end_time_embedding_model = time.time()
@@ -740,12 +782,16 @@ def main():
                 f"LLM Model Time: {(end_time_embedding_model - start_time_llm_model) / 60:.2f} minutes, {(end_time_embedding_model - start_time_llm_model) / 3600:.4f} hours"
             )
 
-        end_time_dataset = time.time()
-        logging.info(
-            f"Dataset Time: {(end_time_dataset - start_time_dataset) / 60:.2f} minutes, {(end_time_dataset - start_time_dataset) / 3600:.4f} hours"
-        )
+        except Exception:
+            logging.error(
+                f"Error running benchmark. Combination {embedding_model.value[1]} {llm_model.value[1]} {dataset.value} failed."
+            )
 
-    logging.info("All benchmarks completed!")
+    total_time = (
+        time.time()
+        - time.mktime(datetime.strptime(timestamp, "%Y-%m-%d_%H-%M").timetuple())
+    ) / 3600
+    logging.info(f"All benchmarks completed in {total_time:.2f} hours!")
 
 
 if __name__ == "__main__":
