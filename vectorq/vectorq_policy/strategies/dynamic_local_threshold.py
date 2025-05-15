@@ -85,6 +85,7 @@ class DynamicLocalThresholdPolicy(VectorQPolicy):
                 should_have_exploited = self.similarity_evaluator.answers_similar(
                     a=set_id, b=metadata.set_id
                 )
+                    
                 self.bayesian.update_metadata(
                     similarity_score=similarity_score,
                     is_correct=should_have_exploited,

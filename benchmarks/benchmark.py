@@ -47,6 +47,7 @@ from vectorq.vectorq_policy.strategies.dynamic_local_threshold import (
 from vectorq.vectorq_policy.strategies.static_global_threshold import (
     StaticGlobalThresholdPolicy,
 )
+from vectorq.vectorq_policy.strategies.iid import IIDLocalThresholdPolicy
 from vectorq.vectorq_policy.vectorq_policy import VectorQPolicy
 
 repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -64,7 +65,7 @@ logging.basicConfig(
 ########################################################################################################################
 
 # Benchmark Config
-MAX_SAMPLES: int = 60000
+MAX_SAMPLES: int = 150000
 CONFIDENCE_INTERVALS_ITERATIONS: int = 4
 IS_LLM_JUDGE_BENCHMARK: bool = True
 
@@ -82,13 +83,13 @@ EMBEDDING_MODEL_1_FT = (
 )
 EMBEDDING_MODEL_2 = (
     "emb_gte",
-    "E5_Mistral_7B_Instruct",
+    "GTE",
     "float16",
     4096,
 )  # 'intfloat/e5-mistral-7b-instruct'
 EMBEDDING_MODEL_2_FT = (
     "emb_gte_ft",
-    "E5_Mistral_7B_Instruct",
+    "GTE_FT",
     "float16",
     4096,
 )  # 'intfloat/e5-mistral-7b-instruct'
@@ -115,31 +116,33 @@ DATASETS: List[str] = [
     "commonsense_qa.json",
     "ecommerce_dataset.json",
     "semantic_prompt_cache_benchmark.json",
-    "sem_benchmark_search_queries.json"
+    "benchmark_arena.json",
+    "sem_benchmark_search_queries.json",
+    "sem_benchmark_search_queries_150k.json"
 ]
-DATASETS_TO_EXCLUDE: List[str] = [DATASETS[0], DATASETS[1], DATASETS[2], DATASETS[3]]
+DATASETS_TO_EXCLUDE: List[str] = [DATASETS[0], DATASETS[1], DATASETS[2], DATASETS[3], DATASETS[4], DATASETS[5]]
 
 embedding_models: List[Tuple[str, str, str, int]] = [
-    EMBEDDING_MODEL_1,
+    #EMBEDDING_MODEL_1,
     EMBEDDING_MODEL_2,
 ]
 llm_models: List[Tuple[str, str, str, int]] = [
-    LARGE_LANGUAGE_MODEL_1,
+    #LARGE_LANGUAGE_MODEL_1,
     LARGE_LANGUAGE_MODEL_2,
 ]
 candidate_strategy: str = SIMILARITY_STRATEGY[0]
 
 static_thresholds = np.array(
-    [0.84, 0.86, 0.89, 0.90, 0.91, 0.92, 0.93, 0.94, 0.95, 0.96, 0.97, 0.98, 0.985, 0.99, 0.995, 0.9975, 1.0]
+   []#[0.84, 0.86, 0.89, 0.90, 0.91, 0.92, 0.93, 0.94, 0.95, 0.96, 0.97, 0.98, 0.985, 0.99, 0.995, 0.9975, 1.0]
 )
-deltas = np.array([0.01, 0.0125, 0.015, 0.0175, 0.02, 0.025,0.03, 0.035, 0.04, 0.05, 0.06, 0.07, 0.08]) #np.array([0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1])
+deltas = np.array([0.01, 0.0125, 0.015, 0.0175, 0.02, 0.025, 0.03, 0.035, 0.04, 0.05, 0.06, 0.07, 0.08]) #np.array([0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1])
 
 # VectorQ Config
-MAX_VECTOR_DB_CAPACITY: int = 100000
+MAX_VECTOR_DB_CAPACITY: int = 150000
 PLOT_FONT_SIZE: int = 24
 
-SYSTEM_TYPES: List[str] = ["static", "dynamic_local", "dynamic_global", "berkeley_embedding", "vcache_berkeley_embedding", "all"]
-SYSTEM_TYPE: str = SYSTEM_TYPES[5]
+SYSTEM_TYPES: List[str] = ["static", "dynamic_local", "dynamic_global", "berkeley_embedding", "vcache_berkeley_embedding", "iid", "iid_berkeley_embedding", "all"]
+SYSTEM_TYPE: str = SYSTEM_TYPES[1]
 
 
 ########################################################################################################################
@@ -187,7 +190,7 @@ class Benchmark(unittest.TestCase):
             with open(self.filepath, "rb") as file:
                 data_entries = ijson.items(file, "item")
 
-                pbar = tqdm(total=MAX_SAMPLES, desc="Processing entries", disable=True)
+                pbar = tqdm(total=MAX_SAMPLES, desc="Processing entries")
                 for idx, data_entry in enumerate(data_entries):
                     if idx >= MAX_SAMPLES:
                         break
@@ -592,7 +595,39 @@ def main():
                                 delta=delta,
                                 threshold=-1,
                             )
+                            print("Finished Dynamic Local Threshold")
                             llm_model_extra_time += extra_time
+                            
+                # Baseline IID) IID
+                if SYSTEM_TYPE in ["iid", "all"]:
+                    for delta in deltas:
+                        for i in range(0, CONFIDENCE_INTERVALS_ITERATIONS):
+                            path = os.path.join(
+                                results_dir,
+                                dataset,
+                                embedding_model[1],
+                                llm_model[1],
+                                f"iid_{delta}_run_{i + 1}",
+                            )
+                            if os.path.exists(path) and os.listdir(path):
+                                continue
+
+                            logging.info(
+                                f"Using dynamic threshold with delta (IID): {delta}. Run {i + 1} of {CONFIDENCE_INTERVALS_ITERATIONS}"
+                            )
+
+                            extra_time = __run_baseline(
+                                vectorq_policy=IIDLocalThresholdPolicy(delta=delta),
+                                path=path,
+                                dataset_file=dataset_file,
+                                embedding_model=embedding_model,
+                                llm_model=llm_model,
+                                timestamp=timestamp,
+                                delta=delta,
+                                threshold=-1,
+                            )
+                            llm_model_extra_time += extra_time
+                            
                 # Baseline 2) Dynamic thresholds (VectorQ, Global)
                 """
                 if SYSTEM_TYPE in ["dynamic_global", "all"]:
@@ -730,16 +765,53 @@ def main():
                                 threshold=-1,
                             )
                             llm_model_extra_time += extra_time
+                            
+                # Baseline XX) IID with Berkely Embedding
+                if SYSTEM_TYPE in ["iid_berkeley_embedding", "all"]:
+                    for delta in deltas:
+                        for i in range(0, CONFIDENCE_INTERVALS_ITERATIONS):
+                            if embedding_model[0] == "emb_gte":
+                                berkeley_embedding_model = EMBEDDING_MODEL_2_FT
+                            elif embedding_model[0] == "emb_e5_large_v2" or embedding_model[0] == "e5_large_v2":
+                                berkeley_embedding_model = EMBEDDING_MODEL_1_FT
+                            else:
+                                print(f"Skipping {embedding_model[0]} for berkeley embedding. Not supported.")
+                                continue
+                        
+                            path = os.path.join(
+                                results_dir,
+                                dataset,
+                                embedding_model[1],
+                                llm_model[1],
+                                f"iid_berkeley_embedding_{delta}_run_{i + 1}",
+                            )
+                            if os.path.exists(path) and os.listdir(path):
+                                continue
 
-                if SYSTEM_TYPE == "all":
-                    generate_combined_plots(
-                        dataset=dataset,
-                        embedding_model_name=embedding_model[1],
-                        llm_model_name=llm_model[1],
-                        results_dir=results_dir,
-                        timestamp=timestamp,
-                        font_size=PLOT_FONT_SIZE,
-                    )
+                            logging.info(
+                                f"Using dynamic threshold (IID) with berkeley embedding and delta: {delta}. Run {i + 1} of {CONFIDENCE_INTERVALS_ITERATIONS}"
+                            )
+
+                            extra_time = __run_baseline(
+                                vectorq_policy=IIDLocalThresholdPolicy(delta=delta),
+                                path=path,
+                                dataset_file=dataset_file,
+                                embedding_model=berkeley_embedding_model,
+                                llm_model=llm_model,
+                                timestamp=timestamp,
+                                delta=delta,
+                                threshold=-1,
+                            )
+                            llm_model_extra_time += extra_time
+
+                generate_combined_plots(
+                    dataset=dataset,
+                    embedding_model_name=embedding_model[1],
+                    llm_model_name=llm_model[1],
+                    results_dir=results_dir,
+                    timestamp=timestamp,
+                    font_size=PLOT_FONT_SIZE,
+                )
                 embedding_model_extra_time += llm_model_extra_time
                 end_time_llm_model = time.time() - llm_model_extra_time
                 logging.info(

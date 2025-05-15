@@ -54,6 +54,7 @@ from vectorq.vectorq_policy import (
     NoCachePolicy,
     StaticGlobalThresholdPolicy,
     VectorQPolicy,
+    IIDLocalThresholdPolicy,
 )
 
 __all__ = [
@@ -89,4 +90,5 @@ __all__ = [
     "DynamicGlobalThresholdPolicy",
     "StaticGlobalThresholdPolicy",
     "NoCachePolicy",
+    "IIDLocalThresholdPolicy",
 ]
