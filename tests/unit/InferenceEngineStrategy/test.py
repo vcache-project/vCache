@@ -3,7 +3,7 @@ import unittest
 
 import pytest
 
-from vectorq.inference_engine import LangChainInferenceEngine, OpenAIInferenceEngine
+from vCache.inference_engine import LangChainInferenceEngine, OpenAIInferenceEngine
 
 INFERENCE_ENGINE_PARAMS = [
     pytest.param(

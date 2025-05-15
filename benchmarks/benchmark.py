@@ -15,43 +15,43 @@ from tqdm import tqdm
 from benchmarks._plotter_combined import generate_combined_plots
 from benchmarks._plotter_individual import generate_individual_plots
 from benchmarks.common.comparison import answers_have_same_meaning_static
-from vectorq.config import VectorQConfig
-from vectorq.inference_engine.strategies.benchmark import (
+from vCache.config import VectorQConfig
+from vCache.inference_engine.strategies.benchmark import (
     BenchmarkInferenceEngine,
 )
-from vectorq.main import VectorQ
-from vectorq.vectorq_core.cache.embedding_engine.strategies.benchmark import (
+from vCache.main import VectorQ
+from vCache.vectorq_core.cache.embedding_engine.strategies.benchmark import (
     BenchmarkEmbeddingEngine,
 )
-from vectorq.vectorq_core.cache.embedding_store.embedding_metadata_storage import (
+from vCache.vectorq_core.cache.embedding_store.embedding_metadata_storage import (
     InMemoryEmbeddingMetadataStorage,
 )
-from vectorq.vectorq_core.cache.embedding_store.embedding_metadata_storage.embedding_metadata_obj import (
+from vCache.vectorq_core.cache.embedding_store.embedding_metadata_storage.embedding_metadata_obj import (
     EmbeddingMetadataObj,
 )
-from vectorq.vectorq_core.cache.embedding_store.vector_db import (
+from vCache.vectorq_core.cache.embedding_store.vector_db import (
     HNSWLibVectorDB,
     SimilarityMetricType,
 )
-from vectorq.vectorq_core.similarity_evaluator.strategies.llm_comparison import (
+from vCache.vectorq_core.similarity_evaluator.strategies.llm_comparison import (
     LLMComparisonSimilarityEvaluator,
 )
-from vectorq.vectorq_core.similarity_evaluator.strategies.string_comparison import (
+from vCache.vectorq_core.similarity_evaluator.strategies.string_comparison import (
     StringComparisonSimilarityEvaluator,
 )
-from vectorq.vectorq_policy.strategies.dynamic_global_threshold import (
+from vCache.vectorq_policy.strategies.dynamic_global_threshold import (
     DynamicGlobalThresholdPolicy,
 )
-from vectorq.vectorq_policy.strategies.dynamic_local_threshold import (
+from vCache.vectorq_policy.strategies.dynamic_local_threshold import (
     DynamicLocalThresholdPolicy,
 )
-from vectorq.vectorq_policy.strategies.iid_local_threshold import (
+from vCache.vectorq_policy.strategies.iid_local_threshold import (
     IIDLocalThresholdPolicy,
 )
-from vectorq.vectorq_policy.strategies.static_global_threshold import (
+from vCache.vectorq_policy.strategies.static_global_threshold import (
     StaticGlobalThresholdPolicy,
 )
-from vectorq.vectorq_policy.vectorq_policy import VectorQPolicy
+from vCache.vectorq_policy.vectorq_policy import VectorQPolicy
 
 repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 results_dir = os.path.join(repo_root, "benchmarks", "results")
