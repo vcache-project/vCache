@@ -1006,7 +1006,7 @@ def __plot_roc(
     plt.gca().spines["bottom"].set_linewidth(1)
     plt.gca().spines["left"].set_linewidth(1)
 
-    filename = results_dir + "/roc.pdf"
+    filename = results_dir + f"/roc_{chopped_index}.pdf"
     plt.savefig(filename, format="pdf", bbox_inches="tight", transparent=True)
     plt.close()
 
@@ -1224,7 +1224,7 @@ def __plot_precision_vs_recall(
     plt.gca().spines["bottom"].set_linewidth(1)
     plt.gca().spines["left"].set_linewidth(1)
 
-    filename = results_dir + "/precision_vs_recall.pdf"
+    filename = results_dir + f"/precision_vs_recall_{chopped_index}.pdf"
     plt.savefig(filename, format="pdf", bbox_inches="tight", transparent=True)
     plt.close()
 
@@ -1487,7 +1487,7 @@ def __plot_avg_latency_vs_error_rate(
     plt.gca().spines["bottom"].set_linewidth(1)
     plt.gca().spines["left"].set_linewidth(1)
 
-    filename = results_dir + "/avg_latency_vs_error_rate.pdf"
+    filename = results_dir + f"/avg_latency_vs_error_rate_{chopped_index}.pdf"
     plt.savefig(filename, format="pdf", bbox_inches="tight", transparent=True)
     plt.close()
 
@@ -1504,7 +1504,7 @@ def __plot_cache_hit_vs_error_rate(
     chopped_index: int
 ):
     plt.figure(figsize=(12, 10))
-    ERROR_RATE_UPPER_BOUND = 6  # 6%
+    ERROR_RATE_UPPER_BOUND = 8  # 6%
 
     # Collect run directories for each type
     gptcache_run_dirs_map = __collect_run_dirs_by_prefix_and_key(
@@ -1719,7 +1719,7 @@ def __plot_cache_hit_vs_error_rate(
     for spine in ["top", "right", "bottom", "left"]:
         plt.gca().spines[spine].set_linewidth(1)
 
-    filename = results_dir + "/cache_hit_vs_error_rate.pdf"
+    filename = results_dir + f"/cache_hit_vs_error_rate_{chopped_index}.pdf"
     plt.savefig(filename, format="pdf", bbox_inches="tight", transparent=True)
     plt.close()
 
@@ -1736,8 +1736,8 @@ def __plot_cache_hit_vs_error_rate_vs_sample_size(
     keep_split: int,
     chopped_index: int
 ):
-    target_deltas = [0.015, 0.03]
-    target_error_rates = [2, 3.5]
+    target_deltas = [0.015, 0.02, 0.02, 0.03, 0.03, 0.03]
+    target_error_rates = [2, 2, 2.5, 2.5, 3, 3.5]
 
     # Collect all run directories once
     gptcache_run_dirs_map = __collect_run_dirs_by_prefix_and_key(
@@ -2228,7 +2228,7 @@ def __plot_cache_hit_vs_error_rate_vs_sample_size(
         plt.legend(fontsize=font_size - 10, handlelength=0.5)
 
         error_rate_filename = (
-            results_dir + f"/error_rate_vs_sample_size_delta_{target_delta:.3f}.pdf"
+            results_dir + f"/error_rate_vs_sample_size_delta_{target_delta:.3f}_{chopped_index}.pdf"
         )
         plt.savefig(
             error_rate_filename, format="pdf", bbox_inches="tight", transparent=True
@@ -2341,7 +2341,7 @@ def __plot_cache_hit_vs_error_rate_vs_sample_size(
         plt.legend(fontsize=font_size - 10, handlelength=0.5)
 
         cache_hit_filename = (
-            results_dir + f"/cache_hit_rate_vs_sample_size_delta_{target_delta:.3f}.pdf"
+            results_dir + f"/cache_hit_rate_vs_sample_size_delta_{target_delta:.3f}_{chopped_index}.pdf"
         )
         plt.savefig(
             cache_hit_filename, format="pdf", bbox_inches="tight", transparent=True
@@ -2479,6 +2479,6 @@ def __plot_delta_accuracy(
         else:
             plt.ylim(0, 8.0)  # Default if no values, adjusted for percentage scale
 
-    filename = results_dir + "/delta_accuracy.pdf"
+    filename = results_dir + f"/delta_accuracy_{chopped_index}.pdf"
     plt.savefig(filename, format="pdf", bbox_inches="tight", transparent=True)
     plt.close()

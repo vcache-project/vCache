@@ -114,19 +114,19 @@ MAX_SAMPLES: int = 60000
 CONFIDENCE_INTERVALS_ITERATIONS: int = 5
 IS_LLM_JUDGE_BENCHMARK: bool = False
 DISABLE_PROGRESS_BAR: bool = True
-KEEP_SPLIT: int = 90
+KEEP_SPLIT: int = 80
 
 RUN_COMBINATIONS: List[Tuple[EmbeddingModel, LargeLanguageModel, Dataset, GenerateResultsOnly]] = [
     (EmbeddingModel.GTE, LargeLanguageModel.LLAMA_3_8B, Dataset.SEM_BENCHMARK_SEARCH_QUERIES, GenerateResultsOnly.YES),
-    #(EmbeddingModel.GTE, LargeLanguageModel.GPT_4O_MINI, Dataset.SEM_BENCHMARK_ARENA, GenerateResultsOnly.YES),
-    #(EmbeddingModel.E5_LARGE_V2, LargeLanguageModel.GPT_4O_MINI, Dataset.SEM_BENCHMARK_ARENA, GenerateResultsOnly.YES),
-    #(EmbeddingModel.E5_LARGE_V2, LargeLanguageModel.LLAMA_3_8B, Dataset.SEM_BENCHMARK_CLASSIFICATION, GenerateResultsOnly.YES),
-    #(EmbeddingModel.GTE, LargeLanguageModel.LLAMA_3_8B, Dataset.SEM_BENCHMARK_CLASSIFICATION, GenerateResultsOnly.YES),
-    #(EmbeddingModel.GTE, LargeLanguageModel.LLAMA_3_70B, Dataset.SEM_BENCHMARK_CLASSIFICATION, GenerateResultsOnly.YES),
+    (EmbeddingModel.GTE, LargeLanguageModel.GPT_4O_MINI, Dataset.SEM_BENCHMARK_ARENA, GenerateResultsOnly.YES),
+    (EmbeddingModel.E5_LARGE_V2, LargeLanguageModel.GPT_4O_MINI, Dataset.SEM_BENCHMARK_ARENA, GenerateResultsOnly.YES),
+    (EmbeddingModel.E5_LARGE_V2, LargeLanguageModel.LLAMA_3_8B, Dataset.SEM_BENCHMARK_CLASSIFICATION, GenerateResultsOnly.YES),
+    (EmbeddingModel.GTE, LargeLanguageModel.LLAMA_3_8B, Dataset.SEM_BENCHMARK_CLASSIFICATION, GenerateResultsOnly.YES),
+    (EmbeddingModel.GTE, LargeLanguageModel.LLAMA_3_70B, Dataset.SEM_BENCHMARK_CLASSIFICATION, GenerateResultsOnly.YES),
 ]
 
 BASELINES_TO_RUN: List[Baseline] = [
-    Baseline.IID,
+    # Baseline.IID,
     # Baseline.GPTCache,
     # Baseline.VCacheLocal,
     # Baseline.BerkeleyEmbedding,
