@@ -2,7 +2,7 @@ import unittest
 
 import pytest
 
-from vCache.vectorq_core.cache.embedding_store.vector_db import (
+from vectorq.vectorq_core.cache.embedding_store.vector_db import (
     ChromaVectorDB,
     FAISSVectorDB,
     HNSWLibVectorDB,

@@ -2,7 +2,7 @@ import unittest
 
 from dotenv import load_dotenv
 
-from vCache import (
+from vectorq import (
     HNSWLibVectorDB,
     InMemoryEmbeddingMetadataStorage,
     LangChainEmbeddingEngine,
