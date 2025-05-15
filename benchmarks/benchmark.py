@@ -114,7 +114,7 @@ MAX_SAMPLES: int = 60000
 CONFIDENCE_INTERVALS_ITERATIONS: int = 5
 IS_LLM_JUDGE_BENCHMARK: bool = False
 DISABLE_PROGRESS_BAR: bool = True
-KEEP_SPLIT: int = 80
+KEEP_SPLIT: int = 100
 
 RUN_COMBINATIONS: List[Tuple[EmbeddingModel, LargeLanguageModel, Dataset, GenerateResultsOnly]] = [
     (EmbeddingModel.GTE, LargeLanguageModel.LLAMA_3_8B, Dataset.SEM_BENCHMARK_SEARCH_QUERIES, GenerateResultsOnly.YES),
