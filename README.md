@@ -39,6 +39,29 @@ response, cache_hit = vcache.create("Is the sky blue?")
 print(f"Response: {response}")
 ```
 
+## Advanced Configuration
+
+vCache offers extensive configuration options to customize its behavior according to your specific needs:
+
+```python
+from vcache.main import vCache
+from vcache.vcache_core import *
+
+    vCache_config: vCacheConfig = vCacheConfig(
+        inference_engine=OpenAIInferenceEngine(),
+        embedding_engine=SelfHostedEmbeddingEngine(),
+        vector_db=HNSWLibVectorDB(
+            similarity_metric_type=SimilarityMetricType.COSINE,
+            max_capacity=10000,
+        ),
+        embedding_metadata_storage=InMemoryEmbeddingMetadataStorage(),
+        similarity_evaluator=LLMComparisonSimilarityEvaluator(),
+    )
+    vCache: vCache = vCache(vCache_config, vCache_policy)
+```
+
+You can also customize the eviction policy, embedding model, and more through the configuration options.
+
 ## Development Setup
 
 To set up vCache for development:
