@@ -595,7 +595,7 @@ def __plot_roc(
     plt.gca().spines["bottom"].set_linewidth(1)
     plt.gca().spines["left"].set_linewidth(1)
 
-    filename = results_dir + f"/roc_{timestamp}.pdf"
+    filename = results_dir + f"/roc.pdf"
     plt.savefig(filename, format="pdf", transparent=True)
     plt.close()
 
@@ -812,7 +812,7 @@ def __plot_precision_vs_recall(
     plt.gca().spines["bottom"].set_linewidth(1)
     plt.gca().spines["left"].set_linewidth(1)
 
-    filename = results_dir + f"/precision_vs_recall_{timestamp}.pdf"
+    filename = results_dir + f"/precision_vs_recall.pdf"
     plt.savefig(filename, format="pdf", bbox_inches="tight")
     plt.close()
 
@@ -1040,7 +1040,7 @@ def __plot_avg_latency_vs_error_rate(
     plt.gca().spines["bottom"].set_linewidth(1)
     plt.gca().spines["left"].set_linewidth(1)
 
-    filename = results_dir + f"/avg_latency_vs_error_rate_{timestamp}.pdf"
+    filename = results_dir + f"/avg_latency_vs_error_rate.pdf"
     plt.savefig(filename, format="pdf", bbox_inches="tight")
     plt.close()
 
@@ -1268,7 +1268,7 @@ def __plot_cache_hit_vs_error_rate(
     plt.gca().spines["bottom"].set_linewidth(1)
     plt.gca().spines["left"].set_linewidth(1)
 
-    filename = results_dir + f"/cache_hit_vs_error_rate_{timestamp}.pdf"
+    filename = results_dir + f"/cache_hit_vs_error_rate.pdf"
     plt.savefig(filename, format="pdf", bbox_inches="tight")
     plt.close()
 
@@ -1427,7 +1427,7 @@ def __plot_cache_hit_vs_error_rate_vs_sample_size(
         plt.tight_layout()
         filename = (
             results_dir
-            + f"/cache_hit_vs_error_rate_vs_sample_size_delta_{delta:.2f}_{timestamp}.pdf"
+            + f"/cache_hit_vs_error_rate_vs_sample_size_delta_{delta:.2f}.pdf"
         )
         plt.savefig(filename, format="pdf", bbox_inches="tight")
         plt.close()
@@ -1524,6 +1524,6 @@ def __plot_delta_accuracy(
             y_max = max(all_values) * 1.15
             plt.ylim(y_min, y_max)
 
-    filename = results_dir + f"/delta_accuracy_{timestamp}.pdf"
+    filename = results_dir + f"/delta_accuracy.pdf"
     plt.savefig(filename, format="pdf", bbox_inches="tight")
     plt.close()

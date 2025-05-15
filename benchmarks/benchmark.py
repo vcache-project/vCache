@@ -95,10 +95,10 @@ class Baseline(Enum):
 class Dataset(Enum):
     SEM_BENCHMARK_CLASSIFICATION = "benchmark_classification"
     SEM_BENCHMARK_ARENA = "benchmark_arena"
+    SEM_BENCHMARK_SEARCH_QUERIES = "sem_benchmark_search_queries_150k"
     AMAZON_INSTANT_VIDEO = "amazon_instant_video"
     COMMONSENSE_QA = "commonsense_qa"
     ECOMMERCE_DATASET = "ecommerce_dataset"
-    SEMANTIC_PROMPT_CACHE_BENCHMARK = "semantic_prompt_cache_benchmark"
 
 
 ########################################################################################################################
@@ -113,7 +113,6 @@ DISABLE_PROGRESS_BAR: bool = True
 
 RUN_COMBINATIONS: List[Tuple[EmbeddingModel, LargeLanguageModel]] = [
     (EmbeddingModel.GTE, LargeLanguageModel.LLAMA_3_8B),
-    (EmbeddingModel.E5_LARGE_V2, LargeLanguageModel.LLAMA_3_8B),
 ]
 
 BASELINES_TO_RUN: List[Baseline] = [
@@ -123,22 +122,22 @@ BASELINES_TO_RUN: List[Baseline] = [
     Baseline.VCacheBerkeleyEmbedding,
 ]
 
-DATASETS_TO_RUN: List[str] = [Dataset.SEM_BENCHMARK_CLASSIFICATION]
+DATASETS_TO_RUN: List[str] = [Dataset.SEM_BENCHMARK_SEARCH_QUERIES]
 
 STATIC_THRESHOLDS: List[float] = [
-    0.64,
-    0.72,
-    0.76,
-    0.80,
-    0.84,
-    0.88,
-    0.92,
-    0.94,
-    0.96,
-    0.98,
+    # 0.64,
+    # 0.72,
+    # 0.76,
+    # 0.80,
+    # 0.84,
+    # 0.88,
+    # 0.92,
+    # 0.94,
+    # 0.96,
+    # 0.98,
 ]
 
-DELTAS: List[float] = [0.01, 0.015, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07]
+DELTAS: List[float] = []#0.01, 0.015, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07]
 
 MAX_VECTOR_DB_CAPACITY: int = 100000
 PLOT_FONT_SIZE: int = 32
