@@ -99,7 +99,8 @@ class Dataset(Enum):
     AMAZON_INSTANT_VIDEO = "amazon_instant_video"
     COMMONSENSE_QA = "commonsense_qa"
     ECOMMERCE_DATASET = "ecommerce_dataset"
-    
+
+
 class GenerateResultsOnly(Enum):
     YES = True
     NO = False
@@ -116,13 +117,45 @@ IS_LLM_JUDGE_BENCHMARK: bool = False
 DISABLE_PROGRESS_BAR: bool = True
 KEEP_SPLIT: int = 100
 
-RUN_COMBINATIONS: List[Tuple[EmbeddingModel, LargeLanguageModel, Dataset, GenerateResultsOnly]] = [
-    (EmbeddingModel.GTE, LargeLanguageModel.LLAMA_3_8B, Dataset.SEM_BENCHMARK_SEARCH_QUERIES, GenerateResultsOnly.YES),
-    (EmbeddingModel.GTE, LargeLanguageModel.GPT_4O_MINI, Dataset.SEM_BENCHMARK_ARENA, GenerateResultsOnly.YES),
-    (EmbeddingModel.E5_LARGE_V2, LargeLanguageModel.GPT_4O_MINI, Dataset.SEM_BENCHMARK_ARENA, GenerateResultsOnly.YES),
-    (EmbeddingModel.E5_LARGE_V2, LargeLanguageModel.LLAMA_3_8B, Dataset.SEM_BENCHMARK_CLASSIFICATION, GenerateResultsOnly.YES),
-    (EmbeddingModel.GTE, LargeLanguageModel.LLAMA_3_8B, Dataset.SEM_BENCHMARK_CLASSIFICATION, GenerateResultsOnly.YES),
-    (EmbeddingModel.GTE, LargeLanguageModel.LLAMA_3_70B, Dataset.SEM_BENCHMARK_CLASSIFICATION, GenerateResultsOnly.YES),
+RUN_COMBINATIONS: List[
+    Tuple[EmbeddingModel, LargeLanguageModel, Dataset, GenerateResultsOnly]
+] = [
+    (
+        EmbeddingModel.GTE,
+        LargeLanguageModel.LLAMA_3_8B,
+        Dataset.SEM_BENCHMARK_SEARCH_QUERIES,
+        GenerateResultsOnly.YES,
+    ),
+    (
+        EmbeddingModel.GTE,
+        LargeLanguageModel.GPT_4O_MINI,
+        Dataset.SEM_BENCHMARK_ARENA,
+        GenerateResultsOnly.YES,
+    ),
+    (
+        EmbeddingModel.E5_LARGE_V2,
+        LargeLanguageModel.GPT_4O_MINI,
+        Dataset.SEM_BENCHMARK_ARENA,
+        GenerateResultsOnly.YES,
+    ),
+    (
+        EmbeddingModel.E5_LARGE_V2,
+        LargeLanguageModel.LLAMA_3_8B,
+        Dataset.SEM_BENCHMARK_CLASSIFICATION,
+        GenerateResultsOnly.YES,
+    ),
+    (
+        EmbeddingModel.GTE,
+        LargeLanguageModel.LLAMA_3_8B,
+        Dataset.SEM_BENCHMARK_CLASSIFICATION,
+        GenerateResultsOnly.YES,
+    ),
+    (
+        EmbeddingModel.GTE,
+        LargeLanguageModel.LLAMA_3_70B,
+        Dataset.SEM_BENCHMARK_CLASSIFICATION,
+        GenerateResultsOnly.YES,
+    ),
 ]
 
 BASELINES_TO_RUN: List[Baseline] = [
@@ -583,7 +616,10 @@ def main():
 
             #####################################################
             ### Baseline: Berkeley Embedding
-            if Baseline.BerkeleyEmbedding in BASELINES_TO_RUN and not generate_results_only:
+            if (
+                Baseline.BerkeleyEmbedding in BASELINES_TO_RUN
+                and not generate_results_only
+            ):
                 for threshold in STATIC_THRESHOLDS:
                     if embedding_model == EmbeddingModel.E5_MISTRAL_7B:
                         logging.info(
@@ -626,7 +662,10 @@ def main():
 
             #####################################################
             ### Baseline: vCache + Berkeley Embedding
-            if Baseline.VCacheBerkeleyEmbedding in BASELINES_TO_RUN and not generate_results_only:
+            if (
+                Baseline.VCacheBerkeleyEmbedding in BASELINES_TO_RUN
+                and not generate_results_only
+            ):
                 for delta in DELTAS:
                     for i in range(0, CONFIDENCE_INTERVALS_ITERATIONS):
                         if embedding_model == EmbeddingModel.E5_MISTRAL_7B:
@@ -742,11 +781,16 @@ def main():
             logging.info(
                 f"LLM Model Time: {(end_time_embedding_model - start_time_llm_model) / 60:.2f} minutes, {(end_time_embedding_model - start_time_llm_model) / 3600:.4f} hours"
             )
-            
-        except Exception as e:
-            logging.error(f"Error running benchmark. Combination {embedding_model.value[1]} {llm_model.value[1]} {dataset.value} failed.")
 
-    total_time = (time.time() - time.mktime(datetime.strptime(timestamp, "%Y-%m-%d_%H-%M").timetuple())) / 3600
+        except Exception:
+            logging.error(
+                f"Error running benchmark. Combination {embedding_model.value[1]} {llm_model.value[1]} {dataset.value} failed."
+            )
+
+    total_time = (
+        time.time()
+        - time.mktime(datetime.strptime(timestamp, "%Y-%m-%d_%H-%M").timetuple())
+    ) / 3600
     logging.info(f"All benchmarks completed in {total_time:.2f} hours!")
 
 

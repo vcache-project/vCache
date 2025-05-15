@@ -31,12 +31,14 @@ def convert_to_dataframe_from_benchmark(benchmark: "Benchmark") -> tuple:
     return df, metadata
 
 
-def convert_to_dataframe_from_json_file(json_data: Any, keep_split: int = 100) -> Tuple[pd.DataFrame, dict, int]:
+def convert_to_dataframe_from_json_file(
+    json_data: Any, keep_split: int = 100
+) -> Tuple[pd.DataFrame, dict, int]:
     """
     Convert the json data to a dataframe.
     Args:
         json_data: Any - The json data to convert.
-        keep_split: int - The percentage of the data to keep. 
+        keep_split: int - The percentage of the data to keep.
         For example, if keep_split is 20, the benchmark will keep the last 20% of the data.
         keep_split ∈ (0, 100]
     Returns:
@@ -44,7 +46,7 @@ def convert_to_dataframe_from_json_file(json_data: Any, keep_split: int = 100) -
         metadata: dict - The metadata.
         chopped_index: int - The index of the data that was chopped.
     """
-    
+
     cache_hit_list = json_data["cache_hit_list"]
     cache_miss_list = json_data["cache_miss_list"]
     tp_list = json_data["tp_list"]
@@ -53,7 +55,7 @@ def convert_to_dataframe_from_json_file(json_data: Any, keep_split: int = 100) -
     fn_list = json_data["fn_list"]
     latency_direct_list = json_data["latency_direct_list"]
     latency_vectorq_list = json_data["latency_vectorq_list"]
-    
+
     chopped_index = 0
     if keep_split > 0 and keep_split < 100:
         chopped_index = int(len(cache_hit_list) * (100 - keep_split) / 100)
@@ -65,7 +67,7 @@ def convert_to_dataframe_from_json_file(json_data: Any, keep_split: int = 100) -
         fn_list = fn_list[chopped_index:]
         latency_direct_list = latency_direct_list[chopped_index:]
         latency_vectorq_list = latency_vectorq_list[chopped_index:]
-    
+
     data = {
         "cache_hit_list": cache_hit_list,
         "cache_miss_list": cache_miss_list,
