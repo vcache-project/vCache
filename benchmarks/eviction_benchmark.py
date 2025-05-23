@@ -49,7 +49,7 @@ logging.basicConfig(
 ########################################################################################################################
 
 # Benchmark Config
-MAX_SAMPLES: int = 20000
+MAX_SAMPLES: int = 45000
 EVICTION_POLICY = EvictionPolicyType.LRU
 # MAX_VECTOR_DB_CAPACITY: int = 20000
 CONFIDENCE_INTERVALS_ITERATIONS: int = 1 # num trials
@@ -90,7 +90,7 @@ DATASETS: List[str] = [
     "semantic_prompt_cache_benchmark.json",
 ]
 # DATASETS_TO_EXCLUDE: List[str] = [DATASETS[0], DATASETS[1], DATASETS[2]] seb
-DATASETS_TO_EXCLUDE: List[str] = [DATASETS[0]]
+DATASETS_TO_EXCLUDE: List[str] = [DATASETS[2]]
 embedding_models: List[Tuple[str, str, str, int]] = [
     EMBEDDING_MODEL_2,
 ]
@@ -103,8 +103,8 @@ candidate_strategy: str = SIMILARITY_STRATEGY[0]
 static_thresholds = np.array(
     [0.76, 0.78, 0.80, 0.82, 0.84, 0.86, 0.88, 0.90, 0.92, 0.94, 0.96]
 )
-deltas = np.array([0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1])
-
+# deltas = np.array([0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1])
+deltas = np.array([0.02])
 # VectorQ Config
 PLOT_FONT_SIZE: int = 24
 
@@ -155,31 +155,65 @@ class Benchmark(unittest.TestCase):
         try:
             with open(self.filepath, "rb") as file:
                 data_entries = ijson.items(file, "item")
+                # Count total entries
+                total_entries = sum(1 for _ in data_entries)
+                print(f"Total number of data entries: {total_entries}")
+                
+                # Reset file pointer to beginning
+                file.seek(0)
+                data_entries = ijson.items(file, "item")
 
                 pbar = tqdm(total=MAX_SAMPLES, desc="Processing entries")
                 for idx, data_entry in enumerate(data_entries):
                     if idx >= MAX_SAMPLES:
                         break
 
+                    # Debug: Print first data entry structure
+                    if idx == 0:
+                        print("\nFirst data entry structure:")
+                        # Convert Decimal objects to float for JSON serialization
+                        def decimal_to_float(obj):
+                            if isinstance(obj, dict):
+                                return {k: decimal_to_float(v) for k, v in obj.items()}
+                            elif isinstance(obj, list):
+                                return [decimal_to_float(i) for i in obj]
+                            elif hasattr(obj, 'to_eng_string'):  # Check if it's a Decimal
+                                return float(obj)
+                            return obj
+                        
+                        print(json.dumps(decimal_to_float(data_entry), indent=2))
+                        print("\nAvailable keys:", list(data_entry.keys()))
+                        print("\n")
+
                     # 1) Get Data
                     task = data_entry["task"]
                     output_format = data_entry["output_format"]
                     review_text = data_entry["text"]
 
+                    # Map model names to their corresponding keys
+                    embedding_key_map = {
+                        "embedding_1": "emb_gte",
+                        "embedding_2": "emb_e5_mistral_7b"
+                    }
+                    llm_key_map = {
+                        "response_1": "response_llama_3_8b",
+                        "response_2": "response_llama_3_70b"
+                    }
+
                     emb_generation_latency: float = float(
-                        data_entry[self.embedding_model[0] + "_lat"]
+                        data_entry[embedding_key_map[self.embedding_model[0]] + "_lat"]
                     )
                     llm_generation_latency: float = float(
-                        data_entry[self.llm_model[0] + "_lat"]
+                        data_entry[llm_key_map[self.llm_model[0]] + "_lat"]
                     )
 
                     # 2.1) Direct Inference (No Cache)
-                    label_response: str = data_entry[self.llm_model[0]]
+                    label_response: str = data_entry[llm_key_map[self.llm_model[0]]]
                     latency_direct: float = llm_generation_latency
 
                     # 2.2) VectorQ Inference (With Cache)
                     candidate_embedding: List[float] = data_entry[
-                        self.embedding_model[0]
+                        embedding_key_map[self.embedding_model[0]]
                     ]
                     is_cache_hit, cache_response, nn_response, latency_vectorq_logic, nearest_qu_idx = (
                         self.get_vectorQ_answer(
@@ -403,23 +437,21 @@ def main():
 
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
 
-    
-    for policy in [EvictionPolicyType.LRU]:
+    for policy in [EvictionPolicyType.LFU, EvictionPolicyType.LRU]:
 
-        for cache_size in [500]:
-        
+        for cache_size in [10, 25, 50, 75, 100, 250, 500, 1000, 2000, 4000, 6000, 8000, 10000]:
             for dataset in datasets:
                 dataset_file = f"{datasets_dir}{dataset}.json"
                 logging.info(f"Running benchmark for dataset: {dataset}\n\n\n")
                 start_time_dataset = time.time()
 
-                for embedding_model in embedding_models:
+                for embedding_model in [EMBEDDING_MODEL_1]:
                     logging.info(
                         f"Running benchmark for dataset: {dataset}, embedding model: {embedding_model[1]}\n\n"
                     )
                     start_time_embedding_model = time.time()
 
-                    for llm_model in llm_models:
+                    for llm_model in [LARGE_LANGUAGE_MODEL_2]:
                         logging.info(
                             f"Running benchmark for dataset: {dataset}, embedding model: {embedding_model[1]}, LLM model: {llm_model[1]}\n"
                         )
