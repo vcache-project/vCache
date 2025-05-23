@@ -25,7 +25,7 @@ from benchmarks._plotter_helper import (
 )
 
 if TYPE_CHECKING:
-    from benchmarks.benchmark import Benchmark
+    from benchmarks.eviction_benchmark import Benchmark
 
 
 def generate_individual_plots(

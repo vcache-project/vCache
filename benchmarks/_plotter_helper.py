@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 
 if TYPE_CHECKING:
-    from benchmarks.benchmark import Benchmark
+    from benchmarks.eviction_benchmark import Benchmark
 
 
 ###################################################################################
