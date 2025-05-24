@@ -1,7 +1,7 @@
 """
-VectorQ Benchmarking Framework
+vCache Benchmarking Framework
 
-This package provides tools for benchmarking VectorQ's performance, including:
+This package provides tools for benchmarking vCache's performance, including:
 - Cache hit rates
 - Error rates
 - Latency improvements

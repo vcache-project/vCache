@@ -15,7 +15,7 @@ from tqdm import tqdm
 from benchmarks._plotter_combined import generate_combined_plots
 from benchmarks._plotter_individual import generate_individual_plots
 from benchmarks.common.comparison import answers_have_same_meaning_static
-from vcache.config import VectorQConfig
+from vcache.config import vCacheConfig
 from vcache.inference_engine.strategies.benchmark import (
     BenchmarkInferenceEngine,
 )
@@ -51,7 +51,7 @@ from vcache.vcache_policy.strategies.iid_local_threshold import (
 from vcache.vcache_policy.strategies.static_global_threshold import (
     StaticGlobalThresholdPolicy,
 )
-from vcache.vcache_policy.vectorq_policy import VectorQPolicy
+from vcache.vcache_policy.vcache_policy import vCachePolicy
 
 repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 results_dir = os.path.join(repo_root, "benchmarks", "results")
@@ -272,7 +272,7 @@ class Benchmark(unittest.TestCase):
                     label_response: str = data_entry[self.llm_model[0]]
                     latency_direct: float = llm_generation_latency
 
-                    # 2.2) VectorQ Inference (With Cache)
+                    # 2.2) vCache Inference (With Cache)
                     candidate_embedding: List[float] = data_entry[
                         self.embedding_model[0]
                     ]
@@ -402,7 +402,7 @@ class Benchmark(unittest.TestCase):
             )
         except Exception as e:
             logging.error(
-                "Error getting VectorQ answer. Check VectorQ logs for more details."
+                "Error getting vCache answer. Check vCache logs for more details."
             )
             raise e
 
@@ -490,7 +490,7 @@ class Benchmark(unittest.TestCase):
 
 
 def __run_baseline(
-    vectorq_policy: VectorQPolicy,
+    vectorq_policy: vCachePolicy,
     path: str,
     dataset_file: str,
     embedding_model: Tuple[str, str, str, int],
@@ -504,7 +504,7 @@ def __run_baseline(
     else:
         similarity_evaluator = StringComparisonSimilarityEvaluator()
 
-    vectorq_config: VectorQConfig = VectorQConfig(
+    vectorq_config: vCacheConfig = vCacheConfig(
         inference_engine=BenchmarkInferenceEngine(),
         embedding_engine=BenchmarkEmbeddingEngine(),
         vector_db=HNSWLibVectorDB(

@@ -161,11 +161,11 @@ def __plot_error_rate_cache_hit_rate_duration_avg_latency(
     axes[0, 1].grid(True)
     axes[0, 1].tick_params(axis="both", labelsize=font_size - 2)
 
-    # Plot VectorQ and DirectDuration
+    # Plot vCache and DirectDuration
     duration_vectorq_minutes = [d / 60.0 for d in duration_vectorq_acc_list]
     duration_direct_minutes = [d / 60.0 for d in duration_direct_acc_list]
     axes[1, 0].plot(
-        sample_index, duration_vectorq_minutes, "b-", linewidth=2, label="VectorQ"
+        sample_index, duration_vectorq_minutes, "b-", linewidth=2, label="vCache"
     )
     axes[1, 0].plot(
         sample_index, duration_direct_minutes, "m-", linewidth=2, label="Direct"
@@ -177,12 +177,12 @@ def __plot_error_rate_cache_hit_rate_duration_avg_latency(
     axes[1, 0].tick_params(axis="both", labelsize=font_size - 2)
     axes[1, 0].legend(fontsize=font_size - 2)
 
-    # Plot VectorQ and Direct Latency with regression lines
+    # Plot vCache and Direct Latency with regression lines
     slope_vq, intercept_vq, r_value_vq, p_value_vq, std_err_vq = stats.linregress(
         sample_index_array, df["latency_vectorq_list"]
     )
     line_vq = [slope_vq * x + intercept_vq for x in sample_index_array]
-    axes[1, 1].plot(sample_index, line_vq, "b--", linewidth=2, label="VectorQ")
+    axes[1, 1].plot(sample_index, line_vq, "b--", linewidth=2, label="vCache")
 
     slope_dir, intercept_dir, r_value_dir, p_value_dir, std_err_dir = stats.linregress(
         sample_index_array, df["latency_direct_list"]

@@ -26,10 +26,10 @@ from vcache.vcache_core.similarity_evaluator.strategies.string_comparison import
 )
 
 
-class VectorQConfig:
+class vCacheConfig:
     """
-    VectorQConfig is a class that contains the configuration for the VectorQ system.
-    It is used to configure the VectorQ system with the appropriate parameters.
+    vCacheConfig is a class that contains the configuration for the vCache system.
+    It is used to configure the vCache system with the appropriate parameters.
     """
 
     def __init__(
