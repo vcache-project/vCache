@@ -26,9 +26,9 @@ from vcache.vcache_core.similarity_evaluator.strategies.string_comparison import
 )
 
 
-class vCacheConfig:
+class VCacheConfig:
     """
-    vCacheConfig is a class that contains the configuration for the vCache system.
+    VCacheConfig is a class that contains the configuration for the vCache system.
     It is used to configure the vCache system with the appropriate parameters.
     """
 

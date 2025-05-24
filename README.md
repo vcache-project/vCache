@@ -47,7 +47,7 @@ vCache offers extensive configuration options to customize its behavior accordin
 from vcache.main import vCache
 from vcache.vcache_core import *
 
-    vCache_config: vCacheConfig = vCacheConfig(
+    vCache_config: VCacheConfig = VCacheConfig(
         inference_engine=OpenAIInferenceEngine(),
         embedding_engine=SelfHostedEmbeddingEngine(),
         vector_db=HNSWLibVectorDB(

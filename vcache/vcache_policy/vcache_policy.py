@@ -1,15 +1,15 @@
 from abc import ABC, abstractmethod
 from typing import Optional
 
-from vcache.config import vCacheConfig
+from vcache.config import VCacheConfig
 
 
 class vCachePolicy(ABC):
     @abstractmethod
-    def setup(self, config: vCacheConfig):
+    def setup(self, config: VCacheConfig):
         """
         Setup the policy with the given config.
-        config: vCacheConfig - The config to setup the policy with.
+        config: VCacheConfig - The config to setup the policy with.
         """
         pass
 
@@ -19,7 +19,7 @@ class vCachePolicy(ABC):
     ) -> tuple[bool, str, str]:
         """
         prompt: str - The prompt to check for cache hit
-        system_prompt: Optional[str] - The optional system prompt to use for the response. It will override the system prompt in the vCacheConfig if provided.
+        system_prompt: Optional[str] - The optional system prompt to use for the response. It will override the system prompt in the VCacheConfig if provided.
         returns: tuple[bool, str, str] - [is_cache_hit, actual_response, nn_response]
         """
         pass

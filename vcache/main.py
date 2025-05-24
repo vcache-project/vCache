@@ -1,6 +1,6 @@
 from typing import List, Optional, Tuple
 
-from vcache.config import vCacheConfig
+from vcache.config import VCacheConfig
 from vcache.vcache_policy.strategies.static_global_threshold import (
     StaticGlobalThresholdPolicy,
 )
@@ -10,7 +10,7 @@ from vcache.vcache_policy.vcache_policy import vCachePolicy
 class vCache:
     def __init__(
         self,
-        config: vCacheConfig = vCacheConfig(),
+        config: VCacheConfig = VCacheConfig(),
         policy: vCachePolicy = StaticGlobalThresholdPolicy(),
     ):
         self.vectorq_config = config
@@ -26,7 +26,7 @@ class vCache:
         Infer a response from the cache and return the response.
         Args
             prompt: str - The prompt to create a response for.
-            system_prompt: Optional[str] - The optional system prompt to use for the response. It will override the system prompt in the vCacheConfig if provided.
+            system_prompt: Optional[str] - The optional system prompt to use for the response. It will override the system prompt in the VCacheConfig if provided.
         Returns
             str - The response to be used by the user
         """
@@ -42,7 +42,7 @@ class vCache:
         Infer a response from the cache and return the cache hit status, the response, and the nearest neighbor response.
         Args
             prompt: str - The prompt to create a response for.
-            system_prompt: Optional[str] - The optional system prompt to use for the response. It will override the system prompt in the vCacheConfig if provided.
+            system_prompt: Optional[str] - The optional system prompt to use for the response. It will override the system prompt in the VCacheConfig if provided.
         Returns
             Tuple[bool, str, str] - [is_cache_hit, response, nn_response] (the response is the one supposed to be used by the user, the nn_response is for benchmarking purposes)
         """

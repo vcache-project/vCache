@@ -5,7 +5,7 @@ import numpy as np
 from scipy.stats import norm
 from typing_extensions import override
 
-from vcache.config import vCacheConfig
+from vcache.config import VCacheConfig
 from vcache.vcache_core.cache.cache import Cache
 from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage.embedding_metadata_obj import (
     EmbeddingMetadataObj,
@@ -39,7 +39,7 @@ class IIDLocalThresholdPolicy(vCachePolicy):
         self.cache = None
 
     @override
-    def setup(self, config: vCacheConfig):
+    def setup(self, config: VCacheConfig):
         self.inference_engine = config.inference_engine
         self.cache = Cache(
             embedding_engine=config.embedding_engine,
@@ -57,7 +57,7 @@ class IIDLocalThresholdPolicy(vCachePolicy):
         """
         Args
             prompt: str - The prompt to check for cache hit
-            system_prompt: Optional[str] - The optional system prompt to use for the response. It will override the system prompt in the vCacheConfig if provided.
+            system_prompt: Optional[str] - The optional system prompt to use for the response. It will override the system prompt in the VCacheConfig if provided.
         Returns
             tuple[bool, str, str] - [is_cache_hit, actual_response, nn_response]
         """

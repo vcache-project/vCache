@@ -15,7 +15,7 @@ from tqdm import tqdm
 from benchmarks._plotter_combined import generate_combined_plots
 from benchmarks._plotter_individual import generate_individual_plots
 from benchmarks.common.comparison import answers_have_same_meaning_static
-from vcache.config import vCacheConfig
+from vcache.config import VCacheConfig
 from vcache.inference_engine.strategies.benchmark import (
     BenchmarkInferenceEngine,
 )
@@ -504,7 +504,7 @@ def __run_baseline(
     else:
         similarity_evaluator = StringComparisonSimilarityEvaluator()
 
-    vectorq_config: vCacheConfig = vCacheConfig(
+    vectorq_config: VCacheConfig = VCacheConfig(
         inference_engine=BenchmarkInferenceEngine(),
         embedding_engine=BenchmarkEmbeddingEngine(),
         vector_db=HNSWLibVectorDB(

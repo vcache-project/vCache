@@ -3,7 +3,7 @@ vCache: Reliable and Efficient Semantic Prompt Caching
 """
 
 # Main vCache classes
-from vcache.config import vCacheConfig
+from vcache.config import VCacheConfig
 
 # Inference engines
 from vcache.inference_engine import (
@@ -60,7 +60,7 @@ from vcache.vcache_policy import (
 __all__ = [
     # Main classes
     "vCache",
-    "vCacheConfig",
+    "VCacheConfig",
     # Inference engines
     "InferenceEngine",
     "OpenAIInferenceEngine",
