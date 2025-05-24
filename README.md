@@ -123,7 +123,7 @@ Traditional systems use a **global threshold** to make reuse decisions, but this
 vCache instead learns a **separate decision boundary per embedding** and adapts it over time to guarantee a user-specified error rate.
 
 <p align="left">
-  <img src="./docs/vCache_core.png" alt="vCache Core" width="50%">
+  <img src="./docs/vCache_workflow.png" alt="vCache Core" width="50%">
 </p>
 
 
