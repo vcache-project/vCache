@@ -126,10 +126,11 @@ vCache instead learns a **separate decision boundary per embedding** and adapts 
   <img src="./docs/vCache_core.png" alt="vCache Core" width="50%">
 </p>
 
+vCache uses a simple probabilistic framework to bound the error rate conditioned on the per-prompt thresholds. When deploying vCache, the user specifies a maximum error rate, and the system maximizes the cache hit rate subject to this correctness constraint.
 
 ## 🛠 Developer Guide
 
-For advanced usage and development setup, see the [Developer Guide](README_DEV.md).
+For advanced usage and development setup, see the [Developer Guide](ReadMe_Dev.md).
 
 
 
@@ -142,8 +143,8 @@ vCache includes a benchmarking framework to evaluate:
 - **...**
 
 We provide three open benchmarks:
-- **SemCacheLmArena** (chat-style prompts) - [Dataset](https://huggingface.co/datasets/vCache/SemBenchmarkLmArena)
-- **SemCacheClassification** (classification queries) - [Dataset](https://huggingface.co/datasets/vCache/SemBenchmarkClassification)
-- **SemCacheSearchQueries** (real-world search logs) - [Dataset](https://huggingface.co/datasets/vCache/SemBenchmarkSearchQueries)
+- **SemCacheLmArena** (chat-style prompts) - [Dataset  ↗](https://huggingface.co/datasets/vCache/SemBenchmarkLmArena)
+- **SemCacheClassification** (classification queries) - [Dataset  ↗](https://huggingface.co/datasets/vCache/SemBenchmarkClassification)
+- **SemCacheSearchQueries** (real-world search logs) - [Dataset  ↗](https://huggingface.co/datasets/vCache/SemBenchmarkSearchQueries)
 
-See the [Benchmarking Documentation](benchmarks/README.md) for instructions.
+See the [Benchmarking Documentation](benchmarks/ReadMe.md) for instructions.

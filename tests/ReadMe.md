@@ -1,14 +1,47 @@
-# Tests
+<br>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./../docs/vCache_Logo_For_Dark_Background.png">
+    <source media="(prefers-color-scheme: light)" srcset="./../docs/vCache_Logo_For_Light_Background.png">
+    <!-- Fallback -->
+    <img alt="vCache" src="./../docs/vCache_Logo_For_Dark_Background.png" width="55%">
+  </picture>
+</p>
 
-## Unit Tests
-The unit tests are supposed to soley test the logic of an invidual module strategy.
 
-## Integration Tests
-The integration tests are supposed to test the combination and interaction of all module strategies.
+<h3 align="center">
+Reliable and Efficient Semantic Prompt Caching
+</h3>
+<br>
 
-### Run Integration Tests
-Set `OPEN_AI_APIKEY` in `.env`, and run:
+## 🧪 Tests
 
-```base
+vCache includes both **unit tests** and **integration tests** to ensure correctness and reliability across its modular components.
+
+
+
+### Unit Tests
+
+Unit tests verify the **logic of individual module strategies** (e.g., caching policies, embedding engines, similarity evaluators) in isolation.  
+They are designed to be fast, deterministic, and independent of external services.
+
+
+
+### Integration Tests
+
+Integration tests validate the **end-to-end behavior** of vCache by checking how components interact (e.g., LLM inference + vector DB + thresholding policy).  
+They may involve real API calls and require a valid OpenAI key.
+
+#### Running Integration Tests
+
+1. Create a `.env` file and set your OpenAI API key:
+
+```env
+OPENAI_API_KEY=your_key_here
+```
+
+2. Run the tests using Poetry:
+
+```bash
 poetry run pytest tests/integration
 ```
