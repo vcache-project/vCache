@@ -15,10 +15,10 @@ from vcache.vcache_core.similarity_evaluator import (
     SimilarityEvaluator,
     StringComparisonSimilarityEvaluator,
 )
-from vcache.vcache_policy.vcache_policy import vCachePolicy
+from vcache.vcache_policy.vcache_policy import VCachePolicy
 
 
-class IIDLocalThresholdPolicy(vCachePolicy):
+class IIDLocalThresholdPolicy(VCachePolicy):
     def __init__(
         self,
         similarity_evaluator: SimilarityEvaluator = StringComparisonSimilarityEvaluator(),

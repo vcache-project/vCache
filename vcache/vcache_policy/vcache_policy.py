@@ -4,7 +4,7 @@ from typing import Optional
 from vcache.config import VCacheConfig
 
 
-class vCachePolicy(ABC):
+class VCachePolicy(ABC):
     @abstractmethod
     def setup(self, config: VCacheConfig):
         """

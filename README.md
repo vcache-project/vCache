@@ -44,7 +44,7 @@ print(f"Response: {response}")
 vCache offers extensive configuration options to customize its behavior according to your specific needs:
 
 ```python
-from vcache.main import vCache
+from vcache.main import VCache
 from vcache.vcache_core import *
 
     vCache_config: VCacheConfig = VCacheConfig(
@@ -57,7 +57,7 @@ from vcache.vcache_core import *
         embedding_metadata_storage=InMemoryEmbeddingMetadataStorage(),
         similarity_evaluator=LLMComparisonSimilarityEvaluator(),
     )
-    vCache: vCache = vCache(vCache_config, vCache_policy)
+    vCache: VCache = VCache(vCache_config, vCache_policy)
 ```
 
 You can also customize the eviction policy, embedding model, and more through the configuration options.

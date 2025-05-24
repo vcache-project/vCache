@@ -19,7 +19,7 @@ from vcache.config import VCacheConfig
 from vcache.inference_engine.strategies.benchmark import (
     BenchmarkInferenceEngine,
 )
-from vcache.main import vCache
+from vcache.main import VCache
 from vcache.vcache_core.cache.embedding_engine.strategies.benchmark import (
     BenchmarkEmbeddingEngine,
 )
@@ -51,7 +51,7 @@ from vcache.vcache_policy.strategies.iid_local_threshold import (
 from vcache.vcache_policy.strategies.static_global_threshold import (
     StaticGlobalThresholdPolicy,
 )
-from vcache.vcache_policy.vcache_policy import vCachePolicy
+from vcache.vcache_policy.vcache_policy import VCachePolicy
 
 repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 results_dir = os.path.join(repo_root, "benchmarks", "results")
@@ -200,9 +200,9 @@ PLOT_FONT_SIZE: int = 50
 ### Benchmark Class ####################################################################################################
 ########################################################################################################################
 class Benchmark(unittest.TestCase):
-    def __init__(self, vectorq: vCache):
+    def __init__(self, vectorq: VCache):
         super().__init__()
-        self.vectorq: vCache = vectorq
+        self.vectorq: VCache = vectorq
         self.embedding_model: Tuple[str, str, str, int] = None
         self.llm_model: Tuple[str, str, str, int] = None
         self.filepath: str = None
@@ -490,7 +490,7 @@ class Benchmark(unittest.TestCase):
 
 
 def __run_baseline(
-    vectorq_policy: vCachePolicy,
+    vectorq_policy: VCachePolicy,
     path: str,
     dataset_file: str,
     embedding_model: Tuple[str, str, str, int],
@@ -514,7 +514,7 @@ def __run_baseline(
         embedding_metadata_storage=InMemoryEmbeddingMetadataStorage(),
         similarity_evaluator=similarity_evaluator,
     )
-    vectorQ: vCache = vCache(vectorq_config, vectorq_policy)
+    vectorQ: VCache = VCache(vectorq_config, vectorq_policy)
 
     benchmark = Benchmark(vectorQ)
     benchmark.filepath = dataset_file

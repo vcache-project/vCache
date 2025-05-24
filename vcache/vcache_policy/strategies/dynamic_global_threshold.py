@@ -17,10 +17,10 @@ from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage.embeddi
 )
 from vcache.vcache_core.cache.embedding_store.embedding_store import EmbeddingStore
 from vcache.vcache_core.similarity_evaluator import SimilarityEvaluator
-from vcache.vcache_policy.vcache_policy import vCachePolicy
+from vcache.vcache_policy.vcache_policy import VCachePolicy
 
 
-class DynamicGlobalThresholdPolicy(vCachePolicy):
+class DynamicGlobalThresholdPolicy(VCachePolicy):
     def __init__(
         self,
         delta: float = 0.01,

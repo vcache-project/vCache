@@ -4,14 +4,14 @@ from vcache.config import VCacheConfig
 from vcache.vcache_policy.strategies.static_global_threshold import (
     StaticGlobalThresholdPolicy,
 )
-from vcache.vcache_policy.vcache_policy import vCachePolicy
+from vcache.vcache_policy.vcache_policy import VCachePolicy
 
 
-class vCache:
+class VCache:
     def __init__(
         self,
         config: VCacheConfig = VCacheConfig(),
-        policy: vCachePolicy = StaticGlobalThresholdPolicy(),
+        policy: VCachePolicy = StaticGlobalThresholdPolicy(),
     ):
         self.vectorq_config = config
         self.vectorq_policy = policy

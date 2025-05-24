@@ -8,8 +8,8 @@ from vcache import (
     InMemoryEmbeddingMetadataStorage,
     LangChainEmbeddingEngine,
     OpenAIInferenceEngine,
+    VCache,
     VCacheConfig,
-    vCache,
 )
 
 load_dotenv()
@@ -36,7 +36,7 @@ class TestvcacheDynamicThreshold(unittest.TestCase):
     def test_basic_functionality(self):
         """Test that the cache correctly identifies hits and misses."""
         config, policy = create_default_config_and_policy()
-        vcache = vCache(config, policy)
+        vcache = VCache(config, policy)
 
         # First request should be a miss
         cache_hit, response, _ = vcache.infer_with_cache_info(

@@ -5,10 +5,10 @@ from typing_extensions import override
 from vcache.config import VCacheConfig
 from vcache.vcache_core.cache.cache import Cache
 from vcache.vcache_core.cache.embedding_store.embedding_store import EmbeddingStore
-from vcache.vcache_policy.vcache_policy import vCachePolicy
+from vcache.vcache_policy.vcache_policy import VCachePolicy
 
 
-class StaticGlobalThresholdPolicy(vCachePolicy):
+class StaticGlobalThresholdPolicy(VCachePolicy):
     def __init__(
         self,
         threshold: float = 0.8,

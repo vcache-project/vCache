@@ -11,7 +11,7 @@ from vcache.inference_engine import (
     LangChainInferenceEngine,
     OpenAIInferenceEngine,
 )
-from vcache.main import vCache
+from vcache.main import VCache
 
 # Embedding engines
 from vcache.vcache_core.cache.embedding_engine import (
@@ -54,12 +54,12 @@ from vcache.vcache_policy import (
     IIDLocalThresholdPolicy,
     NoCachePolicy,
     StaticGlobalThresholdPolicy,
-    vCachePolicy,
+    VCachePolicy,
 )
 
 __all__ = [
     # Main classes
-    "vCache",
+    "VCache",
     "VCacheConfig",
     # Inference engines
     "InferenceEngine",
@@ -85,7 +85,7 @@ __all__ = [
     "EmbeddingMetadataStorage",
     "InMemoryEmbeddingMetadataStorage",
     # vCache Policies
-    "vCachePolicy",
+    "VCachePolicy",
     "DynamicLocalThresholdPolicy",
     "DynamicGlobalThresholdPolicy",
     "StaticGlobalThresholdPolicy",

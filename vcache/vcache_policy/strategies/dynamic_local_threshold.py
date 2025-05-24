@@ -19,10 +19,10 @@ from vcache.vcache_core.cache.embedding_store.embedding_store import EmbeddingSt
 from vcache.vcache_core.similarity_evaluator import (
     SimilarityEvaluator,
 )
-from vcache.vcache_policy.vcache_policy import vCachePolicy
+from vcache.vcache_policy.vcache_policy import VCachePolicy
 
 
-class DynamicLocalThresholdPolicy(vCachePolicy):
+class DynamicLocalThresholdPolicy(VCachePolicy):
     def __init__(self, delta: float = 0.01):
         """
         This policy uses the vCache algorithm to compute the optimal threshold for each

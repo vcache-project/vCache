@@ -3,10 +3,10 @@ from typing import Optional
 from typing_extensions import override
 
 from vcache.config import VCacheConfig
-from vcache.vcache_policy.vcache_policy import vCachePolicy
+from vcache.vcache_policy.vcache_policy import VCachePolicy
 
 
-class NoCachePolicy(vCachePolicy):
+class NoCachePolicy(VCachePolicy):
     def __init__(self):
         """
         This policy does not use a cache and will always compute a response.

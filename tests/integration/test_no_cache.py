@@ -5,8 +5,8 @@ from dotenv import load_dotenv
 from vcache import (
     NoCachePolicy,
     OpenAIInferenceEngine,
+    VCache,
     VCacheConfig,
-    vCache,
 )
 
 load_dotenv()
@@ -27,7 +27,7 @@ class TestvcacheNoCache(unittest.TestCase):
     def test_basic_functionality(self):
         """Test that when cache is disabled, all requests are misses."""
         config, policy = create_default_config_and_policy()
-        vcache = vCache(config, policy)
+        vcache = VCache(config, policy)
 
         # First request should be a miss
         cache_hit, response, _ = vcache.infer_with_cache_info(
