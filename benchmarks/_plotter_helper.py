@@ -19,7 +19,7 @@ def convert_to_dataframe_from_benchmark(benchmark: "Benchmark") -> tuple:
         "tn_list": benchmark.tn_list,
         "fn_list": benchmark.fn_list,
         "latency_direct_list": benchmark.latency_direct_list,
-        "latency_vectorq_list": benchmark.latency_vectorq_list,
+        "latency_vectorq_list": benchmark.latency_vcach_list,
     }
     df = pd.DataFrame(data)
 
@@ -54,7 +54,7 @@ def convert_to_dataframe_from_json_file(
     tn_list = json_data["tn_list"]
     fn_list = json_data["fn_list"]
     latency_direct_list = json_data["latency_direct_list"]
-    latency_vectorq_list = json_data["latency_vectorq_list"]
+    latency_vcache_list = json_data["latency_vectorq_list"]
 
     chopped_index = 0
     if keep_split > 0 and keep_split < 100:
@@ -66,7 +66,7 @@ def convert_to_dataframe_from_json_file(
         tn_list = tn_list[chopped_index:]
         fn_list = fn_list[chopped_index:]
         latency_direct_list = latency_direct_list[chopped_index:]
-        latency_vectorq_list = latency_vectorq_list[chopped_index:]
+        latency_vcache_list = latency_vcache_list[chopped_index:]
 
     data = {
         "cache_hit_list": cache_hit_list,
@@ -76,7 +76,7 @@ def convert_to_dataframe_from_json_file(
         "tn_list": tn_list,
         "fn_list": fn_list,
         "latency_direct_list": latency_direct_list,
-        "latency_vectorq_list": latency_vectorq_list,
+        "latency_vectorq_list": latency_vcache_list,
     }
     df = pd.DataFrame(data)
 

@@ -1,5 +1,5 @@
 __pycache__/
-vectorq.egg-info/
+*.egg-info/
 temp/
 nohup.out
 
@@ -14,4 +14,3 @@ temp/*
 bin/*
 .venv/
 .env
-*.png

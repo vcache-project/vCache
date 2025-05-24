@@ -15,90 +15,149 @@ Reliable and Efficient Semantic Prompt Caching
 <br>
 
 
-**vCache** is the first verified semantic cache with user-defined failure rate guarantees. It employs an online learning algorithm to estimate an optimal threshold for each cached prompt, enabling reliable cache responses without additional training.
 
-## Quick Install
 
-First, install the vCache package.
+**vCache** is the first *verified* semantic cache for large language models (LLMs) with **user-defined failure rate guarantees**. Unlike existing systems that use a fixed global similarity threshold, vCache dynamically learns an optimal **per-embedding threshold** online, without any additional training. This approach enables **reliable reuse** of cached responses and **low latency inference**, even under tight error-rate constraints.
+
+
+
+## 🚀 Quick Install
+
+Install vCache in editable mode:
+
 ```bash
 pip install -e .
 ```
 
-Second, set the OpenAI key. By default, vCache uses OpenAI for LLM inference and embedding generation, but you can configure any inference setting you like. 
+Then, set your OpenAI key:
+
 ```bash
 export OPENAI_API_KEY="your_api_key_here"
 ```
+(Note: vCache uses OpenAI by default for both LLM inference and embedding generation, but you can configure any other backend)
 
-Third, use vCache for your LLM inference.
+Finally, use vCache in your Python code:
+
 ```python
-from vcache.main import vCache
+from vcache.main import VCache
 
-vcache: vCache = vCache()
+vcache = VCache()
 response, cache_hit = vcache.create("Is the sky blue?")
-
 print(f"Response: {response}")
 ```
 
-## Advanced Configuration
+By default, vCache uses:
+- `OpenAIInferenceEngine`
+- `OpenAIEmbeddingEngine`
+- `HNSWLibVectorDB`
+- `InMemoryEmbeddingMetadataStorage`
+- `NoEvictionPolicy`
+- `StringComparisonSimilarityEvaluator`
+- `DynamicLocalThresholdPolicy` with a maximum failure rate of 2%
 
-vCache offers extensive configuration options to customize its behavior according to your specific needs:
+
+
+## ⚙️ Advanced Configuration
+
+vCache is modular and highly configurable. Below is an example showing how to customize key components:
+
+<details closed>
+<summary>Imports</summary>
 
 ```python
-from vcache.main import vCache
-from vcache.vcache_core import *
+from vcache.main import VCache
+from vcache.config import VCacheConfig
+from vcache.inference_engine.strategies.open_ai import OpenAIInferenceEngine
+from vcache.vcache_core.cache.embedding_engine.strategies.open_ai import OpenAIEmbeddingEngine
+from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage.strategies.in_memory import InMemoryEmbeddingMetadataStorage
+from vcache.vcache_core.similarity_evaluator.strategies.string_comparison import StringComparisonSimilarityEvaluator
+from vcache.vcache_policy.strategies.dynamic_local_threshold import DynamicLocalThresholdPolicy
+from vcache.vcache_policy.vcache_policy import VCachePolicy
+from vcache.vcache_core.cache.embedding_store.vector_db import HNSWLibVectorDB, SimilarityMetricType
+```
+</details>
 
-    vCache_config: vCacheConfig = vCacheConfig(
-        inference_engine=OpenAIInferenceEngine(),
-        embedding_engine=SelfHostedEmbeddingEngine(),
-        vector_db=HNSWLibVectorDB(
-            similarity_metric_type=SimilarityMetricType.COSINE,
-            max_capacity=10000,
-        ),
-        embedding_metadata_storage=InMemoryEmbeddingMetadataStorage(),
-        similarity_evaluator=LLMComparisonSimilarityEvaluator(),
-    )
-    vCache: vCache = vCache(vCache_config, vCache_policy)
+```python
+vcache_policy: VCachePolicy = DynamicLocalThresholdPolicy(delta=0.02)
+vcache_config: VCacheConfig = VCacheConfig(
+    inference_engine=OpenAIInferenceEngine(),
+    embedding_engine=OpenAIEmbeddingEngine(),
+    vector_db=HNSWLibVectorDB(
+        similarity_metric_type=SimilarityMetricType.COSINE,
+        max_capacity=100_000,
+    ),
+    embedding_metadata_storage=InMemoryEmbeddingMetadataStorage(),
+    similarity_evaluator=StringComparisonSimilarityEvaluator,
+)
+
+vcache = VCache(vcache_config, vcache_policy)
 ```
 
-You can also customize the eviction policy, embedding model, and more through the configuration options.
+You can swap out any component—such as the eviction policy or vector database—for your specific use case.
 
-## Development Setup
 
-To set up vCache for development:
 
-### Using Poetry
+## 🧠 What Is Semantic Caching?
 
-1. Install Poetry if you don't have it already:
-```bash
-curl -sSL https://install.python-poetry.org | python3 -
+Semantic caching reduces LLM inference latency and cost by reusing previously generated responses for **semantically similar prompts** (not just exact matches). 
+
+<p align="left">
+  <img src="./docs/vCache_architecture.png" alt="vCache Architecture" width="60%">
+</p>
+
+### Architecture Overview
+
+
+Here’s how it works:
+- Prompts are embedded using a vector encoder and stored in a vector database.
+- At query time, the most similar cached prompt is retrieved.
+- A similarity score (e.g., cosine) is computed.
+- If the score is sufficiently high, the cached response is reused.
+
+<p align="left">
+  <img src="./docs/vCache_workflow.png" alt="vCache Workflow" width="50%">
+</p>
+
+Traditional systems use a **global threshold** to make reuse decisions, but this fails to capture prompt-specific variation in correctness.
+
+vCache instead learns a **separate decision boundary per embedding** and adapts it over time to guarantee a user-specified error rate.
+
+<p align="left">
+  <img src="./docs/vCache_core.png" alt="vCache Core" width="50%">
+</p>
+
+vCache uses a simple probabilistic framework to bound the error rate conditioned on the per-prompt thresholds. When deploying vCache, the user specifies a maximum error rate, and the system maximizes the cache hit rate subject to this correctness constraint.
+
+## 🛠 Developer Guide
+
+For advanced usage and development setup, see the [Developer Guide](ReadMe_Dev.md).
+
+
+
+## 📊 Benchmarking vCache
+
+vCache includes a benchmarking framework to evaluate:
+- **Cache hit rate**
+- **Error rate**
+- **Latency improvement**
+- **...**
+
+We provide three open benchmarks:
+- **SemCacheLmArena** (chat-style prompts) - [Dataset  ↗](https://huggingface.co/datasets/vCache/SemBenchmarkLmArena)
+- **SemCacheClassification** (classification queries) - [Dataset  ↗](https://huggingface.co/datasets/vCache/SemBenchmarkClassification)
+- **SemCacheSearchQueries** (real-world search logs) - [Dataset  ↗](https://huggingface.co/datasets/vCache/SemBenchmarkSearchQueries)
+
+See the [Benchmarking Documentation](benchmarks/ReadMe.md) for instructions.
+
+## 📄 Citation
+
+If you use vCache for your research, please cite our [paper](https://arxiv.org/abs/2502.03771).
+
+```bibtex
+@article{schroeder2025adaptive,
+  title={vCache: Verified Semantic Prompt Caching},
+  author={Schroeder, Luis Gaspar and Liu, Shu and Cuadron, Alejandro and Zhao, Mark and Krusche, Stephan and Kemper, Alfons and Zaharia, Matei and Gonzalez, Joseph E},
+  journal={arXiv preprint arXiv:2502.03771},
+  year={2025}
+}
 ```
-
-2. Install dependencies:
-```bash
-poetry install --with dev,benchmarks
-```
-
-### Setting Up Pre-commit Hooks
-
-Install pre-commit hooks to ensure code quality:
-```bash
-poetry run pre-commit install
-```
-
-The pre-commit hooks will automatically:
-- Format code with Ruff
-- Check imports
-- Validate Python syntax
-- Run type checking with mypy
-
-When you commit changes, these checks will run automatically. You can also run them manually:
-```bash
-poetry run pre-commit run --all-files
-```
-
-## Semantic Prompt Caches
-Semantic caches return cached LLM-generated responses for semantically similar prompts to reduce inference latency and cost. They embed cached prompts and store them alongside their response in a vector database. Embedding similarity metrics assign a numerical score to quantify the similarity between a request and its nearest neighbor prompt from the cache.
-
-## Benchmarking vCache
-
-vCache includes a benchmarking framework to evaluate performance metrics such as cache hit rates, error rates, and latency improvements. For detailed instructions on running benchmarks, see the [Benchmarking Documentation](benchmarks/README.md).
