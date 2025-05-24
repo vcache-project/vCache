@@ -11,10 +11,10 @@ from vcache.vcache_policy.strategies.no_cache import NoCachePolicy
 from vcache.vcache_policy.strategies.static_global_threshold import (
     StaticGlobalThresholdPolicy,
 )
-from vcache.vcache_policy.vectorq_policy import VectorQPolicy
+from vcache.vcache_policy.vcache_policy import vCachePolicy
 
 __all__ = [
-    "VectorQPolicy",
+    "vCachePolicy",
     "StaticGlobalThresholdPolicy",
     "DynamicLocalThresholdPolicy",
     "DynamicGlobalThresholdPolicy",

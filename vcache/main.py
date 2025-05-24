@@ -1,21 +1,17 @@
 from typing import List, Optional, Tuple
 
-from vcache.config import VectorQConfig
+from vcache.config import vCacheConfig
 from vcache.vcache_policy.strategies.static_global_threshold import (
     StaticGlobalThresholdPolicy,
 )
-from vcache.vcache_policy.vectorq_policy import VectorQPolicy
+from vcache.vcache_policy.vcache_policy import vCachePolicy
 
 
 class VectorQ:
-    """
-    VectorQ is a main class that contains the VectorQ semantic prompt caching system.
-    """
-
     def __init__(
         self,
-        config: VectorQConfig = VectorQConfig(),
-        policy: VectorQPolicy = StaticGlobalThresholdPolicy(),
+        config: vCacheConfig = vCacheConfig(),
+        policy: vCachePolicy = StaticGlobalThresholdPolicy(),
     ):
         self.vectorq_config = config
         self.vectorq_policy = policy
@@ -30,7 +26,7 @@ class VectorQ:
         Infer a response from the cache and return the response.
         Args
             prompt: str - The prompt to create a response for.
-            system_prompt: Optional[str] - The optional system prompt to use for the response. It will override the system prompt in the VectorQConfig if provided.
+            system_prompt: Optional[str] - The optional system prompt to use for the response. It will override the system prompt in the vCacheConfig if provided.
         Returns
             str - The response to be used by the user
         """
@@ -46,7 +42,7 @@ class VectorQ:
         Infer a response from the cache and return the cache hit status, the response, and the nearest neighbor response.
         Args
             prompt: str - The prompt to create a response for.
-            system_prompt: Optional[str] - The optional system prompt to use for the response. It will override the system prompt in the VectorQConfig if provided.
+            system_prompt: Optional[str] - The optional system prompt to use for the response. It will override the system prompt in the vCacheConfig if provided.
         Returns
             Tuple[bool, str, str] - [is_cache_hit, response, nn_response] (the response is the one supposed to be used by the user, the nn_response is for benchmarking purposes)
         """

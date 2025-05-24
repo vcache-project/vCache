@@ -6,14 +6,14 @@ from vcache import (
     NoCachePolicy,
     OpenAIInferenceEngine,
     VectorQ,
-    VectorQConfig,
+    vCacheConfig,
 )
 
 load_dotenv()
 
 
 def create_default_config_and_policy():
-    config = VectorQConfig(
+    config = vCacheConfig(
         inference_engine=OpenAIInferenceEngine(
             model_name="gpt-4.1-nano-2025-04-14",
             temperature=0.0,

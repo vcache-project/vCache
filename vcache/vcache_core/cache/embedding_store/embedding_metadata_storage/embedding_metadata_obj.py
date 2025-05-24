@@ -18,7 +18,7 @@ class EmbeddingMetadataObj:
         self.response: str = response
         self.last_accessed: datetime = last_accessed
 
-        # VectorQ Bayesian Policy ########################
+        # vCache Bayesian Policy ########################
         self.observations: List[Tuple[float, int]] = []  # (similarity, label)
         self.observations.append((0.0, 0))
         self.observations.append((1.0, 1))
@@ -30,7 +30,7 @@ class EmbeddingMetadataObj:
         self.t_hat: float = None
         ##################################################
 
-        # VectorQ Heuristic Policy #######################
+        # vCache Heuristic Policy #######################
         self.prior: np.ndarray = prior
         self.posterior: np.ndarray = posterior
         self.region_reject: List[float] = region_reject

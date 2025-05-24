@@ -2,11 +2,11 @@ from typing import Optional
 
 from typing_extensions import override
 
-from vcache.config import VectorQConfig
-from vcache.vcache_policy.vectorq_policy import VectorQPolicy
+from vcache.config import vCacheConfig
+from vcache.vcache_policy.vcache_policy import vCachePolicy
 
 
-class NoCachePolicy(VectorQPolicy):
+class NoCachePolicy(vCachePolicy):
     def __init__(self):
         """
         This policy does not use a cache and will always compute a response.
@@ -14,7 +14,7 @@ class NoCachePolicy(VectorQPolicy):
         self.inference_engine = None
 
     @override
-    def setup(self, config: VectorQConfig):
+    def setup(self, config: vCacheConfig):
         self.inference_engine = config.inference_engine
 
     @override
@@ -24,7 +24,7 @@ class NoCachePolicy(VectorQPolicy):
         """
         Args
             prompt: str - The prompt to check for cache hit
-            system_prompt: Optional[str] - The optional system prompt to use for the response. It will override the system prompt in the VectorQConfig if provided.
+            system_prompt: Optional[str] - The optional system prompt to use for the response. It will override the system prompt in the vCacheConfig if provided.
         Returns
             tuple[bool, str, str] - [is_cache_hit, actual_response, nn_response]
         """

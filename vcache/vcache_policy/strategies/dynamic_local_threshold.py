@@ -9,7 +9,7 @@ from scipy.stats import norm
 from sklearn.linear_model import LogisticRegression
 from typing_extensions import override
 
-from vcache.config import VectorQConfig
+from vcache.config import vCacheConfig
 from vcache.inference_engine import InferenceEngine
 from vcache.vcache_core.cache.cache import Cache
 from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage.embedding_metadata_obj import (
@@ -19,13 +19,13 @@ from vcache.vcache_core.cache.embedding_store.embedding_store import EmbeddingSt
 from vcache.vcache_core.similarity_evaluator import (
     SimilarityEvaluator,
 )
-from vcache.vcache_policy.vectorq_policy import VectorQPolicy
+from vcache.vcache_policy.vcache_policy import vCachePolicy
 
 
-class DynamicLocalThresholdPolicy(VectorQPolicy):
+class DynamicLocalThresholdPolicy(vCachePolicy):
     def __init__(self, delta: float = 0.01):
         """
-        This policy uses the VectorQ algorithm to compute the optimal threshold for each
+        This policy uses the vCache algorithm to compute the optimal threshold for each
         embedding in the cache.
         Each threshold is used to determine if a response is a cache hit.
 
@@ -38,7 +38,7 @@ class DynamicLocalThresholdPolicy(VectorQPolicy):
         self.cache: Cache = None
 
     @override
-    def setup(self, config: VectorQConfig):
+    def setup(self, config: vCacheConfig):
         self.similarity_evaluator = config.similarity_evaluator
         self.inference_engine = config.inference_engine
         self.cache = Cache(
@@ -57,7 +57,7 @@ class DynamicLocalThresholdPolicy(VectorQPolicy):
         """
         Args
             prompt: str - The prompt to check for cache hit
-            system_prompt: Optional[str] - The optional system prompt to use for the response. It will override the system prompt in the VectorQConfig if provided.
+            system_prompt: Optional[str] - The optional system prompt to use for the response. It will override the system prompt in the vCacheConfig if provided.
         Returns
             tuple[bool, str, str] - [is_cache_hit, actual_response, nn_response]
         """

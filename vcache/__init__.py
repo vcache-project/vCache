@@ -3,7 +3,7 @@ vCache: Reliable and Efficient Semantic Prompt Caching
 """
 
 # Main vCache classes
-from vcache.config import VectorQConfig
+from vcache.config import vCacheConfig
 
 # Inference engines
 from vcache.inference_engine import (
@@ -47,20 +47,20 @@ from vcache.vcache_core.similarity_evaluator import (
     StringComparisonSimilarityEvaluator,
 )
 
-# VectorQ Policies
+# vCache Policies
 from vcache.vcache_policy import (
     DynamicGlobalThresholdPolicy,
     DynamicLocalThresholdPolicy,
     IIDLocalThresholdPolicy,
     NoCachePolicy,
     StaticGlobalThresholdPolicy,
-    VectorQPolicy,
+    vCachePolicy,
 )
 
 __all__ = [
     # Main classes
     "VectorQ",
-    "VectorQConfig",
+    "vCacheConfig",
     # Inference engines
     "InferenceEngine",
     "OpenAIInferenceEngine",
@@ -84,8 +84,8 @@ __all__ = [
     # Embedding metadata storage
     "EmbeddingMetadataStorage",
     "InMemoryEmbeddingMetadataStorage",
-    # VectorQ Policies
-    "VectorQPolicy",
+    # vCache Policies
+    "vCachePolicy",
     "DynamicLocalThresholdPolicy",
     "DynamicGlobalThresholdPolicy",
     "StaticGlobalThresholdPolicy",
