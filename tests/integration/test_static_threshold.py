@@ -8,7 +8,7 @@ from vcache import (
     LangChainEmbeddingEngine,
     OpenAIInferenceEngine,
     StaticGlobalThresholdPolicy,
-    VectorQ,
+    vCache,
     vCacheConfig,
 )
 
@@ -35,7 +35,7 @@ class TestVectorQStaticThreshold(unittest.TestCase):
     def test_basic_functionality(self):
         """Test that the cache correctly identifies hits and misses."""
         config, policy = create_default_config_and_policy()
-        vectorq = VectorQ(config, policy)
+        vectorq = vCache(config, policy)
 
         # First request should be a miss
         cache_hit, response, _ = vectorq.infer_with_cache_info(
@@ -71,7 +71,7 @@ class TestVectorQStaticThreshold(unittest.TestCase):
         """Test different similarity thresholds effect on cache hits."""
         config, policy = create_default_config_and_policy()
         policy.threshold = 0.5
-        vectorq = VectorQ(config, policy)
+        vectorq = vCache(config, policy)
 
         # First request should be a miss
         cache_hit, _, _ = vectorq.infer_with_cache_info(
@@ -91,7 +91,7 @@ class TestVectorQStaticThreshold(unittest.TestCase):
         """Test different similarity thresholds effect on cache hits."""
         config, policy = create_default_config_and_policy()
         policy.threshold = 0.99
-        vectorq = VectorQ(config, policy)
+        vectorq = vCache(config, policy)
 
         # First request should be a miss
         cache_hit, _, _ = vectorq.infer_with_cache_info(

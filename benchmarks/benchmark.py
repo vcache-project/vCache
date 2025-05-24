@@ -19,7 +19,7 @@ from vcache.config import vCacheConfig
 from vcache.inference_engine.strategies.benchmark import (
     BenchmarkInferenceEngine,
 )
-from vcache.main import VectorQ
+from vcache.main import vCache
 from vcache.vcache_core.cache.embedding_engine.strategies.benchmark import (
     BenchmarkEmbeddingEngine,
 )
@@ -200,9 +200,9 @@ PLOT_FONT_SIZE: int = 50
 ### Benchmark Class ####################################################################################################
 ########################################################################################################################
 class Benchmark(unittest.TestCase):
-    def __init__(self, vectorq: VectorQ):
+    def __init__(self, vectorq: vCache):
         super().__init__()
-        self.vectorq: VectorQ = vectorq
+        self.vectorq: vCache = vectorq
         self.embedding_model: Tuple[str, str, str, int] = None
         self.llm_model: Tuple[str, str, str, int] = None
         self.filepath: str = None
@@ -514,7 +514,7 @@ def __run_baseline(
         embedding_metadata_storage=InMemoryEmbeddingMetadataStorage(),
         similarity_evaluator=similarity_evaluator,
     )
-    vectorQ: VectorQ = VectorQ(vectorq_config, vectorq_policy)
+    vectorQ: vCache = vCache(vectorq_config, vectorq_policy)
 
     benchmark = Benchmark(vectorQ)
     benchmark.filepath = dataset_file

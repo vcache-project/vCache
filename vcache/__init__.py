@@ -11,7 +11,7 @@ from vcache.inference_engine import (
     LangChainInferenceEngine,
     OpenAIInferenceEngine,
 )
-from vcache.main import VectorQ
+from vcache.main import vCache
 
 # Embedding engines
 from vcache.vcache_core.cache.embedding_engine import (
@@ -59,7 +59,7 @@ from vcache.vcache_policy import (
 
 __all__ = [
     # Main classes
-    "VectorQ",
+    "vCache",
     "vCacheConfig",
     # Inference engines
     "InferenceEngine",

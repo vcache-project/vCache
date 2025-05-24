@@ -7,7 +7,7 @@ from vcache.vcache_policy.strategies.static_global_threshold import (
 from vcache.vcache_policy.vcache_policy import vCachePolicy
 
 
-class VectorQ:
+class vCache:
     def __init__(
         self,
         config: vCacheConfig = vCacheConfig(),
