@@ -1,9 +1,9 @@
 import unittest
 
-from vcache.vectorq_core.cache.embedding_store.embedding_metadata_storage import (
+from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage import (
     InMemoryEmbeddingMetadataStorage,
 )
-from vcache.vectorq_core.cache.embedding_store.embedding_metadata_storage.embedding_metadata_obj import (
+from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage.embedding_metadata_obj import (
     EmbeddingMetadataObj,
 )
 
