@@ -148,3 +148,16 @@ We provide three open benchmarks:
 - **SemCacheSearchQueries** (real-world search logs) - [Dataset  ↗](https://huggingface.co/datasets/vCache/SemBenchmarkSearchQueries)
 
 See the [Benchmarking Documentation](benchmarks/ReadMe.md) for instructions.
+
+## 📄 Citation
+
+If you use vCache for your research, please cite our [paper](https://arxiv.org/abs/2502.03771).
+
+```bibtex
+@article{schroeder2025adaptive,
+  title={vCache: Verified Semantic Prompt Caching},
+  author={Schroeder, Luis Gaspar and Liu, Shu and Cuadron, Alejandro and Zhao, Mark and Krusche, Stephan and Kemper, Alfons and Zaharia, Matei and Gonzalez, Joseph E},
+  journal={arXiv preprint arXiv:2502.03771},
+  year={2025}
+}
+```
