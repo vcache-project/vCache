@@ -15,11 +15,9 @@ Reliable and Efficient Semantic Prompt Caching
 <br>
 
 
-## 🧑‍💻 Developer Guide
-
 This guide outlines how to set up a development environment for vCache, enforce code quality, and follow coding standards.
 
-
+## 🧑‍💻 Developer Guide Beginning
 
 ### Environment Setup with Poetry
 
@@ -71,9 +69,12 @@ You can manually trigger all pre-commit hooks with:
 poetry run pre-commit run --all-files
 ```
 
+## 🧪 Running Tests
+
+See the [Test Documentation](tests/ReadMe.md) for instructions.
 
 
-### 📏 Coding Guidelines
+## 📏 Coding Guidelines
 
 To ensure consistency across contributions:
 
