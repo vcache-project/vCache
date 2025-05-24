@@ -102,7 +102,7 @@ You can swap out any component—such as the eviction policy or vector database�
 Semantic caching reduces LLM inference latency and cost by reusing previously generated responses for **semantically similar prompts** (not just exact matches). 
 
 <p align="left">
-  <img src="./docs/vCache_architecture.png" alt="vCache Architecture" width="70%">
+  <img src="./docs/vCache_architecture.png" alt="vCache Architecture" width="60%">
 </p>
 
 ### Architecture Overview
@@ -115,7 +115,7 @@ Here’s how it works:
 - If the score is sufficiently high, the cached response is reused.
 
 <p align="left">
-  <img src="./docs/vCache_workflow.png" alt="vCache Architecture" width="55%">
+  <img src="./docs/vCache_workflow.png" alt="vCache Architecture" width="50%">
 </p>
 
 Traditional systems use a **global threshold** to make reuse decisions, but this fails to capture prompt-specific variation in correctness.
@@ -123,7 +123,7 @@ Traditional systems use a **global threshold** to make reuse decisions, but this
 vCache instead learns a **separate decision boundary per embedding** and adapts it over time to guarantee a user-specified error rate.
 
 <p align="left">
-  <img src="./docs/vCache_core.png" alt="vCache Architecture" width="55%">
+  <img src="./docs/vCache_Core.png" alt="vCache Architecture" width="50%">
 </p>
 
 
