@@ -14,4 +14,3 @@ temp/*
 bin/*
 .venv/
 .env
-*.png
