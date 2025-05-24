@@ -31,28 +31,28 @@ def create_default_config_and_policy():
     return config, policy
 
 
-class TestVectorQStaticThreshold(unittest.TestCase):
+class TestvcacheStaticThreshold(unittest.TestCase):
     def test_basic_functionality(self):
         """Test that the cache correctly identifies hits and misses."""
         config, policy = create_default_config_and_policy()
-        vectorq = vCache(config, policy)
+        vcache = vCache(config, policy)
 
         # First request should be a miss
-        cache_hit, response, _ = vectorq.infer_with_cache_info(
+        cache_hit, response, _ = vcache.infer_with_cache_info(
             prompt="What is the capital of France?"
         )
         self.assertFalse(cache_hit, "First request should be a cache miss")
         self.assertTrue(len(response) > 0, "Response should not be empty")
 
         # Same request should be a hit
-        cache_hit, response, _ = vectorq.infer_with_cache_info(
+        cache_hit, response, _ = vcache.infer_with_cache_info(
             prompt="What is the capital of France?"
         )
         self.assertTrue(cache_hit, "Identical request should be a cache hit")
         self.assertTrue(len(response) > 0, "Response should not be empty")
 
         # Similar but different request, should be a hit
-        cache_hit, response, _ = vectorq.infer_with_cache_info(
+        cache_hit, response, _ = vcache.infer_with_cache_info(
             prompt="What's France's capital city?"
         )
         self.assertTrue(
@@ -61,7 +61,7 @@ class TestVectorQStaticThreshold(unittest.TestCase):
         self.assertTrue(len(response) > 0, "Response should not be empty")
 
         # Different request should be a miss
-        cache_hit, response, _ = vectorq.infer_with_cache_info(
+        cache_hit, response, _ = vcache.infer_with_cache_info(
             prompt="What is the capital of Germany?"
         )
         self.assertFalse(cache_hit, "Different request should be a cache miss")
@@ -71,16 +71,16 @@ class TestVectorQStaticThreshold(unittest.TestCase):
         """Test different similarity thresholds effect on cache hits."""
         config, policy = create_default_config_and_policy()
         policy.threshold = 0.5
-        vectorq = vCache(config, policy)
+        vcache = vCache(config, policy)
 
         # First request should be a miss
-        cache_hit, _, _ = vectorq.infer_with_cache_info(
+        cache_hit, _, _ = vcache.infer_with_cache_info(
             prompt="What is the capital of France?"
         )
         self.assertFalse(cache_hit, "First request should be a cache miss")
 
         # Similar request with low threshold should be a hit
-        cache_hit, _, _ = vectorq.infer_with_cache_info(
+        cache_hit, _, _ = vcache.infer_with_cache_info(
             prompt="What's France's capital city?"
         )
         self.assertTrue(
@@ -91,16 +91,16 @@ class TestVectorQStaticThreshold(unittest.TestCase):
         """Test different similarity thresholds effect on cache hits."""
         config, policy = create_default_config_and_policy()
         policy.threshold = 0.99
-        vectorq = vCache(config, policy)
+        vcache = vCache(config, policy)
 
         # First request should be a miss
-        cache_hit, _, _ = vectorq.infer_with_cache_info(
+        cache_hit, _, _ = vcache.infer_with_cache_info(
             prompt="What is the capital of France?"
         )
         self.assertFalse(cache_hit, "First request should be a cache miss")
 
         # Similar request with high threshold should be a miss
-        cache_hit, _, _ = vectorq.infer_with_cache_info(
+        cache_hit, _, _ = vcache.infer_with_cache_info(
             prompt="What's France's capital city?"
         )
         self.assertFalse(

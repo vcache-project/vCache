@@ -32,45 +32,45 @@ def create_default_config_and_policy():
     return config, policy
 
 
-class TestVectorQDynamicThreshold(unittest.TestCase):
+class TestvcacheDynamicThreshold(unittest.TestCase):
     def test_basic_functionality(self):
         """Test that the cache correctly identifies hits and misses."""
         config, policy = create_default_config_and_policy()
-        vectorq = vCache(config, policy)
+        vcache = vCache(config, policy)
 
         # First request should be a miss
-        cache_hit, response, _ = vectorq.infer_with_cache_info(
+        cache_hit, response, _ = vcache.infer_with_cache_info(
             prompt="What is the capital of France?"
         )
         self.assertFalse(cache_hit, "First request should be a cache miss")
         self.assertTrue(len(response) > 0, "Response should not be empty")
 
         # The 2nd to 5th request should be miss because it's still adjusting the threshold
-        cache_hit, response, _ = vectorq.infer_with_cache_info(
+        cache_hit, response, _ = vcache.infer_with_cache_info(
             prompt="What's France's capital city?"
         )
         self.assertFalse(cache_hit, "Second request should be a cache miss")
         self.assertTrue(len(response) > 0, "Response should not be empty")
-        cache_hit, response, _ = vectorq.infer_with_cache_info(
+        cache_hit, response, _ = vcache.infer_with_cache_info(
             prompt="France's capital city is called what?"
         )
         self.assertFalse(cache_hit, "Identical request should be a cache hit")
         self.assertTrue(len(response) > 0, "Response should not be empty")
-        cache_hit, response, _ = vectorq.infer_with_cache_info(
+        cache_hit, response, _ = vcache.infer_with_cache_info(
             prompt="Tell me the capital city of France"
         )
-        cache_hit, response, _ = vectorq.infer_with_cache_info(
+        cache_hit, response, _ = vcache.infer_with_cache_info(
             prompt="Which city is the capital of France?"
         )
 
         # After several tries with the Bayesian policy, we should now get a hit
-        cache_hit, response, _ = vectorq.infer_with_cache_info(
+        cache_hit, response, _ = vcache.infer_with_cache_info(
             prompt="The capital of France is?"
         )
         self.assertTrue(cache_hit, "Similar request should now be a cache hit")
         self.assertTrue(len(response) > 0, "Response should not be empty")
 
-        cache_hit, response, _ = vectorq.infer_with_cache_info(
+        cache_hit, response, _ = vcache.infer_with_cache_info(
             prompt="Can you tell me what the capital of France is?"
         )
         self.assertTrue(cache_hit, "Similar request should now be a cache hit")
