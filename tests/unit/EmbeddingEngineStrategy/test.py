@@ -3,7 +3,7 @@ import unittest
 
 import pytest
 
-from vectorq.vectorq_core.cache.embedding_engine import (
+from vcache.vectorq_core.cache.embedding_engine import (
     LangChainEmbeddingEngine,
     OpenAIEmbeddingEngine,
 )

@@ -2,7 +2,7 @@ import unittest
 
 from dotenv import load_dotenv
 
-from vectorq import (
+from vcache import (
     NoCachePolicy,
     OpenAIInferenceEngine,
     VectorQ,
