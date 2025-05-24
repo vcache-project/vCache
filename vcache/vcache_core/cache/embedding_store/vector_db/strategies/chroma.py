@@ -59,7 +59,7 @@ class ChromaVectorDB(VectorDB):
 
     def _init_vector_store(self, embedding_dim: int):
         self.client = chromadb.Client()
-        collection_name = f"vectorq_collection_{id(self)}"
+        collection_name = f"vcache_collection_{id(self)}"
         metric_type = self.similarity_metric_type.value
         match metric_type:
             case "cosine":

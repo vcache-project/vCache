@@ -200,9 +200,9 @@ PLOT_FONT_SIZE: int = 50
 ### Benchmark Class ####################################################################################################
 ########################################################################################################################
 class Benchmark(unittest.TestCase):
-    def __init__(self, vectorq: VCache):
+    def __init__(self, vcache: VCache):
         super().__init__()
-        self.vectorq: VCache = vectorq
+        self.vcache: VCache = vcache
         self.embedding_model: Tuple[str, str, str, int] = None
         self.llm_model: Tuple[str, str, str, int] = None
         self.filepath: str = None
@@ -220,7 +220,7 @@ class Benchmark(unittest.TestCase):
         self.tn_list: List[int] = []
         self.fn_list: List[int] = []
         self.latency_direct_list: List[float] = []
-        self.latency_vectorq_list: List[float] = []
+        self.latency_vcach_list: List[float] = []
         self.observations_dict: Dict[str, Dict[str, float]] = {}
         self.gammas_dict: Dict[str, float] = {}
         self.t_hats_dict: Dict[str, float] = {}
@@ -276,8 +276,8 @@ class Benchmark(unittest.TestCase):
                     candidate_embedding: List[float] = data_entry[
                         self.embedding_model[0]
                     ]
-                    is_cache_hit, cache_response, nn_response, latency_vectorq_logic = (
-                        self.get_vectorQ_answer(
+                    is_cache_hit, cache_response, nn_response, latency_vcache_logic = (
+                        self.get_vcache_answer(
                             task=task,
                             review_text=review_text,
                             candidate_embedding=candidate_embedding,
@@ -285,11 +285,11 @@ class Benchmark(unittest.TestCase):
                             system_prompt=system_prompt,
                         )
                     )
-                    latency_vectorq: float = (
-                        latency_vectorq_logic + emb_generation_latency
+                    latency_vcache: float = (
+                        latency_vcache_logic + emb_generation_latency
                     )
                     if not is_cache_hit:
-                        latency_vectorq += llm_generation_latency
+                        latency_vcache += llm_generation_latency
 
                     # 3) Update Stats
                     self.update_stats(
@@ -298,7 +298,7 @@ class Benchmark(unittest.TestCase):
                         cache_response=cache_response,
                         nn_response=nn_response,
                         latency_direct=latency_direct,
-                        latency_vectorq=latency_vectorq,
+                        latency_vcache=latency_vcache,
                     )
 
                     pbar.update(1)
@@ -330,7 +330,7 @@ class Benchmark(unittest.TestCase):
         cache_response: str,
         nn_response: str,
         latency_direct: float,
-        latency_vectorq: float,
+        latency_vcache: float,
     ):
         if is_cache_hit:  # If cache hit, the actual response is the nearest neighbor response (cache_response == nn_response)
             self.cache_hit_list.append(1)
@@ -362,9 +362,9 @@ class Benchmark(unittest.TestCase):
             self.fp_list.append(0)
 
         self.latency_direct_list.append(latency_direct)
-        self.latency_vectorq_list.append(latency_vectorq)
+        self.latency_vcache_list.append(latency_vcache)
 
-    def get_vectorQ_answer(
+    def get_vcache_answer(
         self,
         task: str,
         review_text: str,
@@ -373,7 +373,7 @@ class Benchmark(unittest.TestCase):
         system_prompt: str,
     ) -> Tuple[bool, str, str, float]:
         """
-        Returns: Tuple[bool, str, str, float] - [is_cache_hit, cache_response, nn_response, latency_vectorq_logic]
+        Returns: Tuple[bool, str, str, float] - [is_cache_hit, cache_response, nn_response, latency_vcache_logic]
         """
         if isinstance(candidate_embedding, torch.Tensor):
             candidate_embedding = candidate_embedding.tolist()
@@ -386,17 +386,17 @@ class Benchmark(unittest.TestCase):
                 for val in candidate_embedding
             ]
 
-        self.vectorq.vectorq_config.embedding_engine.set_next_embedding(
+        self.vcache.vcache_config.embedding_engine.set_next_embedding(
             candidate_embedding
         )
-        self.vectorq.vectorq_config.inference_engine.set_next_response(label_response)
+        self.vcache.vcache_config.inference_engine.set_next_response(label_response)
 
-        vectorQ_prompt = f"{task} {review_text}"
-        latency_vectorq_logic: float = time.time()
+        prompt = f"{task} {review_text}"
+        latency_vcache_logic: float = time.time()
         try:
             is_cache_hit, cache_response, nn_response = (
-                self.vectorq.infer_with_cache_info(
-                    prompt=vectorQ_prompt,
+                self.vcache.infer_with_cache_info(
+                    prompt=prompt,
                     system_prompt=system_prompt,
                 )
             )
@@ -406,8 +406,8 @@ class Benchmark(unittest.TestCase):
             )
             raise e
 
-        latency_vectorq_logic = time.time() - latency_vectorq_logic
-        return is_cache_hit, cache_response, nn_response, latency_vectorq_logic
+        latency_vcache_logic = time.time() - latency_vcache_logic
+        return is_cache_hit, cache_response, nn_response, latency_vcache_logic
 
     def dump_results_to_json(self):
         observations_dict = {}
@@ -417,7 +417,7 @@ class Benchmark(unittest.TestCase):
         var_ts_dict = {}
 
         metadata_objects: List[EmbeddingMetadataObj] = (
-            self.vectorq.vectorq_config.embedding_metadata_storage.get_all_embedding_metadata_objects()
+            self.vcache.vcache_config.embedding_metadata_storage.get_all_embedding_metadata_objects()
         )
 
         for metadata_object in metadata_objects:
@@ -437,12 +437,12 @@ class Benchmark(unittest.TestCase):
 
         try:
             global_observations_dict = (
-                self.vectorq.vectorq_policy.bayesian.global_observations
+                self.vcache.vcache_policy.bayesian.global_observations
             )
-            global_gamma = self.vectorq.vectorq_policy.bayesian.global_gamma
-            global_t_hat = self.vectorq.vectorq_policy.bayesian.global_t_hat
-            global_t_prime = self.vectorq.vectorq_policy.bayesian.global_t_prime
-            global_var_t = self.vectorq.vectorq_policy.bayesian.global_var_t
+            global_gamma = self.vcache.vcache_policy.bayesian.global_gamma
+            global_t_hat = self.vcache.vcache_policy.bayesian.global_t_hat
+            global_t_prime = self.vcache.vcache_policy.bayesian.global_t_prime
+            global_var_t = self.vcache.vcache_policy.bayesian.global_var_t
         except Exception:
             global_observations_dict = {}
             global_gamma = None
@@ -465,7 +465,7 @@ class Benchmark(unittest.TestCase):
             "tn_list": self.tn_list,
             "fn_list": self.fn_list,
             "latency_direct_list": self.latency_direct_list,
-            "latency_vectorq_list": self.latency_vectorq_list,
+            "latency_vectorq_list": self.latency_vcach_list,
             "observations_dict": self.observations_dict,
             "gammas_dict": self.gammas_dict,
             "t_hats_dict": self.t_hats_dict,
@@ -490,7 +490,7 @@ class Benchmark(unittest.TestCase):
 
 
 def __run_baseline(
-    vectorq_policy: VCachePolicy,
+    vcache_policy: VCachePolicy,
     path: str,
     dataset_file: str,
     embedding_model: Tuple[str, str, str, int],
@@ -504,7 +504,7 @@ def __run_baseline(
     else:
         similarity_evaluator = StringComparisonSimilarityEvaluator()
 
-    vectorq_config: VCacheConfig = VCacheConfig(
+    vcache_config: VCacheConfig = VCacheConfig(
         inference_engine=BenchmarkInferenceEngine(),
         embedding_engine=BenchmarkEmbeddingEngine(),
         vector_db=HNSWLibVectorDB(
@@ -514,9 +514,9 @@ def __run_baseline(
         embedding_metadata_storage=InMemoryEmbeddingMetadataStorage(),
         similarity_evaluator=similarity_evaluator,
     )
-    vectorQ: VCache = VCache(vectorq_config, vectorq_policy)
+    vcache: VCache = VCache(vcache_config, vcache_policy)
 
-    benchmark = Benchmark(vectorQ)
+    benchmark = Benchmark(vcache)
     benchmark.filepath = dataset_file
     benchmark.embedding_model = embedding_model
     benchmark.llm_model = llm_model
@@ -575,7 +575,7 @@ def main():
                         )
 
                         __run_baseline(
-                            vectorq_policy=DynamicLocalThresholdPolicy(delta=delta),
+                            vcache_policy=DynamicLocalThresholdPolicy(delta=delta),
                             path=path,
                             dataset_file=dataset_file,
                             embedding_model=embedding_model.value,
@@ -604,7 +604,7 @@ def main():
                     )
 
                     __run_baseline(
-                        vectorq_policy=DynamicGlobalThresholdPolicy(delta=delta),
+                        vcache_policy=DynamicGlobalThresholdPolicy(delta=delta),
                         path=path,
                         dataset_file=dataset_file,
                         embedding_model=embedding_model.value,
@@ -650,7 +650,7 @@ def main():
                     logging.info(f"Using static threshold: {threshold}")
 
                     __run_baseline(
-                        vectorq_policy=StaticGlobalThresholdPolicy(threshold=threshold),
+                        vcache_policy=StaticGlobalThresholdPolicy(threshold=threshold),
                         path=path,
                         dataset_file=dataset_file,
                         embedding_model=berkeley_embedding_model.value,
@@ -699,7 +699,7 @@ def main():
                         )
 
                         __run_baseline(
-                            vectorq_policy=DynamicLocalThresholdPolicy(delta=delta),
+                            vcache_policy=DynamicLocalThresholdPolicy(delta=delta),
                             path=path,
                             dataset_file=dataset_file,
                             embedding_model=berkeley_embedding_model.value,
@@ -729,7 +729,7 @@ def main():
                         )
 
                         __run_baseline(
-                            vectorq_policy=IIDLocalThresholdPolicy(delta=delta),
+                            vcache_policy=IIDLocalThresholdPolicy(delta=delta),
                             path=path,
                             dataset_file=dataset_file,
                             embedding_model=embedding_model.value,
@@ -756,7 +756,7 @@ def main():
                     logging.info(f"Using static threshold: {threshold}")
 
                     __run_baseline(
-                        vectorq_policy=StaticGlobalThresholdPolicy(threshold=threshold),
+                        vcache_policy=StaticGlobalThresholdPolicy(threshold=threshold),
                         path=path,
                         dataset_file=dataset_file,
                         embedding_model=embedding_model.value,

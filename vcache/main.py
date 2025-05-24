@@ -13,9 +13,9 @@ class VCache:
         config: VCacheConfig = VCacheConfig(),
         policy: VCachePolicy = StaticGlobalThresholdPolicy(),
     ):
-        self.vectorq_config = config
-        self.vectorq_policy = policy
-        self.vectorq_policy.setup(config)
+        self.vcache_config = config
+        self.vcache_policy = policy
+        self.vcache_policy.setup(config)
 
     def infer(
         self,
@@ -47,9 +47,9 @@ class VCache:
             Tuple[bool, str, str] - [is_cache_hit, response, nn_response] (the response is the one supposed to be used by the user, the nn_response is for benchmarking purposes)
         """
         if system_prompt is None:
-            system_prompt = self.vectorq_config.system_prompt
+            system_prompt = self.vcache_config.system_prompt
 
-        return self.vectorq_policy.process_request(prompt, system_prompt)
+        return self.vcache_policy.process_request(prompt, system_prompt)
 
     def import_data(self, data: List[str]) -> bool:
         # TODO

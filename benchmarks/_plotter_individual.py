@@ -128,7 +128,7 @@ def __plot_error_rate_cache_hit_rate_duration_avg_latency(
     )
     cache_hit_rate_acc_list = [rate * 100 for rate in cache_hit_rate_acc_list]
 
-    duration_vectorq_acc_list = compute_duration_cumulative_list(
+    duration_vcache_acc_list = compute_duration_cumulative_list(
         latency_list=df["latency_vectorq_list"]
     )
     duration_direct_acc_list = compute_duration_cumulative_list(
@@ -162,10 +162,10 @@ def __plot_error_rate_cache_hit_rate_duration_avg_latency(
     axes[0, 1].tick_params(axis="both", labelsize=font_size - 2)
 
     # Plot vCache and DirectDuration
-    duration_vectorq_minutes = [d / 60.0 for d in duration_vectorq_acc_list]
+    duration_vcache_minutes = [d / 60.0 for d in duration_vcache_acc_list]
     duration_direct_minutes = [d / 60.0 for d in duration_direct_acc_list]
     axes[1, 0].plot(
-        sample_index, duration_vectorq_minutes, "b-", linewidth=2, label="vCache"
+        sample_index, duration_vcache_minutes, "b-", linewidth=2, label="vCache"
     )
     axes[1, 0].plot(
         sample_index, duration_direct_minutes, "m-", linewidth=2, label="Direct"
@@ -210,7 +210,7 @@ def __plot_error_rate_cache_hit_rate_duration_avg_latency(
 def __plot_avg_latency_cache_hit_rate_cache_miss_rate(
     benchmark: "Benchmark", df: pd.DataFrame
 ):
-    avg_latency_vectorq_overall = compute_avg_latency_score(
+    avg_latency_vcache_overall = compute_avg_latency_score(
         latency_list=df["latency_vectorq_list"]
     )
     avg_latency_direct_overall = compute_avg_latency_score(
@@ -220,19 +220,19 @@ def __plot_avg_latency_cache_hit_rate_cache_miss_rate(
     cache_hit_mask = df["cache_hit_list"] > 0
     cache_miss_mask = df["cache_miss_list"] > 0
 
-    latency_vectorq_cache_hit_list = df.loc[cache_hit_mask, "latency_vectorq_list"]
-    latency_vectorq_cache_miss_list = df.loc[cache_miss_mask, "latency_vectorq_list"]
+    latency_vcache_cache_hit_list = df.loc[cache_hit_mask, "latency_vectorq_list"]
+    latency_vcache_cache_miss_list = df.loc[cache_miss_mask, "latency_vectorq_list"]
 
-    avg_latency_vectorq_cache_hit = 0
-    if not latency_vectorq_cache_hit_list.empty:
-        avg_latency_vectorq_cache_hit = compute_avg_latency_score(
-            latency_list=latency_vectorq_cache_hit_list
+    avg_latency_vcache_cache_hit = 0
+    if not latency_vcache_cache_hit_list.empty:
+        avg_latency_vcache_cache_hit = compute_avg_latency_score(
+            latency_list=latency_vcache_cache_hit_list
         )
 
-    avg_latency_vectorq_cache_miss = 0
-    if not latency_vectorq_cache_miss_list.empty:
-        avg_latency_vectorq_cache_miss = compute_avg_latency_score(
-            latency_list=latency_vectorq_cache_miss_list
+    avg_latency_vcache_cache_miss = 0
+    if not latency_vcache_cache_miss_list.empty:
+        avg_latency_vcache_cache_miss = compute_avg_latency_score(
+            latency_list=latency_vcache_cache_miss_list
         )
 
     latency_direct_cache_hit_list = df.loc[cache_hit_mask, "latency_direct_list"]
@@ -250,32 +250,32 @@ def __plot_avg_latency_cache_hit_rate_cache_miss_rate(
             latency_list=latency_direct_cache_miss_list
         )
 
-    cache_hit_rate_vectorq = compute_cache_hit_rate_score(
+    cache_hit_rate_vcache = compute_cache_hit_rate_score(
         cache_hit_list=df["cache_hit_list"]
     )
-    cache_miss_rate_vectorq = 1 - cache_hit_rate_vectorq
+    cache_miss_rate_vcache = 1 - cache_hit_rate_vcache
 
-    error_rate_vectorq = compute_error_rate_score(fp=df["fp_list"])
+    error_rate_vcache = compute_error_rate_score(fp=df["fp_list"])
 
-    duration_vectorq = compute_duration_score(latency_list=df["latency_vectorq_list"])
+    duration_vcache = compute_duration_score(latency_list=df["latency_vectorq_list"])
 
     duration_direct = compute_duration_score(latency_list=df["latency_direct_list"])
 
-    accuracy_vectorq = compute_accuracy_score(
+    accuracy_vcache = compute_accuracy_score(
         tp=df["tp_list"],
         fp=df["fp_list"],
         tn=df["tn_list"],
         fn=df["fn_list"],
     )
-    precision_vectorq = compute_precision_score(
+    precision_vcache = compute_precision_score(
         tp=df["tp_list"],
         fp=df["fp_list"],
     )
-    recall_vectorq = compute_recall_score(
+    recall_vcache = compute_recall_score(
         tp=df["tp_list"],
         fn=df["fn_list"],
     )
-    f1_score_vectorq = compute_f1_score_score(
+    f1_score_vcache = compute_f1_score_score(
         tp=df["tp_list"],
         fp=df["fp_list"],
         fn=df["fn_list"],
@@ -284,57 +284,57 @@ def __plot_avg_latency_cache_hit_rate_cache_miss_rate(
     statistics = {
         "avg_latency": {
             "cache": {
-                "overall": float(avg_latency_vectorq_overall),
-                "cache_hit": float(avg_latency_vectorq_cache_hit),
-                "cache_miss": float(avg_latency_vectorq_cache_miss),
+                "overall": float(avg_latency_vcache_overall),
+                "cache_hit": float(avg_latency_vcache_cache_hit),
+                "cache_miss": float(avg_latency_vcache_cache_miss),
             },
             "direct": {"overall": float(avg_latency_direct_overall)},
             "difference": {
                 "overall": float(
-                    avg_latency_direct_overall - avg_latency_vectorq_overall
+                    avg_latency_direct_overall - avg_latency_vcache_overall
                 ),
                 "cache_hit": float(
-                    avg_latency_direct_cache_hit - avg_latency_vectorq_cache_hit
+                    avg_latency_direct_cache_hit - avg_latency_vcache_cache_hit
                 ),
                 "cache_miss": float(
-                    avg_latency_direct_cache_miss - avg_latency_vectorq_cache_miss
+                    avg_latency_direct_cache_miss - avg_latency_vcache_cache_miss
                 ),
             },
             "ratio": {
                 "overall": float(
-                    avg_latency_direct_overall / avg_latency_vectorq_overall
+                    avg_latency_direct_overall / avg_latency_vcache_overall
                 )
-                if avg_latency_vectorq_overall > 0
+                if avg_latency_vcache_overall > 0
                 else "N/A",
                 "cache_hit": float(
-                    avg_latency_direct_cache_hit / avg_latency_vectorq_cache_hit
+                    avg_latency_direct_cache_hit / avg_latency_vcache_cache_hit
                 )
-                if avg_latency_vectorq_cache_hit > 0
+                if avg_latency_vcache_cache_hit > 0
                 else "N/A",
                 "cache_miss": float(
-                    avg_latency_direct_cache_miss / avg_latency_vectorq_cache_miss
+                    avg_latency_direct_cache_miss / avg_latency_vcache_cache_miss
                 )
-                if avg_latency_vectorq_cache_miss > 0
+                if avg_latency_vcache_cache_miss > 0
                 else "N/A",
             },
         },
         "cache": {
-            "hit_rate": float(cache_hit_rate_vectorq),
-            "miss_rate": float(cache_miss_rate_vectorq),
+            "hit_rate": float(cache_hit_rate_vcache),
+            "miss_rate": float(cache_miss_rate_vcache),
             "total_samples": int(len(df["latency_vectorq_list"])),
             "hits": int(df["cache_hit_list"].iloc[-1]),
             "misses": int(df["cache_miss_list"].iloc[-1]),
-            "error_rate": float(error_rate_vectorq),
+            "error_rate": float(error_rate_vcache),
         },
         "duration": {
-            "vectorq": float(duration_vectorq),
+            "vectorq": float(duration_vcache),
             "direct": float(duration_direct),
         },
         "statistics": {
-            "accuracy": float(accuracy_vectorq),
-            "precision": float(precision_vectorq),
-            "recall": float(recall_vectorq),
-            "f1_score": float(f1_score_vectorq),
+            "accuracy": float(accuracy_vcache),
+            "precision": float(precision_vcache),
+            "recall": float(recall_vcache),
+            "f1_score": float(f1_score_vcache),
         },
     }
 
