@@ -1,6 +1,6 @@
 ---
-name: "[Short, Descriptive Title]"
-about: A one-sentence description
+name: vCache Issue Template
+about: Please use this template to create issues
 title: ''
 labels: ''
 assignees: ''
@@ -13,6 +13,9 @@ Please set the GitHub labels
  • Priority: Low, Medium, Urgent  
  • Type: Enhancement, Bug, Documentation, Good first issue, Help wanted
 -->
+
+### Description
+_A concise summary of the issue or feature request._
 
 ### Requirements
 - [ ] Followed coding conventions
