@@ -17,7 +17,8 @@ Reliable and Efficient Semantic Prompt Caching
 
 
 
-**vCache** is the first *verified* semantic cache for large language models (LLMs) with **user-defined failure rate guarantees**. Unlike existing systems that use a fixed global similarity threshold, vCache dynamically learns an optimal **per-embedding threshold** online, without any additional training. This approach enables **reliable reuse** of cached responses and **low latency inference**, even under tight error-rate constraints.
+**vCache** is the first verified semantic cache for LLMs that **guarantees user-defined error rate bounds**. Semantic caching reduces LLM latency and cost by returning cached model responses for semantically similar prompts (not just exact matches). vCache replaces static thresholds with **online-learned, embedding-specific decision boundaries**—no manual fine-tuning required. This enables reliable cached response reuse across any embedding model or workload.
+
 
 
 > [NOTE]
@@ -102,7 +103,7 @@ You can swap out any component—such as the eviction policy or vector database�
 
 ## 🧠 What Is Semantic Caching?
 
-Semantic caching reduces LLM latency and cost by reusing past model responses for **semantically similar** prompts—so you don’t pay for inference cost and latency on repeated questions that have the same answer.
+Semantic caching reduces LLM latency and cost by returning cached model responses for **semantically similar** prompts (not just exact matches)—so you don’t pay for inference cost and latency on repeated questions that have the same answer.
 
 <p align="left">
   <img src="./docs/vCache_architecture.png" alt="vCache Architecture" width="50%">
@@ -162,36 +163,6 @@ vCache overcomes these limitations with two ideas:
 
 Please refer to the [vCache paper](https://arxiv.org/abs/2502.03771) for further details.
 
-<!-- ## 🧠 What Is Semantic Caching?
-
-Semantic caching reduces LLM inference latency and cost by reusing previously generated responses for **semantically similar prompts** (not just exact matches). 
-
-<p align="left">
-  <img src="./docs/vCache_architecture.png" alt="vCache Architecture" width="60%">
-</p>
-
-### Architecture Overview
-
-
-Here’s how it works:
-- Prompts are embedded using a vector encoder and stored in a vector database.
-- At query time, the most similar cached prompt is retrieved.
-- A similarity score (e.g., cosine) is computed.
-- If the score is sufficiently high, the cache returns the to the user. Otherwise, the cache sends a request to the inference server, updates the vector database, and returns the response to the user.
-
-<p align="left">
-  <img src="./docs/vCache_workflow.png" alt="vCache Workflow" width="50%">
-</p>
-
-Traditional systems use a **global threshold** to make reuse decisions, but this fails to capture prompt-specific variation in correctness.
-
-vCache instead learns a **separate decision boundary per embedding** and adapts it over time to guarantee a user-specified error rate.
-
-<p align="left">
-  <img src="./docs/vCache_core.png" alt="vCache Core" width="50%">
-</p>
-
-vCache uses a simple probabilistic framework to bound the error rate conditioned on the per-prompt thresholds. When deploying vCache, the user specifies a maximum error rate, and the system maximizes the cache hit rate subject to this correctness constraint. -->
 
 ## 🛠 Developer Guide
 
