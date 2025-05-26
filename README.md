@@ -106,7 +106,12 @@ You can swap out any component—such as the eviction policy or vector database�
 Semantic caching reduces LLM latency and cost by returning cached model responses for **semantically similar** prompts (not just exact matches)—so you don’t pay for inference cost and latency on repeated questions that have the same answer.
 
 <p align="left">
-  <img src="./docs/vCache_architecture.png" alt="vCache Architecture" width="50%">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./docs/vCache_architecture.png">
+    <source media="(prefers-color-scheme: light)" srcset="./docs/vCache_architecture_white.png">
+    <!-- Fallback -->
+    <img alt="vCache Architecture" src="./docs/vCache_architecture.png" width="50%">
+  </picture>
 </p>
 
 ### Architecture Overview
@@ -125,7 +130,12 @@ The system computes a score between 0 and 1 that quantifies how “close” the 
    - **Explore (cache miss):** Otherwise, infer the LLM for a response, add its embedding and answer to the cache, and return it.
 
 <p align="left">
-  <img src="./docs/vCache_workflow.png" alt="vCache Workflow" width="45%">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./docs/vCache_workflow.png">
+    <source media="(prefers-color-scheme: light)" srcset="./docs/vCache_workflow_white.png">
+    <!-- Fallback -->
+    <img alt="vCache Architecture" src="./docs/vCache_workflow.png" width="45%">
+  </picture>
 </p>
 
 ### Why Fixed Thresholds Fall Short
@@ -157,8 +167,13 @@ vCache overcomes these limitations with two ideas:
 - **Simplicity**  
   Plug in any embedding model; vCache learns and adapts automatically at runtime.
 
-<p align="left">
-  <img src="./docs/vCache_core.png" alt="vCache Core" width="50%">
+  <p align="left">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./docs/vCache_core.png">
+    <source media="(prefers-color-scheme: light)" srcset="./docs/vCache_core_white.png">
+    <!-- Fallback -->
+    <img alt="vCache Architecture" src="./docs/vCache_core.png" width="50%">
+  </picture>
 </p>
 
 Please refer to the [vCache paper](https://arxiv.org/abs/2502.03771) for further details.
