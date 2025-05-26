@@ -8,32 +8,21 @@
   </picture>
 </p>
 
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <h3 align="center">
 Reliable and Efficient Semantic Prompt Caching
 </h3>
 <br>
 
-<style>
-  img.vcache {
-    width: 50%;
-    height: auto;
-  }
 
-  @media only screen and (max-width: 600px) {
-    img.vcache {
-      width: 90% !important;
-    }
-  }
-</style>
+
 
 Semantic caching reduces LLM latency and cost by returning cached model responses for semantically similar prompts (not just exact matches). **vCache** is the first verified semantic cache that **guarantees user-defined error rate bounds**. vCache replaces static thresholds with **online-learned, embedding-specific decision boundaries**—no manual fine-tuning required. This enables reliable cached response reuse across any embedding model or workload.
 
 
 
 > [NOTE]
-> vCache is in active development. Features and APIs may change as we continue to improve the system.
+> vCache is currently in active development. Features and APIs may change as we continue to improve the system.
 
 
 
@@ -117,7 +106,7 @@ You can swap out any component—such as the eviction policy or vector database�
 Semantic caching reduces LLM latency and cost by returning cached model responses for **semantically similar** prompts (not just exact matches)—so you don’t pay for inference cost and latency on repeated questions that have the same answer.
 
 <p align="left">
-  <img src="./docs/vCache_architecture.png" alt="vCache Architecture" class="vcache">
+  <img src="./docs/vCache_architecture.png" alt="vCache Architecture" width="50%">
 </p>
 
 ### Architecture Overview
@@ -136,7 +125,7 @@ The system computes a score between 0 and 1 that quantifies how “close” the 
    - **Explore (cache miss):** Otherwise, infer the LLM for a response, add its embedding and answer to the cache, and return it.
 
 <p align="left">
-  <img src="./docs/vCache_workflow.png" alt="vCache Workflow" class="vcache">
+  <img src="./docs/vCache_workflow.png" alt="vCache Workflow" width="45%">
 </p>
 
 ### Why Fixed Thresholds Fall Short
@@ -169,9 +158,7 @@ vCache overcomes these limitations with two ideas:
   Plug in any embedding model; vCache learns and adapts automatically at runtime.
 
 <p align="left">
-  <img src="./docs/vCache_core.png"
-       alt="vCache Core"
-       class="vcache">
+  <img src="./docs/vCache_core.png" alt="vCache Core" width="50%">
 </p>
 
 Please refer to the [vCache paper](https://arxiv.org/abs/2502.03771) for further details.
