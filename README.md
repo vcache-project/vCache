@@ -14,15 +14,25 @@ Reliable and Efficient Semantic Prompt Caching
 </h3>
 <br>
 
+<style>
+  img.vcache {
+    width: 50%;
+    height: auto;
+  }
 
+  @media only screen and (max-width: 600px) {
+    img.vcache {
+      width: 90% !important;
+    }
+  }
+</style>
 
-
-**vCache** is the first verified semantic cache for LLMs that **guarantees user-defined error rate bounds**. Semantic caching reduces LLM latency and cost by returning cached model responses for semantically similar prompts (not just exact matches). vCache replaces static thresholds with **online-learned, embedding-specific decision boundaries**—no manual fine-tuning required. This enables reliable cached response reuse across any embedding model or workload.
+Semantic caching reduces LLM latency and cost by returning cached model responses for semantically similar prompts (not just exact matches). **vCache** is the first verified semantic cache that **guarantees user-defined error rate bounds**. vCache replaces static thresholds with **online-learned, embedding-specific decision boundaries**—no manual fine-tuning required. This enables reliable cached response reuse across any embedding model or workload.
 
 
 
 > [NOTE]
-> vCache is currently in active development. Features and APIs may change as we continue to improve the system.
+> vCache is in active development. Features and APIs may change as we continue to improve the system.
 
 
 
@@ -106,7 +116,7 @@ You can swap out any component—such as the eviction policy or vector database�
 Semantic caching reduces LLM latency and cost by returning cached model responses for **semantically similar** prompts (not just exact matches)—so you don’t pay for inference cost and latency on repeated questions that have the same answer.
 
 <p align="left">
-  <img src="./docs/vCache_architecture.png" alt="vCache Architecture" width="50%">
+  <img src="./docs/vCache_architecture.png" alt="vCache Architecture" class="vcache">
 </p>
 
 ### Architecture Overview
@@ -125,7 +135,7 @@ The system computes a score between 0 and 1 that quantifies how “close” the 
    - **Explore (cache miss):** Otherwise, infer the LLM for a response, add its embedding and answer to the cache, and return it.
 
 <p align="left">
-  <img src="./docs/vCache_workflow.png" alt="vCache Workflow" width="45%">
+  <img src="./docs/vCache_workflow.png" alt="vCache Workflow" class="vcache">
 </p>
 
 ### Why Fixed Thresholds Fall Short
@@ -136,7 +146,7 @@ Existing semantic caches rely on a **global static threshold** to decide whether
 - **Threshold too high → false negatives:** Prompts with semantically equivalent meaning may fail the similarity check, forcing unnecessary LLM inference and reducing cache efficiency.
 - **No correctness control:** There is no mechanism to ensure or even estimate how often reused answers will be wrong.
 
-In short, fixed thresholds trade correctness for simplicity—and offer no guarantees. Please refer to the [vCache paper](https://arxiv.org/abs/2502.03771) for further details.
+In short, fixed thresholds trade correctness for simplicity and offer no guarantees. Please refer to the [vCache paper](https://arxiv.org/abs/2502.03771) for further details.
 
 ### Introducing vCache
 
@@ -146,7 +156,7 @@ vCache overcomes these limitations with two ideas:
   vCache learns a custom decision boundary for each cached prompt, based on past observations of “how often similarity × actually matched the correct response.”
 
 - **Built-In Error Constraint**  
-  You specify a maximum error rate (e.g., 1%). vCache adjusts every per-prompt decision boundary online —no offline training or fine-tuning required.
+  You specify a maximum error rate (e.g., 1%). vCache adjusts every per-prompt decision boundary online. The algorithm enforces optimized cache hit rates and does not require offline training or manual fine-tuning.
 
 ### Benefits
 
@@ -158,7 +168,9 @@ vCache overcomes these limitations with two ideas:
   Plug in any embedding model; vCache learns and adapts automatically at runtime.
 
 <p align="left">
-  <img src="./docs/vCache_core.png" alt="vCache Core" width="50%">
+  <img src="./docs/vCache_core.png"
+       alt="vCache Core"
+       class="vcache">
 </p>
 
 Please refer to the [vCache paper](https://arxiv.org/abs/2502.03771) for further details.
