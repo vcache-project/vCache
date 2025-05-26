@@ -17,11 +17,6 @@ Please set the GitHub labels
 ### Description
 _A concise summary of the issue or feature request._
 
-### Requirements
-- [ ] Followed coding conventions
-- [ ] Implemented or updated tests
-- [ ] <…>
-
 ### Impact
 - **Who**: <Who or what will be affected (e.g. “Developer“, “Companies“)>  
 - **What**: <Type of impact (e.g. “Performance regression”, “Data integrity”)>  
@@ -31,6 +26,8 @@ _A concise summary of the issue or feature request._
 _A sketch of the approach or design. You might want to include links to mockups, RFCs, docs, etc._
 
 ### Acceptance Criteria
+- [ ] Followed coding conventions
+- [ ] Implemented or updated tests
 - [ ] <…>
 
 ### Risks & Dependencies
