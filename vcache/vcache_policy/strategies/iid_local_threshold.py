@@ -92,12 +92,12 @@ class IIDLocalThresholdPolicy(VCachePolicy):
                     similarity_score=similarity_score,
                     is_correct=should_have_exploited,
                     metadata=metadata,
+                    cache=self.cache,
+                    embedding_id=embedding_id,
                 )
                 if not should_have_exploited:
                     self.cache.add(prompt=prompt, response=response)
-                self.cache.update_metadata(
-                    embedding_id=embedding_id, embedding_metadata=metadata
-                )
+
                 return False, response, metadata.response
 
 
@@ -113,7 +113,12 @@ class _Algorithm:
         self.thold_grid: np.ndarray = np.linspace(0, 1, 20)
 
     def update_metadata(
-        self, similarity_score: float, is_correct: bool, metadata: EmbeddingMetadataObj
+        self,
+        similarity_score: float,
+        is_correct: bool,
+        metadata: EmbeddingMetadataObj,
+        cache: Cache,
+        embedding_id: int,
     ) -> None:
         """
         Update the metadata with the new observation
@@ -121,11 +126,15 @@ class _Algorithm:
             similarity_score: float - The similarity score between the query and the embedding
             is_correct: bool - Whether the query was correct
             metadata: EmbeddingMetadataObj - The metadata of the embedding
+            cache: Cache - The cache to update the metadata for
+            embedding_id: int - The id of the embedding to update the metadata for
         """
         if is_correct:
             metadata.observations.append((round(similarity_score, 3), 1))
         else:
             metadata.observations.append((round(similarity_score, 3), 0))
+
+        cache.update_metadata(embedding_id=embedding_id, embedding_metadata=metadata)
 
     def wilson_proportion_ci(self, cdf_estimates, n, confidence):
         """

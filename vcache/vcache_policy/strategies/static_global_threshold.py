@@ -61,6 +61,7 @@ class StaticGlobalThresholdPolicy(VCachePolicy):
         similarity_score, embedding_id = knn[0]
         metadata = self.cache.get_metadata(embedding_id=embedding_id)
         is_cache_hit = similarity_score >= self.threshold
+
         if is_cache_hit:
             return True, metadata.response, metadata.response
         else:

@@ -1,4 +1,6 @@
+import logging
 import random
+from concurrent.futures import ThreadPoolExecutor
 from enum import Enum
 from typing import Dict, List, Optional, Tuple
 
@@ -23,7 +25,7 @@ from vcache.vcache_policy.vcache_policy import VCachePolicy
 
 
 class DynamicLocalThresholdPolicy(VCachePolicy):
-    def __init__(self, delta: float = 0.01):
+    def __init__(self, delta: float = 0.01, max_background_workers: int = 4):
         """
         This policy uses the vCache algorithm to compute the optimal threshold for each
         embedding in the cache.
@@ -31,11 +33,16 @@ class DynamicLocalThresholdPolicy(VCachePolicy):
 
         Args
             delta: float - The delta value to use
+            max_background_workers: int - Maximum number of background threads for async processing
         """
         self.bayesian = _Algorithm(delta=delta)
         self.similarity_evaluator: SimilarityEvaluator = None
         self.inference_engine: InferenceEngine = None
         self.cache: Cache = None
+        self._executor = ThreadPoolExecutor(
+            max_workers=max_background_workers, thread_name_prefix="vcache-bg"
+        )
+        self._logger = logging.getLogger(__name__)
 
     @override
     def setup(self, config: VCacheConfig):
@@ -85,20 +92,58 @@ class DynamicLocalThresholdPolicy(VCachePolicy):
                 response = self.inference_engine.create(
                     prompt=prompt, system_prompt=system_prompt
                 )
-                should_have_exploited = self.similarity_evaluator.answers_similar(
-                    a=response, b=metadata.response
-                )
-                self.bayesian.update_metadata(
-                    similarity_score=similarity_score,
-                    is_correct=should_have_exploited,
+                self._executor.submit(
+                    self._generate_label,
+                    response=response,
                     metadata=metadata,
+                    similarity_score=similarity_score,
+                    embedding_id=embedding_id,
+                    prompt=prompt,
                 )
-                if not should_have_exploited:
-                    self.cache.add(prompt=prompt, response=response)
-                self.cache.update_metadata(
-                    embedding_id=embedding_id, embedding_metadata=metadata
-                )
+
                 return False, response, metadata.response
+
+    def _generate_label(
+        self,
+        response: str,
+        metadata: EmbeddingMetadataObj,
+        similarity_score: float,
+        embedding_id: int,
+        prompt: str,
+    ):
+        """
+        Generate the label for the response and update the metadata using asynchronous processing. Evaluating whether the nearest neighbor
+        response matches the expected response can require an LLM inference. Consequently, the evaluation should be done in the background
+        because it does not impact the response tuple of its parent function.
+        Args
+            response: str - The response to generate the label for
+            metadata: EmbeddingMetadataObj - The metadata of the embedding
+            similarity_score: float - The similarity score between the query and the embedding
+            embedding_id: int - The id of the embedding to update the metadata for
+            prompt: str - The prompt to add to the cache if the response is not similar to the metadata response
+        """
+        try:
+            should_have_exploited = self.similarity_evaluator.answers_similar(
+                a=response, b=metadata.response
+            )
+            self.bayesian.update_metadata(
+                similarity_score=similarity_score,
+                is_correct=should_have_exploited,
+                metadata=metadata,
+                cache=self.cache,
+                embedding_id=embedding_id,
+            )
+            if not should_have_exploited:
+                self.cache.add(prompt=prompt, response=response)
+        except Exception as e:
+            self._logger.error(
+                f"Error in background label generation: {e}", exc_info=True
+            )
+
+    def __del__(self):
+        """Cleanup the ThreadPoolExecutor when the policy is destroyed."""
+        if hasattr(self, "_executor") and self._executor:
+            self._executor.shutdown(wait=False)
 
 
 class _Action(Enum):
@@ -162,7 +207,12 @@ class _Algorithm:
         }
 
     def update_metadata(
-        self, similarity_score: float, is_correct: bool, metadata: EmbeddingMetadataObj
+        self,
+        similarity_score: float,
+        is_correct: bool,
+        metadata: EmbeddingMetadataObj,
+        cache: Cache,
+        embedding_id: int,
     ) -> None:
         """
         Update the metadata with the new observation
@@ -170,11 +220,15 @@ class _Algorithm:
             similarity_score: float - The similarity score between the query and the embedding
             is_correct: bool - Whether the query was correct
             metadata: EmbeddingMetadataObj - The metadata of the embedding
+            cache: Cache - The cache to update the metadata for
+            embedding_id: int - The id of the embedding to update the metadata for
         """
         if is_correct:
             metadata.observations.append((round(similarity_score, 3), 1))
         else:
             metadata.observations.append((round(similarity_score, 3), 0))
+
+        cache.update_metadata(embedding_id=embedding_id, embedding_metadata=metadata)
 
     def select_action(
         self, similarity_score: float, metadata: EmbeddingMetadataObj
