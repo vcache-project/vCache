@@ -151,7 +151,7 @@ class TestLLMComparisonSimilarityEvaluator(unittest.TestCase):
 
         answer_a = "Paris is the capital"
         answer_b = "The capital city is Paris"
-        
+
         self.evaluator.answers_similar(answer_a, answer_b)
 
         # Verify the call was made
@@ -199,17 +199,17 @@ class TestLLMComparisonSimilarityEvaluator(unittest.TestCase):
         from vcache.vcache_core.similarity_evaluator.similarity_evaluator import (
             SimilarityEvaluator,
         )
-        
+
         self.assertIsInstance(self.evaluator, SimilarityEvaluator)
 
     def test_method_signature(self):
         """Test that answers_similar method has correct signature."""
         import inspect
-        
+
         sig = inspect.signature(self.evaluator.answers_similar)
         params = list(sig.parameters.keys())
-        
-        self.assertEqual(params, ['a', 'b'])
+
+        self.assertEqual(params, ["a", "b"])
         self.assertEqual(sig.return_annotation, bool)
 
 
