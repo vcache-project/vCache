@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List
+from typing import List, Tuple
 
 from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage.embedding_metadata_obj import (
     EmbeddingMetadataObj,
@@ -32,6 +32,19 @@ class EmbeddingMetadataStorage(ABC):
         embedding_id: int - The id of the embedding to update the metadata for
         metadata: EmbeddingMetadataObj - The metadata to update the embedding with
         returns: EmbeddingMetadataObj - The updated metadata of the embedding
+        """
+        pass
+
+    @abstractmethod
+    def add_observation(
+        self, embedding_id: int, observation: Tuple[float, int]
+    ) -> None:
+        """
+        Atomically adds a new observation to an embedding's metadata to avoid race conditions.
+
+        Args:
+            embedding_id: int - The id of the embedding to add the observation to.
+            observation: Tuple[float, int] - The observation tuple (similarity_score, label).
         """
         pass
 

@@ -33,6 +33,7 @@ from vcache.vcache_core.cache.embedding_store.vector_db import (
     HNSWLibVectorDB,
     SimilarityMetricType,
 )
+from vcache.vcache_core.similarity_evaluator import SimilarityEvaluator
 from vcache.vcache_core.similarity_evaluator.strategies.llm_comparison import (
     LLMComparisonSimilarityEvaluator,
 )
@@ -113,7 +114,6 @@ class GeneratePlotsOnly(Enum):
 
 MAX_SAMPLES: int = 60000
 CONFIDENCE_INTERVALS_ITERATIONS: int = 2
-IS_LLM_JUDGE_BENCHMARK: bool = False
 DISABLE_PROGRESS_BAR: bool = False
 KEEP_SPLIT: int = 100
 
@@ -122,9 +122,17 @@ RUN_COMBINATIONS: List[
 ] = [
     (
         EmbeddingModel.GTE,
+        LargeLanguageModel.LLAMA_3_8B,
+        Dataset.SEM_BENCHMARK_CLASSIFICATION,
+        GeneratePlotsOnly.NO,
+        StringComparisonSimilarityEvaluator()
+    ),
+    (
+        EmbeddingModel.GTE,
         LargeLanguageModel.GPT_4O_MINI,
         Dataset.SEM_BENCHMARK_ARENA,
         GeneratePlotsOnly.NO,
+        LLMComparisonSimilarityEvaluator()
     )
 ]
 
@@ -137,28 +145,28 @@ BASELINES_TO_RUN: List[Baseline] = [
 ]
 
 STATIC_THRESHOLDS: List[float] = [
-    # 0.80,
-    # 0.81,
-    # 0.82,
-    # 0.83,
-    # 0.84,
-    # 0.85,
-    # 0.86,
-    # 0.87,
-    # 0.88,
-    # 0.89,
-    # 0.90,
-    # 0.91,
-    # 0.92,
-    # 0.93,
-    # 0.94,
-    # 0.95,
-    # 0.96,
-    # 0.97,
-    # 0.98,
+    0.80,
+    0.81,
+    0.82,
+    0.83,
+    0.84,
+    0.85,
+    0.86,
+    0.87,
+    0.88,
+    0.89,
+    0.90,
+    0.91,
+    0.92,
+    0.93,
+    0.94,
+    0.95,
+    0.96,
+    0.97,
+    0.98,
 ]
 
-DELTAS: List[float] = [0.01, 0.08]#[0.01, 0.015, 0.02, 0.025, 0.03, 0.035, 0.04, 0.05, 0.06, 0.07]
+DELTAS: List[float] = [0.01, 0.015, 0.02, 0.025, 0.03, 0.035, 0.04, 0.05, 0.06, 0.07]
 
 MAX_VECTOR_DB_CAPACITY: int = 100000
 PLOT_FONT_SIZE: int = 50
@@ -466,12 +474,8 @@ def __run_baseline(
     timestamp: str,
     delta: float,
     threshold: float,
+    similarity_evaluator: SimilarityEvaluator,
 ):
-    if IS_LLM_JUDGE_BENCHMARK:
-        similarity_evaluator = LLMComparisonSimilarityEvaluator()
-    else:
-        similarity_evaluator = StringComparisonSimilarityEvaluator()
-
     vcache_config: VCacheConfig = VCacheConfig(
         inference_engine=BenchmarkInferenceEngine(),
         embedding_engine=BenchmarkEmbeddingEngine(),
@@ -515,7 +519,7 @@ def main():
 
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
 
-    for embedding_model, llm_model, dataset, generate_plots_only in RUN_COMBINATIONS:
+    for embedding_model, llm_model, dataset, generate_plots_only, similarity_evaluator in RUN_COMBINATIONS:
         try:
             print(f"DatasetPath: {datasets_dir}, Dataset: {dataset.value}")
             dataset_file = os.path.join(datasets_dir, f"{dataset.value}.json")
@@ -552,6 +556,7 @@ def main():
                             timestamp=timestamp,
                             delta=delta,
                             threshold=-1,
+                            similarity_evaluator=similarity_evaluator,
                         )
 
             #####################################################
@@ -581,6 +586,7 @@ def main():
                         timestamp=timestamp,
                         delta=delta,
                         threshold=-1,
+                        similarity_evaluator=similarity_evaluator,
                     )
 
             #####################################################
@@ -627,6 +633,7 @@ def main():
                         timestamp=timestamp,
                         delta=-1,
                         threshold=threshold,
+                        similarity_evaluator=similarity_evaluator,
                     )
 
             #####################################################
@@ -676,6 +683,7 @@ def main():
                             timestamp=timestamp,
                             delta=delta,
                             threshold=-1,
+                            similarity_evaluator=similarity_evaluator,
                         )
 
             #####################################################
@@ -706,6 +714,7 @@ def main():
                             timestamp=timestamp,
                             delta=delta,
                             threshold=-1,
+                            similarity_evaluator=similarity_evaluator,
                         )
 
             #####################################################
@@ -733,6 +742,7 @@ def main():
                         timestamp=timestamp,
                         delta=-1,
                         threshold=threshold,
+                        similarity_evaluator=similarity_evaluator,
                     )
 
             #####################################################

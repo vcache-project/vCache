@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Tuple
 
 from vcache.vcache_core.cache.embedding_engine.embedding_engine import EmbeddingEngine
 from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage.embedding_metadata_obj import (
@@ -92,6 +92,18 @@ class Cache:
             EmbeddingMetadataObj - The updated metadata of the embedding
         """
         self.embedding_store.update_metadata(embedding_id, embedding_metadata)
+
+    def add_observation(
+        self, embedding_id: int, observation: Tuple[float, int]
+    ) -> None:
+        """
+        Atomically adds a new observation to an embedding's metadata.
+
+        Args:
+            embedding_id: int - The id of the embedding to add the observation to.
+            observation: Tuple[float, int] - The observation tuple (similarity_score, label).
+        """
+        self.embedding_store.add_observation(embedding_id, observation)
 
     def get_current_capacity(self) -> int:
         """

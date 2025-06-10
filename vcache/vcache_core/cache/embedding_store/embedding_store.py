@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Tuple
 
 from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage import (
     EmbeddingMetadataStorage,
@@ -51,6 +51,11 @@ class EmbeddingStore:
         self, embedding_id: int, metadata: "EmbeddingMetadataObj"
     ) -> "EmbeddingMetadataObj":
         return self.embedding_metadata_storage.update_metadata(embedding_id, metadata)
+
+    def add_observation(
+        self, embedding_id: int, observation: Tuple[float, int]
+    ) -> None:
+        self.embedding_metadata_storage.add_observation(embedding_id, observation)
 
     def is_empty(self) -> bool:
         return self.vector_db.is_empty()

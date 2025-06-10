@@ -25,7 +25,7 @@ from vcache.vcache_policy.vcache_policy import VCachePolicy
 
 
 class DynamicLocalThresholdPolicy(VCachePolicy):
-    def __init__(self, delta: float = 0.01, max_background_workers: int = 4):
+    def __init__(self, delta: float = 0.01, max_background_workers: int = 1000):
         """
         This policy uses the vCache algorithm to compute the optimal threshold for each
         embedding in the cache.
@@ -39,9 +39,9 @@ class DynamicLocalThresholdPolicy(VCachePolicy):
         self.similarity_evaluator: SimilarityEvaluator = None
         self.inference_engine: InferenceEngine = None
         self.cache: Cache = None
-        # self._executor = ThreadPoolExecutor(
-        #     max_workers=max_background_workers, thread_name_prefix="vcache-bg"
-        # )
+        self._executor = ThreadPoolExecutor(
+            max_workers=max_background_workers, thread_name_prefix="vcache-bg"
+        )
         self._logger = logging.getLogger(__name__)
 
     @override
@@ -92,28 +92,19 @@ class DynamicLocalThresholdPolicy(VCachePolicy):
                 response = self.inference_engine.create(
                     prompt=prompt, system_prompt=system_prompt
                 )
-                # self._executor.submit(
-                #     self._generate_label,
-                #     response=response,
-                #     metadata=metadata,
-                #     similarity_score=similarity_score,
-                #     embedding_id=embedding_id,
-                #     prompt=prompt,
-                # )
                 self._generate_label(
                     response=response,
-                    metadata=metadata,
+                    nn_response=metadata.response,
                     similarity_score=similarity_score,
                     embedding_id=embedding_id,
                     prompt=prompt)
-            
 
                 return False, response, metadata.response
 
     def _generate_label(
         self,
         response: str,
-        metadata: EmbeddingMetadataObj,
+        nn_response: str,
         similarity_score: float,
         embedding_id: int,
         prompt: str,
@@ -125,33 +116,32 @@ class DynamicLocalThresholdPolicy(VCachePolicy):
         
         Args:
             response: str - The response to generate the label for
-            metadata: EmbeddingMetadataObj - The metadata of the embedding
+            nn_response: str - The response of the nearest neighbor embedding.
             similarity_score: float - The similarity score between the query and the embedding
             embedding_id: int - The id of the embedding to update the metadata for
             prompt: str - The prompt to add to the cache if the response is not similar to the metadata response
         """
         try:
             should_have_exploited = self.similarity_evaluator.answers_similar(
-                a=response, b=metadata.response
+                a=response, b=nn_response
             )
-            self.bayesian.update_metadata(
-                similarity_score=similarity_score,
-                is_correct=should_have_exploited,
-                metadata=metadata,
-                cache=self.cache,
-                embedding_id=embedding_id,
-            )
+
+            label: int = 1 if should_have_exploited else 0
+            observation: Tuple[float, int] = (round(similarity_score, 3), label)
+            self.cache.add_observation(embedding_id=embedding_id, observation=observation)
+
             if not should_have_exploited:
                 self.cache.add(prompt=prompt, response=response)
+
         except Exception as e:
             self._logger.error(
                 f"Error in background label generation: {e}", exc_info=True
             )
 
-    # def __del__(self):
-    #     """Cleanup the ThreadPoolExecutor when the policy is destroyed."""
-    #     if hasattr(self, "_executor") and self._executor:
-    #         self._executor.shutdown(wait=False)
+    def __del__(self):
+        """Cleanup the ThreadPoolExecutor when the policy is destroyed."""
+        if hasattr(self, "_executor") and self._executor:
+            self._executor.shutdown(wait=False)
 
 
 class _Action(Enum):
@@ -169,10 +159,10 @@ class _Algorithm:
         )
 
         self.variance_map: Dict[int, List[float]] = {
-            6: 0.035445,
-            7: 0.028285,
-            8: 0.026436,
-            9: 0.021349,
+            6:  0.035445,
+            7:  0.028285,
+            8:  0.026436,
+            9:  0.021349,
             10: 0.019371,
             11: 0.012615,
             12: 0.011433,
@@ -213,31 +203,6 @@ class _Algorithm:
             47: 0.02109,
             48: 0.01531,
         }
-
-    def update_metadata(
-        self,
-        similarity_score: float,
-        is_correct: bool,
-        metadata: EmbeddingMetadataObj,
-        cache: Cache,
-        embedding_id: int,
-    ) -> None:
-        """
-        Update the metadata with the new observation
-
-        Args
-            similarity_score: float - The similarity score between the query and the embedding
-            is_correct: bool - Whether the query was correct
-            metadata: EmbeddingMetadataObj - The metadata of the embedding
-            cache: Cache - The cache to update the metadata for
-            embedding_id: int - The id of the embedding to update the metadata for
-        """
-        if is_correct:
-            metadata.observations.append((round(similarity_score, 3), 1))
-        else:
-            metadata.observations.append((round(similarity_score, 3), 0))
-
-        cache.update_metadata(embedding_id=embedding_id, embedding_metadata=metadata)
 
     def select_action(
         self, similarity_score: float, metadata: EmbeddingMetadataObj
