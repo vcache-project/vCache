@@ -101,6 +101,18 @@ vcache = VCache(vcache_config, vcache_policy)
 
 You can swap out any component—such as the eviction policy or vector database—for your specific use case.
 
+## 📚 Usage Examples
+
+The `examples/` directory contains comprehensive usage examples to help you get started:
+
+- **[Basic Usage](examples/01_basic_usage.py)**: Simple setup with default configuration
+- **[Custom Policies](examples/02_custom_policy.py)**: Different caching policies and their behavior
+- **[Vector Databases](examples/03_vector_database.py)**: HNSWLib vs FAISS configuration
+- **[System Prompts](examples/04_system_prompts.py)**: Context-specific caching with system prompts
+- **[Advanced Configuration](examples/05_advanced_configuration.py)**: Production-ready setups
+
+Each example is self-contained and includes detailed comments explaining the concepts. See the [examples README](examples/README.md) for more details.
+
 ## 🧠 What Is Semantic Caching?
 
 Semantic caching reduces LLM latency and cost by returning cached model responses for **semantically similar** prompts (not just exact matches)—so you don’t pay for inference cost and latency on repeated questions that have the same answer.
