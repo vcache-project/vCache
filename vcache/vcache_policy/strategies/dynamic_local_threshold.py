@@ -116,6 +116,7 @@ class _Action(Enum):
     """
     Enumeration of possible actions for the algorithm.
     """
+
     EXPLORE = "explore"
     EXPLOIT = "exploit"
 

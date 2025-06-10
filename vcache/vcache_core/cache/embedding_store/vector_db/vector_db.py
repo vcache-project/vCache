@@ -7,6 +7,7 @@ class SimilarityMetricType(Enum):
     """
     Enumeration of supported similarity metric types.
     """
+
     COSINE = "cosine"
     EUCLIDEAN = "euclidean"
 

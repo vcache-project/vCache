@@ -119,6 +119,7 @@ class _Action(Enum):
     """
     Actions that can be taken by the IID algorithm.
     """
+
     EXPLORE = "explore"
     EXPLOIT = "exploit"
 

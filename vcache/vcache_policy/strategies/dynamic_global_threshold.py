@@ -120,6 +120,7 @@ class _Action(Enum):
     """
     Actions that can be taken by the dynamic global threshold algorithm.
     """
+
     EXPLORE = "explore"
     EXPLOIT = "exploit"
 
