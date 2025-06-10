@@ -10,9 +10,19 @@ from vcache.vcache_core.cache.embedding_store.vector_db.vector_db import (
 
 
 class FAISSVectorDB(VectorDB):
+    """
+    FAISS-based vector database implementation for efficient similarity search.
+    """
+
     def __init__(
         self, similarity_metric_type: SimilarityMetricType = SimilarityMetricType.COSINE
     ):
+        """
+        Initialize FAISS vector database.
+
+        Args:
+            similarity_metric_type: The similarity metric to use for comparisons.
+        """
         self.similarity_metric_type = similarity_metric_type
         self.__next_embedding_id = 0
         self.index = None
@@ -20,7 +30,19 @@ class FAISSVectorDB(VectorDB):
     def transform_similarity_score(
         self, similarity_score: float, metric_type: str
     ) -> float:
-        # Override the default transform_similarity_score method
+        """
+        Transform similarity score based on the metric type.
+
+        Args:
+            similarity_score: The raw similarity score.
+            metric_type: The type of similarity metric used.
+
+        Returns:
+            The transformed similarity score.
+
+        Raises:
+            ValueError: If the similarity metric type is invalid.
+        """
         match metric_type:
             case "cosine":
                 return similarity_score
@@ -30,6 +52,15 @@ class FAISSVectorDB(VectorDB):
                 raise ValueError(f"Invalid similarity metric type: {metric_type}")
 
     def add(self, embedding: List[float]) -> int:
+        """
+        Add an embedding vector to the database.
+
+        Args:
+            embedding: The embedding vector to add.
+
+        Returns:
+            The unique ID assigned to the added embedding.
+        """
         if self.index is None:
             self._init_vector_store(len(embedding))
         id = self.__next_embedding_id
@@ -44,6 +75,18 @@ class FAISSVectorDB(VectorDB):
         return id
 
     def remove(self, embedding_id: int) -> int:
+        """
+        Remove an embedding from the database.
+
+        Args:
+            embedding_id: The ID of the embedding to remove.
+
+        Returns:
+            The ID of the removed embedding.
+
+        Raises:
+            ValueError: If the index is not initialized.
+        """
         if self.index is None:
             raise ValueError("Index is not initialized")
         id_array = np.array([embedding_id], dtype=np.int64)
@@ -53,6 +96,19 @@ class FAISSVectorDB(VectorDB):
         return embedding_id
 
     def get_knn(self, embedding: List[float], k: int) -> List[tuple[float, int]]:
+        """
+        Get k-nearest neighbors for the given embedding.
+
+        Args:
+            embedding: The query embedding vector.
+            k: The number of nearest neighbors to return.
+
+        Returns:
+            List of tuples containing similarity scores and embedding IDs.
+
+        Raises:
+            ValueError: If the index is not initialized.
+        """
         if self.index is None:
             raise ValueError("Index is not initialized")
         if self.index.ntotal == 0:
@@ -76,12 +132,24 @@ class FAISSVectorDB(VectorDB):
         ]
 
     def reset(self) -> None:
+        """
+        Reset the vector database to empty state.
+        """
         if self.index is not None:
             dim = self.index.d
             self._init_vector_store(dim)
         self.__next_embedding_id = 0
 
     def _init_vector_store(self, embedding_dim: int):
+        """
+        Initialize the FAISS index with the given embedding dimension.
+
+        Args:
+            embedding_dim: The dimension of the embedding vectors.
+
+        Raises:
+            ValueError: If the similarity metric type is invalid.
+        """
         metric_type = self.similarity_metric_type.value
         match metric_type:
             case "cosine":
@@ -93,4 +161,10 @@ class FAISSVectorDB(VectorDB):
         self.index = faiss.index_factory(embedding_dim, "IDMap,Flat", faiss_metric)
 
     def is_empty(self) -> bool:
+        """
+        Check if the vector database is empty.
+
+        Returns:
+            True if the database contains no embeddings, False otherwise.
+        """
         return self.index.ntotal == 0

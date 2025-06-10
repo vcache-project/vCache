@@ -21,17 +21,19 @@ from vcache.vcache_policy.vcache_policy import VCachePolicy
 
 
 class DynamicGlobalThresholdPolicy(VCachePolicy):
+    """
+    Policy that uses the vCache algorithm to compute optimal global thresholds across all embeddings.
+    """
+
     def __init__(
         self,
         delta: float = 0.01,
     ):
         """
-        This policy uses the vCache algorithm to compute the optimal threshold across all embeddings.
-        Each threshold is used to determine if a response is a cache hit.
-        This is suboptimal in cases when the embeddings cannot seperate correct from incorrect responses.
+        Initialize dynamic global threshold policy.
 
-        Args
-            delta: float - The delta value to use
+        Args:
+            delta: The delta value for the algorithm.
         """
         self.bayesian = _Algorithm(delta=delta)
         self.similarity_evaluator: SimilarityEvaluator = None
@@ -40,6 +42,12 @@ class DynamicGlobalThresholdPolicy(VCachePolicy):
 
     @override
     def setup(self, config: VCacheConfig):
+        """
+        Setup the policy with the given configuration.
+
+        Args:
+            config: The VCache configuration to use.
+        """
         self.similarity_evaluator = config.similarity_evaluator
         self.inference_engine = config.inference_engine
         self.cache = Cache(
@@ -56,11 +64,17 @@ class DynamicGlobalThresholdPolicy(VCachePolicy):
         self, prompt: str, system_prompt: Optional[str]
     ) -> tuple[bool, str, str]:
         """
-        Args
-            prompt: str - The prompt to check for cache hit
-            system_prompt: Optional[str] - The optional system prompt to use for the response. It will override the system prompt in the VCacheConfig if provided.
-        Returns
-            tuple[bool, str, str] - [is_cache_hit, actual_response, nn_response]
+        Process a request using dynamic global threshold policy.
+
+        Args:
+            prompt: The prompt to check for cache hit.
+            system_prompt: The optional system prompt to use for the response. It will override the system prompt in the VCacheConfig if provided.
+
+        Returns:
+            Tuple containing [is_cache_hit, actual_response, nn_response].
+
+        Raises:
+            ValueError: If policy has not been setup.
         """
         if self.inference_engine is None or self.cache is None:
             raise ValueError("Policy has not been setup")
@@ -103,12 +117,25 @@ class DynamicGlobalThresholdPolicy(VCachePolicy):
 
 
 class _Action(Enum):
+    """
+    Actions that can be taken by the dynamic global threshold algorithm.
+    """
     EXPLORE = "explore"
     EXPLOIT = "exploit"
 
 
 class _Algorithm:
+    """
+    Dynamic global threshold algorithm implementation.
+    """
+
     def __init__(self, delta: float):
+        """
+        Initialize the dynamic global threshold algorithm.
+
+        Args:
+            delta: The delta parameter for the algorithm.
+        """
         self.delta: float = delta
         self.P_c: float = 1.0 - self.delta
         self.epsilon_grid: np.ndarray = np.linspace(1e-6, 1 - 1e-6, 50)
@@ -174,11 +201,12 @@ class _Algorithm:
         self, similarity_score: float, is_correct: bool, metadata: EmbeddingMetadataObj
     ) -> None:
         """
-        Update the metadata with the new observation
-        Args
-            similarity_score: float - The similarity score between the query and the embedding
-            is_correct: bool - Whether the query was correct
-            metadata: EmbeddingMetadataObj - The metadata of the embedding
+        Update the metadata with the new observation.
+
+        Args:
+            similarity_score: The similarity score between the query and the embedding.
+            is_correct: Whether the query was correct.
+            metadata: The metadata of the embedding.
         """
         if is_correct:
             self.global_observations.append((round(similarity_score, 3), 1))
@@ -189,12 +217,14 @@ class _Algorithm:
         self, similarity_score: float, metadata: EmbeddingMetadataObj
     ) -> _Action:
         """
-        Select the action to take based on the similarity score, observations, and accuracy target
-        Args
-            similarity_score: float - The similarity score between the query and the embedding
-            metadata: EmbeddingMetadataObj - The metadata of the embedding
-        Returns
-            Action - Explore or Exploit
+        Select the action to take based on the similarity score and observations.
+
+        Args:
+            similarity_score: The similarity score between the query and the embedding.
+            metadata: The metadata of the embedding.
+
+        Returns:
+            The action to take (EXPLORE or EXPLOIT).
         """
         similarity_score = round(similarity_score, 3)
 
