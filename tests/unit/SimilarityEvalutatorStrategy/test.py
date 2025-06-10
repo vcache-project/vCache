@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 from vcache.vcache_core.similarity_evaluator.strategies.llm_comparison import (
     LLMComparisonSimilarityEvaluator,
