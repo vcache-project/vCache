@@ -16,17 +16,22 @@ Usage:
 """
 
 import os
-from vcache.main import VCache
+
 from vcache.config import VCacheConfig
+from vcache.main import VCache
 from vcache.vcache_core.cache.embedding_store.vector_db import SimilarityMetricType
-from vcache.vcache_core.cache.embedding_store.vector_db.strategies.hnsw_lib import HNSWLibVectorDB
-from vcache.vcache_core.cache.embedding_store.vector_db.strategies.faiss import FAISSVectorDB
+from vcache.vcache_core.cache.embedding_store.vector_db.strategies.faiss import (
+    FAISSVectorDB,
+)
+from vcache.vcache_core.cache.embedding_store.vector_db.strategies.hnsw_lib import (
+    HNSWLibVectorDB,
+)
 
 
 def test_vector_db(vcache, db_name, prompts):
     """Test a vector database configuration with a set of prompts."""
     print(f"\n=== Testing {db_name} ===")
-    
+
     for i, prompt in enumerate(prompts, 1):
         cache_hit, response, _ = vcache.infer_with_cache_info(prompt)
         print(f"{i}. Prompt: {prompt}")
@@ -46,9 +51,9 @@ def main():
     test_prompts = [
         "How does photosynthesis work?",
         "Explain the process of photosynthesis",  # Similar
-        "What is cellular respiration?",          # Related but different
-        "How do plants make energy?",             # Similar to first
-        "What is quantum computing?",             # Different topic
+        "What is cellular respiration?",  # Related but different
+        "How do plants make energy?",  # Similar to first
+        "What is quantum computing?",  # Different topic
     ]
 
     # 1. Default HNSWLib with Cosine Similarity
@@ -56,7 +61,7 @@ def main():
     print("   - Fast approximate nearest neighbor search")
     print("   - Cosine similarity metric")
     print("   - Good for high-dimensional embeddings")
-    
+
     hnsw_config = VCacheConfig(
         vector_db=HNSWLibVectorDB(
             similarity_metric_type=SimilarityMetricType.COSINE,
@@ -71,7 +76,7 @@ def main():
     print("   - Same algorithm, different similarity metric")
     print("   - Euclidean distance instead of cosine similarity")
     print("   - May behave differently for normalized embeddings")
-    
+
     hnsw_euclidean_config = VCacheConfig(
         vector_db=HNSWLibVectorDB(
             similarity_metric_type=SimilarityMetricType.EUCLIDEAN,
@@ -87,7 +92,7 @@ def main():
         print("   - Facebook's library for efficient similarity search")
         print("   - Optimized for large-scale vector search")
         print("   - Supports GPU acceleration (if available)")
-        
+
         faiss_config = VCacheConfig(
             vector_db=FAISSVectorDB(
                 similarity_metric_type=SimilarityMetricType.COSINE,
@@ -96,7 +101,7 @@ def main():
         )
         vcache_faiss = VCache(config=faiss_config)
         test_vector_db(vcache_faiss, "FAISS (Cosine)", test_prompts)
-        
+
     except ImportError:
         print("\n3. FAISS Vector Database")
         print("   ❌ FAISS not installed. Install with: pip install faiss-cpu")
@@ -106,7 +111,7 @@ def main():
     print("\n4. Limited Capacity Vector Database")
     print("   - Small capacity (5 vectors) to demonstrate eviction")
     print("   - When capacity is exceeded, oldest vectors are removed")
-    
+
     small_config = VCacheConfig(
         vector_db=HNSWLibVectorDB(
             similarity_metric_type=SimilarityMetricType.COSINE,
@@ -114,7 +119,7 @@ def main():
         )
     )
     vcache_small = VCache(config=small_config)
-    
+
     # Add more prompts than capacity to show eviction
     extended_prompts = test_prompts + [
         "What is machine learning?",

@@ -3,7 +3,7 @@
 Basic vCache Usage Example
 
 This example demonstrates the simplest way to use vCache with default configuration.
-vCache will automatically cache LLM responses and return cached results for 
+vCache will automatically cache LLM responses and return cached results for
 semantically similar prompts.
 
 Requirements:
@@ -15,6 +15,7 @@ Usage:
 """
 
 import os
+
 from vcache.main import VCache
 
 

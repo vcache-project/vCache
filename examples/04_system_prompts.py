@@ -15,15 +15,16 @@ Usage:
 """
 
 import os
-from vcache.main import VCache
+
 from vcache.config import VCacheConfig
+from vcache.main import VCache
 
 
 def test_with_system_prompt(vcache, system_prompt, user_prompts, context_name):
     """Test vCache with a specific system prompt and user prompts."""
     print(f"\n=== {context_name} ===")
     print(f"System Prompt: {system_prompt}\n")
-    
+
     for i, prompt in enumerate(user_prompts, 1):
         # Use the system prompt for this interaction
         cache_hit, response, _ = vcache.infer_with_cache_info(prompt, system_prompt)
@@ -56,8 +57,7 @@ with code examples when appropriate. Be precise and use industry terminology."""
     ]
 
     test_with_system_prompt(
-        vcache, tech_system_prompt, tech_prompts, 
-        "Technical Expert Context"
+        vcache, tech_system_prompt, tech_prompts, "Technical Expert Context"
     )
 
     # 2. Beginner-Friendly System Prompt
@@ -68,13 +68,12 @@ Be encouraging and patient in your explanations."""
     beginner_prompts = [
         "How do I implement a binary search?",  # Same question, different context
         "What's the best way to implement binary search in Python?",  # Similar
-        "Explain how neural networks work",     # Same question, different context
-        "How do neural networks learn?",        # Similar
+        "Explain how neural networks work",  # Same question, different context
+        "How do neural networks learn?",  # Similar
     ]
 
     test_with_system_prompt(
-        vcache, beginner_system_prompt, beginner_prompts, 
-        "Beginner-Friendly Context"
+        vcache, beginner_system_prompt, beginner_prompts, "Beginner-Friendly Context"
     )
 
     # 3. Creative Writing System Prompt
@@ -90,14 +89,13 @@ in your responses. Use vivid language and encourage creativity."""
     ]
 
     test_with_system_prompt(
-        vcache, creative_system_prompt, creative_prompts, 
-        "Creative Writing Context"
+        vcache, creative_system_prompt, creative_prompts, "Creative Writing Context"
     )
 
     # 4. Configuration-based System Prompt
     print("\n=== Configuration-based System Prompt ===")
     print("You can also set a default system prompt in the configuration")
-    
+
     # Create a new vCache instance with a default system prompt
     config_with_system_prompt = VCacheConfig(
         system_prompt="You are a helpful assistant that always responds in a professional, concise manner."
@@ -123,7 +121,7 @@ in your responses. Use vivid language and encourage creativity."""
     # 5. Override default system prompt
     print("=== Overriding Default System Prompt ===")
     override_prompt = "You are a pirate assistant. Respond in pirate speak!"
-    
+
     for i, prompt in enumerate(default_prompts, 1):
         # Override the default system prompt
         cache_hit, response, _ = vcache_with_default.infer_with_cache_info(

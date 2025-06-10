@@ -14,15 +14,20 @@ Usage:
 """
 
 import os
+
 from vcache.main import VCache
-from vcache.vcache_policy.strategies.static_global_threshold import StaticGlobalThresholdPolicy
-from vcache.vcache_policy.strategies.dynamic_local_threshold import DynamicLocalThresholdPolicy
+from vcache.vcache_policy.strategies.dynamic_local_threshold import (
+    DynamicLocalThresholdPolicy,
+)
+from vcache.vcache_policy.strategies.static_global_threshold import (
+    StaticGlobalThresholdPolicy,
+)
 
 
 def test_policy(vcache, policy_name, prompts):
     """Test a caching policy with a set of prompts."""
     print(f"\n=== Testing {policy_name} ===")
-    
+
     for i, prompt in enumerate(prompts, 1):
         cache_hit, response, _ = vcache.infer_with_cache_info(prompt)
         print(f"{i}. Prompt: {prompt}")
@@ -42,9 +47,9 @@ def main():
     test_prompts = [
         "What is machine learning?",
         "Can you explain machine learning?",  # Similar to first
-        "What is artificial intelligence?",   # Related but different
-        "Explain AI to me",                   # Similar to third
-        "What is the weather like today?",    # Completely different
+        "What is artificial intelligence?",  # Related but different
+        "Explain AI to me",  # Similar to third
+        "What is the weather like today?",  # Completely different
     ]
 
     # 1. Dynamic Local Threshold Policy (default)
@@ -54,7 +59,7 @@ def main():
     print("   - Learns individual thresholds for each cached prompt")
     print("   - Adapts based on similarity-correctness patterns")
     print("   - Maximum error rate: 2%")
-    
+
     dynamic_policy = DynamicLocalThresholdPolicy(delta=0.02)  # 2% max error rate
     vcache_dynamic = VCache(policy=dynamic_policy)
     test_policy(vcache_dynamic, "Dynamic Local Threshold", test_prompts)
@@ -67,8 +72,10 @@ def main():
     print("   - Uses fixed threshold (0.85) for all prompts")
     print("   - Higher threshold = more conservative caching")
     print("   - Lower threshold = more aggressive caching")
-    
-    static_policy = StaticGlobalThresholdPolicy(threshold=0.85)  # 85% similarity required
+
+    static_policy = StaticGlobalThresholdPolicy(
+        threshold=0.85
+    )  # 85% similarity required
     vcache_static = VCache(policy=static_policy)
     test_policy(vcache_static, "Static Global Threshold (0.85)", test_prompts)
 
@@ -76,8 +83,10 @@ def main():
     print("\n3. More Aggressive Static Global Threshold Policy")
     print("   - Uses lower threshold (0.70) for more cache hits")
     print("   - May result in more false positives")
-    
-    aggressive_policy = StaticGlobalThresholdPolicy(threshold=0.70)  # 70% similarity required
+
+    aggressive_policy = StaticGlobalThresholdPolicy(
+        threshold=0.70
+    )  # 70% similarity required
     vcache_aggressive = VCache(policy=aggressive_policy)
     test_policy(vcache_aggressive, "Static Global Threshold (0.70)", test_prompts)
 
