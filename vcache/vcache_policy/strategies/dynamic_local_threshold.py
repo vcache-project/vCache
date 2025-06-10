@@ -115,7 +115,8 @@ class DynamicLocalThresholdPolicy(VCachePolicy):
         Generate the label for the response and update the metadata using asynchronous processing. Evaluating whether the nearest neighbor
         response matches the expected response can require an LLM inference. Consequently, the evaluation should be done in the background
         because it does not impact the response tuple of its parent function.
-        Args
+        
+        Args:
             response: str - The response to generate the label for
             metadata: EmbeddingMetadataObj - The metadata of the embedding
             similarity_score: float - The similarity score between the query and the embedding
@@ -216,6 +217,7 @@ class _Algorithm:
     ) -> None:
         """
         Update the metadata with the new observation
+
         Args
             similarity_score: float - The similarity score between the query and the embedding
             is_correct: bool - Whether the query was correct

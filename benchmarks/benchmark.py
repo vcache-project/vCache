@@ -101,7 +101,7 @@ class Dataset(Enum):
     ECOMMERCE_DATASET = "ecommerce_dataset"
 
 
-class GenerateResultsOnly(Enum):
+class GeneratePlotsOnly(Enum):
     YES = True
     NO = False
 
@@ -114,83 +114,51 @@ class GenerateResultsOnly(Enum):
 MAX_SAMPLES: int = 60000
 CONFIDENCE_INTERVALS_ITERATIONS: int = 5
 IS_LLM_JUDGE_BENCHMARK: bool = False
-DISABLE_PROGRESS_BAR: bool = True
+DISABLE_PROGRESS_BAR: bool = False
 KEEP_SPLIT: int = 100
 
 RUN_COMBINATIONS: List[
-    Tuple[EmbeddingModel, LargeLanguageModel, Dataset, GenerateResultsOnly]
+    Tuple[EmbeddingModel, LargeLanguageModel, Dataset, GeneratePlotsOnly]
 ] = [
     (
         EmbeddingModel.GTE,
-        LargeLanguageModel.LLAMA_3_8B,
-        Dataset.SEM_BENCHMARK_SEARCH_QUERIES,
-        GenerateResultsOnly.YES,
-    ),
-    (
-        EmbeddingModel.GTE,
         LargeLanguageModel.GPT_4O_MINI,
         Dataset.SEM_BENCHMARK_ARENA,
-        GenerateResultsOnly.YES,
-    ),
-    (
-        EmbeddingModel.E5_LARGE_V2,
-        LargeLanguageModel.GPT_4O_MINI,
-        Dataset.SEM_BENCHMARK_ARENA,
-        GenerateResultsOnly.YES,
-    ),
-    (
-        EmbeddingModel.E5_LARGE_V2,
-        LargeLanguageModel.LLAMA_3_8B,
-        Dataset.SEM_BENCHMARK_CLASSIFICATION,
-        GenerateResultsOnly.YES,
-    ),
-    (
-        EmbeddingModel.GTE,
-        LargeLanguageModel.LLAMA_3_8B,
-        Dataset.SEM_BENCHMARK_CLASSIFICATION,
-        GenerateResultsOnly.YES,
-    ),
-    (
-        EmbeddingModel.GTE,
-        LargeLanguageModel.LLAMA_3_70B,
-        Dataset.SEM_BENCHMARK_CLASSIFICATION,
-        GenerateResultsOnly.YES,
-    ),
+        GeneratePlotsOnly.NO,
+    )
 ]
 
 BASELINES_TO_RUN: List[Baseline] = [
     # Baseline.IID,
     # Baseline.GPTCache,
-    # Baseline.VCacheLocal,
+    Baseline.VCacheLocal,
     # Baseline.BerkeleyEmbedding,
     # Baseline.VCacheBerkeleyEmbedding,
 ]
 
-DATASETS_TO_RUN: List[str] = [Dataset.SEM_BENCHMARK_SEARCH_QUERIES]
-
 STATIC_THRESHOLDS: List[float] = [
-    0.80,
-    0.81,
-    0.82,
-    0.83,
-    0.84,
-    0.85,
-    0.86,
-    0.87,
-    0.88,
-    0.89,
-    0.90,
-    0.91,
-    0.92,
-    0.93,
-    0.94,
-    0.95,
-    0.96,
-    0.97,
-    0.98,
+    # 0.80,
+    # 0.81,
+    # 0.82,
+    # 0.83,
+    # 0.84,
+    # 0.85,
+    # 0.86,
+    # 0.87,
+    # 0.88,
+    # 0.89,
+    # 0.90,
+    # 0.91,
+    # 0.92,
+    # 0.93,
+    # 0.94,
+    # 0.95,
+    # 0.96,
+    # 0.97,
+    # 0.98,
 ]
 
-DELTAS: List[float] = [0.01, 0.015, 0.02, 0.025, 0.03, 0.035, 0.04, 0.05, 0.06, 0.07]
+DELTAS: List[float] = [0.01]#[0.01, 0.015, 0.02, 0.025, 0.03, 0.035, 0.04, 0.05, 0.06, 0.07]
 
 MAX_VECTOR_DB_CAPACITY: int = 100000
 PLOT_FONT_SIZE: int = 50
@@ -220,7 +188,7 @@ class Benchmark(unittest.TestCase):
         self.tn_list: List[int] = []
         self.fn_list: List[int] = []
         self.latency_direct_list: List[float] = []
-        self.latency_vcach_list: List[float] = []
+        self.latency_vcache_list: List[float] = []
         self.observations_dict: Dict[str, Dict[str, float]] = {}
         self.gammas_dict: Dict[str, float] = {}
         self.t_hats_dict: Dict[str, float] = {}
@@ -465,7 +433,7 @@ class Benchmark(unittest.TestCase):
             "tn_list": self.tn_list,
             "fn_list": self.fn_list,
             "latency_direct_list": self.latency_direct_list,
-            "latency_vectorq_list": self.latency_vcach_list,
+            "latency_vectorq_list": self.latency_vcache_list,
             "observations_dict": self.observations_dict,
             "gammas_dict": self.gammas_dict,
             "t_hats_dict": self.t_hats_dict,
@@ -547,17 +515,18 @@ def main():
 
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
 
-    for embedding_model, llm_model, dataset, generate_results_only in RUN_COMBINATIONS:
+    for embedding_model, llm_model, dataset, generate_plots_only in RUN_COMBINATIONS:
         try:
+            print(f"DatasetPath: {datasets_dir}, Dataset: {dataset.value}")
             dataset_file = os.path.join(datasets_dir, f"{dataset.value}.json")
             logging.info(
                 f"Running benchmark for dataset: {dataset}, embedding model: {embedding_model.value[1]}, LLM model: {llm_model.value[1]}\n"
             )
             start_time_llm_model = time.time()
-
+            print("A")
             #####################################################
             ### Baseline: vCache Local
-            if Baseline.VCacheLocal in BASELINES_TO_RUN and not generate_results_only:
+            if Baseline.VCacheLocal in BASELINES_TO_RUN and not generate_plots_only.value:
                 for delta in DELTAS:
                     for i in range(0, CONFIDENCE_INTERVALS_ITERATIONS):
                         path = os.path.join(
@@ -587,7 +556,7 @@ def main():
 
             #####################################################
             ### Baseline: vCache Global
-            if Baseline.VCacheGlobal in BASELINES_TO_RUN and not generate_results_only:
+            if Baseline.VCacheGlobal in BASELINES_TO_RUN and not generate_plots_only.value:
                 for delta in DELTAS:
                     path = os.path.join(
                         results_dir,
@@ -618,7 +587,7 @@ def main():
             ### Baseline: Berkeley Embedding
             if (
                 Baseline.BerkeleyEmbedding in BASELINES_TO_RUN
-                and not generate_results_only
+                and not generate_plots_only.value
             ):
                 for threshold in STATIC_THRESHOLDS:
                     if embedding_model == EmbeddingModel.E5_MISTRAL_7B:
@@ -664,7 +633,7 @@ def main():
             ### Baseline: vCache + Berkeley Embedding
             if (
                 Baseline.VCacheBerkeleyEmbedding in BASELINES_TO_RUN
-                and not generate_results_only
+                and not generate_plots_only.value
             ):
                 for delta in DELTAS:
                     for i in range(0, CONFIDENCE_INTERVALS_ITERATIONS):
@@ -711,7 +680,7 @@ def main():
 
             #####################################################
             ### Baseline: IID Local
-            if Baseline.IID in BASELINES_TO_RUN and not generate_results_only:
+            if Baseline.IID in BASELINES_TO_RUN and not generate_plots_only.value:
                 for delta in DELTAS:
                     for i in range(0, CONFIDENCE_INTERVALS_ITERATIONS):
                         path = os.path.join(
@@ -741,7 +710,7 @@ def main():
 
             #####################################################
             ### Baseline: GPTCache
-            if Baseline.GPTCache in BASELINES_TO_RUN and not generate_results_only:
+            if Baseline.GPTCache in BASELINES_TO_RUN and not generate_plots_only.value:
                 for threshold in STATIC_THRESHOLDS:
                     path = os.path.join(
                         results_dir,

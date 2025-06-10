@@ -1,4 +1,5 @@
 from typing import List
+import threading
 
 import chromadb
 
@@ -16,48 +17,93 @@ class ChromaVectorDB(VectorDB):
         self.collection = None
         self.client = None
         self.similarity_metric_type = similarity_metric_type
+        self._operation_lock = threading.RLock()
 
     def add(self, embedding: List[float]) -> int:
-        if self.collection is None:
-            self._init_vector_store(len(embedding))
-        id = self.__next_embedding_id
-        self.collection.add(embeddings=[embedding], ids=[str(id)])
-        self.__next_embedding_id += 1
-        return id
+        """
+        Thread-safe addition of embedding to the vector database.
+        
+        Args:
+            embedding: List[float] - The embedding vector to add
+            
+        Returns:
+            int - The unique ID assigned to the embedding
+        """
+        with self._operation_lock:
+            if self.collection is None:
+                self._init_vector_store(len(embedding))
+            
+            # Atomic ID generation and assignment
+            embedding_id = self.__next_embedding_id
+            self.collection.add(embeddings=[embedding], ids=[str(embedding_id)])
+            self.__next_embedding_id += 1
+            
+            return embedding_id
 
     def remove(self, embedding_id: int) -> int:
-        if self.collection is None:
-            raise ValueError("Collection is not initialized")
-        self.collection.delete(ids=[str(embedding_id)])
-        return embedding_id
+        """
+        Thread-safe removal of embedding from the vector database.
+        
+        Args:
+            embedding_id: int - The ID of the embedding to remove
+            
+        Returns:
+            int - The ID of the removed embedding
+        """
+        with self._operation_lock:
+            if self.collection is None:
+                raise ValueError("Collection is not initialized")
+            self.collection.delete(ids=[str(embedding_id)])
+            return embedding_id
 
     def get_knn(self, embedding: List[float], k: int) -> List[tuple[float, int]]:
-        if self.collection is None:
-            raise ValueError("Collection is not initialized")
-        if self.collection.count() == 0:
-            return []
-        k_ = min(k, self.collection.count())
-        results = self.collection.query(
-            query_embeddings=[embedding], n_results=k_, include=["distances"]
-        )
-        distances = results.get("distances", [[]])[0]
-        ids = results.get("ids", [[]])[0]
-        return [
-            (
-                self.transform_similarity_score(
-                    float(dist), self.similarity_metric_type.value
-                ),
-                int(idx),
+        """
+        Thread-safe k-nearest neighbors search.
+        
+        Args:
+            embedding: List[float] - The query embedding
+            k: int - Number of nearest neighbors to return
+            
+        Returns:
+            List[tuple[float, int]] - List of (similarity_score, embedding_id) tuples
+        """
+        with self._operation_lock:
+            if self.collection is None:
+                raise ValueError("Collection is not initialized")
+            if self.collection.count() == 0:
+                return []
+            k_ = min(k, self.collection.count())
+            results = self.collection.query(
+                query_embeddings=[embedding], n_results=k_, include=["distances"]
             )
-            for dist, idx in zip(distances, ids)
-        ]
+            distances = results.get("distances", [[]])[0]
+            ids = results.get("ids", [[]])[0]
+            return [
+                (
+                    self.transform_similarity_score(
+                        float(dist), self.similarity_metric_type.value
+                    ),
+                    int(idx),
+                )
+                for dist, idx in zip(distances, ids)
+            ]
 
     def reset(self) -> None:
-        if self.collection is not None:
-            self.collection.delete(ids=self.collection.get()["ids"])
-        self.__next_embedding_id = 0
+        """
+        Thread-safe reset of the vector database.
+        """
+        with self._operation_lock:
+            if self.collection is not None:
+                self.collection.delete(ids=self.collection.get()["ids"])
+            self.__next_embedding_id = 0
 
     def _init_vector_store(self, embedding_dim: int):
+        """
+        Initialize the vector store. Should be called within a lock context.
+        
+        Args:
+            embedding_dim: int - The dimension of the embedding vectors
+        """
         self.client = chromadb.Client()
         collection_name = f"vcache_collection_{id(self)}"
         metric_type = self.similarity_metric_type.value
@@ -75,4 +121,13 @@ class ChromaVectorDB(VectorDB):
         )
 
     def is_empty(self) -> bool:
-        return self.collection.count() == 0
+        """
+        Thread-safe check if the vector database is empty.
+        
+        Returns:
+            bool - True if the database is empty, False otherwise
+        """
+        with self._operation_lock:
+            if self.collection is None:
+                return True
+            return self.collection.count() == 0
