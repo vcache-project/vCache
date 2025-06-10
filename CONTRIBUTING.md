@@ -127,15 +127,16 @@ poetry run pytest --lf
 poetry run pytest --cov=vcache --cov-report=html
 ```
 
-#### Testing in a container
-For testing in a clean environment, you can use Docker:
+#### Testing in a clean environment
+For testing in a clean environment, consider using a fresh virtual environment:
 
 ```bash
-# Build development container
-docker build -t vcache-dev .
-
-# Run tests in container
-docker run -it --rm -v $(pwd):/workspace vcache-dev poetry run pytest
+# Create a clean environment for testing
+python -m venv test-env
+source test-env/bin/activate  # On Windows: test-env\Scripts\activate
+pip install poetry
+poetry install --with dev,benchmarks
+poetry run pytest
 ```
 
 ### Submitting pull requests
