@@ -39,9 +39,9 @@ class DynamicLocalThresholdPolicy(VCachePolicy):
         self.similarity_evaluator: SimilarityEvaluator = None
         self.inference_engine: InferenceEngine = None
         self.cache: Cache = None
-        self._executor = ThreadPoolExecutor(
-            max_workers=max_background_workers, thread_name_prefix="vcache-bg"
-        )
+        # self._executor = ThreadPoolExecutor(
+        #     max_workers=max_background_workers, thread_name_prefix="vcache-bg"
+        # )
         self._logger = logging.getLogger(__name__)
 
     @override
@@ -92,14 +92,21 @@ class DynamicLocalThresholdPolicy(VCachePolicy):
                 response = self.inference_engine.create(
                     prompt=prompt, system_prompt=system_prompt
                 )
-                self._executor.submit(
-                    self._generate_label,
+                # self._executor.submit(
+                #     self._generate_label,
+                #     response=response,
+                #     metadata=metadata,
+                #     similarity_score=similarity_score,
+                #     embedding_id=embedding_id,
+                #     prompt=prompt,
+                # )
+                self._generate_label(
                     response=response,
                     metadata=metadata,
                     similarity_score=similarity_score,
                     embedding_id=embedding_id,
-                    prompt=prompt,
-                )
+                    prompt=prompt)
+            
 
                 return False, response, metadata.response
 
@@ -141,10 +148,10 @@ class DynamicLocalThresholdPolicy(VCachePolicy):
                 f"Error in background label generation: {e}", exc_info=True
             )
 
-    def __del__(self):
-        """Cleanup the ThreadPoolExecutor when the policy is destroyed."""
-        if hasattr(self, "_executor") and self._executor:
-            self._executor.shutdown(wait=False)
+    # def __del__(self):
+    #     """Cleanup the ThreadPoolExecutor when the policy is destroyed."""
+    #     if hasattr(self, "_executor") and self._executor:
+    #         self._executor.shutdown(wait=False)
 
 
 class _Action(Enum):

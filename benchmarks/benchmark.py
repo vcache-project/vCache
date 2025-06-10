@@ -112,7 +112,7 @@ class GeneratePlotsOnly(Enum):
 
 
 MAX_SAMPLES: int = 60000
-CONFIDENCE_INTERVALS_ITERATIONS: int = 5
+CONFIDENCE_INTERVALS_ITERATIONS: int = 2
 IS_LLM_JUDGE_BENCHMARK: bool = False
 DISABLE_PROGRESS_BAR: bool = False
 KEEP_SPLIT: int = 100
@@ -158,7 +158,7 @@ STATIC_THRESHOLDS: List[float] = [
     # 0.98,
 ]
 
-DELTAS: List[float] = [0.01]#[0.01, 0.015, 0.02, 0.025, 0.03, 0.035, 0.04, 0.05, 0.06, 0.07]
+DELTAS: List[float] = [0.01, 0.08]#[0.01, 0.015, 0.02, 0.025, 0.03, 0.035, 0.04, 0.05, 0.06, 0.07]
 
 MAX_VECTOR_DB_CAPACITY: int = 100000
 PLOT_FONT_SIZE: int = 50
@@ -523,7 +523,7 @@ def main():
                 f"Running benchmark for dataset: {dataset}, embedding model: {embedding_model.value[1]}, LLM model: {llm_model.value[1]}\n"
             )
             start_time_llm_model = time.time()
-            print("A")
+
             #####################################################
             ### Baseline: vCache Local
             if Baseline.VCacheLocal in BASELINES_TO_RUN and not generate_plots_only.value:

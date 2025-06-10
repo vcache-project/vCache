@@ -188,9 +188,9 @@ class _Algorithm:
             embedding_id: int - The id of the embedding to update the metadata for
         """
         if is_correct:
-            metadata.observations.append((round(similarity_score, 3), 1))
+            self.global_observations.append((round(similarity_score, 3), 1))
         else:
-            metadata.observations.append((round(similarity_score, 3), 0))
+            self.global_observations.append((round(similarity_score, 3), 0))
 
         cache.update_metadata(embedding_id=embedding_id, embedding_metadata=metadata)
 
