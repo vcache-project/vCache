@@ -8,11 +8,22 @@ from vcache.vcache_policy.vcache_policy import VCachePolicy
 
 
 class VCache:
+    """
+    Main VCache class that provides caching functionality for inference operations.
+    """
+
     def __init__(
         self,
         config: VCacheConfig = VCacheConfig(),
         policy: VCachePolicy = DynamicLocalThresholdPolicy(delta=0.02),
     ):
+        """
+        Initialize VCache with configuration and policy.
+
+        Args:
+            config: VCache configuration object containing system settings.
+            policy: VCache policy for determining cache behavior.
+        """
         self.vcache_config = config
         self.vcache_policy = policy
         self.vcache_policy.setup(config)
@@ -24,11 +35,13 @@ class VCache:
     ) -> str:
         """
         Infer a response from the cache and return the response.
-        Args
-            prompt: str - The prompt to create a response for.
-            system_prompt: Optional[str] - The optional system prompt to use for the response. It will override the system prompt in the VCacheConfig if provided.
-        Returns
-            str - The response to be used by the user
+
+        Args:
+            prompt: The prompt to create a response for.
+            system_prompt: The optional system prompt to use for the response. It will override the system prompt in the VCacheConfig if provided.
+
+        Returns:
+            The response to be used by the user.
         """
         _, response, _ = self.infer_with_cache_info(prompt, system_prompt)
         return response
@@ -40,11 +53,13 @@ class VCache:
     ) -> Tuple[bool, str, str]:
         """
         Infer a response from the cache and return the cache hit status, the response, and the nearest neighbor response.
-        Args
-            prompt: str - The prompt to create a response for.
-            system_prompt: Optional[str] - The optional system prompt to use for the response. It will override the system prompt in the VCacheConfig if provided.
-        Returns
-            Tuple[bool, str, str] - [is_cache_hit, response, nn_response] (the response is the one supposed to be used by the user, the nn_response is for benchmarking purposes)
+
+        Args:
+            prompt: The prompt to create a response for.
+            system_prompt: The optional system prompt to use for the response. It will override the system prompt in the VCacheConfig if provided.
+
+        Returns:
+            Tuple containing [is_cache_hit, response, nn_response] where response is the one supposed to be used by the user, and nn_response is for benchmarking purposes.
         """
         if system_prompt is None:
             system_prompt = self.vcache_config.system_prompt
@@ -52,13 +67,34 @@ class VCache:
         return self.vcache_policy.process_request(prompt, system_prompt)
 
     def import_data(self, data: List[str]) -> bool:
+        """
+        Import data into the cache.
+
+        Args:
+            data: List of strings to import into the cache.
+
+        Returns:
+            True if import was successful.
+        """
         # TODO
         return True
 
     def flush(self) -> bool:
+        """
+        Flush all data from the cache.
+
+        Returns:
+            True if flush was successful.
+        """
         # TODO
         return True
 
     def get_statistics(self) -> str:
+        """
+        Get statistics about cache performance.
+
+        Returns:
+            String containing cache statistics.
+        """
         # TODO
         return "No statistics available"

@@ -7,14 +7,24 @@ from vcache.vcache_policy.vcache_policy import VCachePolicy
 
 
 class NoCachePolicy(VCachePolicy):
+    """
+    Policy that bypasses caching and always computes fresh responses.
+    """
+
     def __init__(self):
         """
-        This policy does not use a cache and will always compute a response.
+        Initialize no cache policy.
         """
         self.inference_engine = None
 
     @override
     def setup(self, config: VCacheConfig):
+        """
+        Setup the policy with the given configuration.
+
+        Args:
+            config: The VCache configuration to use.
+        """
         self.inference_engine = config.inference_engine
 
     @override
@@ -22,11 +32,17 @@ class NoCachePolicy(VCachePolicy):
         self, prompt: str, system_prompt: Optional[str]
     ) -> tuple[bool, str, str]:
         """
-        Args
-            prompt: str - The prompt to check for cache hit
-            system_prompt: Optional[str] - The optional system prompt to use for the response. It will override the system prompt in the VCacheConfig if provided.
-        Returns
-            tuple[bool, str, str] - [is_cache_hit, actual_response, nn_response]
+        Process a request without using cache.
+
+        Args:
+            prompt: The prompt to process.
+            system_prompt: The optional system prompt to use for the response. It will override the system prompt in the VCacheConfig if provided.
+
+        Returns:
+            Tuple containing [is_cache_hit, actual_response, nn_response].
+
+        Raises:
+            ValueError: If inference engine has not been setup.
         """
         if self.inference_engine is None:
             raise ValueError("Inference engine has not been setup")

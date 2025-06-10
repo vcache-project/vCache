@@ -5,6 +5,10 @@ import numpy as np
 
 
 class EmbeddingMetadataObj:
+    """
+    Metadata object for storing embedding-related information and statistics.
+    """
+
     def __init__(
         self,
         embedding_id: int,
@@ -14,6 +18,17 @@ class EmbeddingMetadataObj:
         region_reject: List[str] = None,
         last_accessed: datetime = None,
     ):
+        """
+        Initialize embedding metadata object.
+
+        Args:
+            embedding_id: Unique identifier for the embedding.
+            response: The response associated with the embedding.
+            prior: Prior distribution for Bayesian inference.
+            posterior: Posterior distribution for Bayesian inference.
+            region_reject: List of rejection regions for heuristic policy.
+            last_accessed: Timestamp of last access to this embedding.
+        """
         self.embedding_id: int = embedding_id
         self.response: str = response
         self.last_accessed: datetime = last_accessed
@@ -40,6 +55,15 @@ class EmbeddingMetadataObj:
         ##################################################
 
     def __eq__(self, other):
+        """
+        Check equality with another EmbeddingMetadataObj.
+
+        Args:
+            other: The other object to compare with.
+
+        Returns:
+            True if objects are equal, False otherwise.
+        """
         if not isinstance(other, EmbeddingMetadataObj):
             return False
         return (
@@ -52,6 +76,12 @@ class EmbeddingMetadataObj:
         )
 
     def __repr__(self):
+        """
+        Return string representation of the embedding metadata object.
+
+        Returns:
+            String representation of the object.
+        """
         return f"""
         EmbeddingMetadataObj(
             embedding_id={self.embedding_id},
@@ -64,7 +94,19 @@ class EmbeddingMetadataObj:
         """
 
     def add_correct_similarity(self, similarity: float):
+        """
+        Add a correct similarity score to the metadata.
+
+        Args:
+            similarity: The similarity score to add.
+        """
         self.correct_similarities.append(similarity)
 
     def add_incorrect_similarity(self, similarity: float):
+        """
+        Add an incorrect similarity score to the metadata.
+
+        Args:
+            similarity: The similarity score to add.
+        """
         self.incorrect_similarities.append(similarity)

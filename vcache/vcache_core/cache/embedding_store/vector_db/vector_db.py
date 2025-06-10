@@ -4,18 +4,30 @@ from typing import List
 
 
 class SimilarityMetricType(Enum):
+    """
+    Enumeration of supported similarity metric types.
+    """
     COSINE = "cosine"
     EUCLIDEAN = "euclidean"
 
 
 class VectorDB(ABC):
+    """
+    Abstract base class for vector databases.
+    """
+
     def transform_similarity_score(
         self, similarity_score: float, metric_type: str
     ) -> float:
         """
-        similarity_score: float - The similarity score to transform
-        metric_type: SimilarityMetricType - The type of similarity metric
-        returns: float - The transformed similarity score in the range of [0, 1]
+        Transform similarity score to a normalized range.
+
+        Args:
+            similarity_score: The similarity score to transform.
+            metric_type: The type of similarity metric.
+
+        Returns:
+            The transformed similarity score in the range of [0, 1].
         """
         match metric_type:
             case "cosine":
@@ -28,45 +40,66 @@ class VectorDB(ABC):
     @abstractmethod
     def add(self, embedding: List[float]) -> int:
         """
-        embedding: List[float] - The embedding to add to the vector db
-        returns: int - The id of the embedding
+        Add an embedding to the vector database.
+
+        Args:
+            embedding: The embedding to add to the vector db.
+
+        Returns:
+            The id of the embedding.
         """
         pass
 
     @abstractmethod
     def remove(self, embedding_id: int) -> int:
         """
-        embedding_id: int - The id of the embedding to remove
-        returns: int - The id of the embedding
+        Remove an embedding from the vector database.
+
+        Args:
+            embedding_id: The id of the embedding to remove.
+
+        Returns:
+            The id of the embedding.
         """
         pass
 
     @abstractmethod
     def get_knn(self, embedding: List[float], k: int) -> List[tuple[float, int]]:
         """
-        embedding: List[float] - The embedding to get the k-nearest neighbors for
-        k: int - The number of nearest neighbors to get
-        returns: List[tuple[float, int]] - A list of tuples, each containing a similarity score and an embedding id
+        Get k-nearest neighbors for the given embedding.
+
+        Args:
+            embedding: The embedding to get the k-nearest neighbors for.
+            k: The number of nearest neighbors to get.
+
+        Returns:
+            A list of tuples, each containing a similarity score and an embedding id.
         """
         pass
 
     @abstractmethod
     def reset(self) -> None:
         """
-        Resets the vector db
+        Reset the vector database to empty state.
         """
         pass
 
     @abstractmethod
     def _init_vector_store(self, embedding_dim: int):
         """
-        embedding_dim: int - The dimension of the embedding
+        Initialize the vector store with the given embedding dimension.
+
+        Args:
+            embedding_dim: The dimension of the embedding.
         """
         pass
 
     @abstractmethod
     def is_empty(self) -> bool:
         """
-        Returns: bool - Whether the vector db is empty
+        Check if the vector database is empty.
+
+        Returns:
+            True if the vector db is empty, False otherwise.
         """
         pass

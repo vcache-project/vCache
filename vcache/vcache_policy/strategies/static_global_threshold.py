@@ -9,15 +9,19 @@ from vcache.vcache_policy.vcache_policy import VCachePolicy
 
 
 class StaticGlobalThresholdPolicy(VCachePolicy):
+    """
+    Policy that uses a static global threshold to determine cache hits.
+    """
+
     def __init__(
         self,
         threshold: float = 0.8,
     ):
         """
-        This policy uses a static threshold to determine if a response is a cache hit.
+        Initialize static global threshold policy.
 
-        Args
-            threshold: float - The threshold to use
+        Args:
+            threshold: The similarity threshold to use for cache hits.
         """
         self.threshold = threshold
         self.inference_engine = None
@@ -25,6 +29,12 @@ class StaticGlobalThresholdPolicy(VCachePolicy):
 
     @override
     def setup(self, config: VCacheConfig):
+        """
+        Setup the policy with the given configuration.
+
+        Args:
+            config: The VCache configuration to use.
+        """
         self.inference_engine = config.inference_engine
         self.cache = Cache(
             embedding_engine=config.embedding_engine,
@@ -40,11 +50,17 @@ class StaticGlobalThresholdPolicy(VCachePolicy):
         self, prompt: str, system_prompt: Optional[str]
     ) -> tuple[bool, str, str]:
         """
-        Args
-            prompt: str - The prompt to check for cache hit
-            system_prompt: Optional[str] - The optional system prompt to use for the response. It will override the system prompt in the VCacheConfig if provided.
-        Returns
-            tuple[bool, str, str] - [is_cache_hit, actual_response, nn_response]
+        Process a request using static global threshold policy.
+
+        Args:
+            prompt: The prompt to check for cache hit.
+            system_prompt: The optional system prompt to use for the response. It will override the system prompt in the VCacheConfig if provided.
+
+        Returns:
+            Tuple containing [is_cache_hit, actual_response, nn_response].
+
+        Raises:
+            ValueError: If policy has not been setup.
         """
         if self.inference_engine is None or self.cache is None:
             raise ValueError("Policy has not been setup")

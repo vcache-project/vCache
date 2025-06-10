@@ -28,7 +28,12 @@ class OpenAIEmbeddingEngine(EmbeddingEngine):
 
     @property
     def client(self) -> OpenAIClient:
-        """Lazily initialize the OpenAI client only when needed."""
+        """
+        Lazily initialize the OpenAI client only when needed.
+
+        Returns:
+            The OpenAI client instance.
+        """
         if self._client is None:
             self._client = (
                 OpenAIClient(api_key=self.api_key) if self.api_key else OpenAIClient()
