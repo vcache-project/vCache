@@ -8,8 +8,15 @@ class LLMComparisonSimilarityEvaluator(SimilarityEvaluator):
         super().__init__()
 
     def answers_similar(self, a: str, b: str) -> bool:
-        # TODO
-        # @Alex: You can access the inference engine via:
-        # self.inference_engine
-        print("TODO: Embedding-based Answer similarity check not implemented")
-        return False
+        if not self.inference_engine:
+            return False
+        
+        system_prompt = "You are a judge evaluating whether two answers are semantically equivalent. Respond with only 'YES' if they convey the same meaning, or 'NO' if they differ significantly."
+        
+        user_prompt = f"Answer 1: {a}\n\nAnswer 2: {b}\n\nAre these answers semantically equivalent?"
+        
+        try:
+            response = self.inference_engine.create(user_prompt, system_prompt).strip().upper()
+            return response.startswith("YES")
+        except Exception:
+            return False
