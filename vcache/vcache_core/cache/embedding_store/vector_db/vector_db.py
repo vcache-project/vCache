@@ -14,11 +14,11 @@ class VectorDB(ABC):
     ) -> float:
         """
         Transforms the similarity score to the range of [0, 1] based on the similarity metric type.
-        
+
         Args:
             similarity_score: float - The similarity score to transform
             metric_type: SimilarityMetricType - The type of similarity metric
-            
+
         Returns:
             float - The transformed similarity score in the range of [0, 1]
         """
@@ -34,10 +34,10 @@ class VectorDB(ABC):
     def add(self, embedding: List[float]) -> int:
         """
         Thread-safe addition of embedding to the vector database.
-        
+
         Args:
             embedding: List[float] - The embedding vector to add
-            
+
         Returns:
             int - The unique ID assigned to the embedding
         """
@@ -47,10 +47,10 @@ class VectorDB(ABC):
     def remove(self, embedding_id: int) -> int:
         """
         Thread-safe removal of embedding from the vector database.
-        
+
         Args:
             embedding_id: int - The ID of the embedding to remove
-            
+
         Returns:
             int - The ID of the removed embedding
         """
@@ -60,11 +60,11 @@ class VectorDB(ABC):
     def get_knn(self, embedding: List[float], k: int) -> List[tuple[float, int]]:
         """
         Thread-safe k-nearest neighbors search.
-        
+
         Args:
             embedding: List[float] - The query embedding
             k: int - Number of nearest neighbors to return
-            
+
         Returns:
             List[tuple[float, int]] - List of (similarity_score, embedding_id) tuples
         """
@@ -74,7 +74,7 @@ class VectorDB(ABC):
     def reset(self) -> None:
         """
         Thread-safe reset of the vector database.
-        
+
         Returns:
             None
         """
@@ -94,7 +94,7 @@ class VectorDB(ABC):
     def is_empty(self) -> bool:
         """
         Thread-safe check if the vector database is empty.
-        
+
         Returns:
             bool - True if the database is empty, False otherwise
         """

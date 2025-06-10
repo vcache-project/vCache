@@ -15,7 +15,7 @@ class SimilarityEvaluator(ABC):
         Args:
             a: str - The first answer
             b: str - The second answer
-            
+
         Returns:
             bool - True if the answers are similar, False otherwise
         """

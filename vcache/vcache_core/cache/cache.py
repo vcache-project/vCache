@@ -27,7 +27,7 @@ class Cache:
         Args:
             prompt: str - The prompt to add to the cache
             response: str - The response to add to the cache
-            
+
         Returns:
             int - The id of the embedding
         """

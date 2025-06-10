@@ -19,11 +19,11 @@ class VCachePolicy(ABC):
     ) -> tuple[bool, str, str]:
         """
         Process a request and either return the cached response or generate a new one with an LLM inference.
-        
+
         Args:
             prompt: str - The prompt to check for cache hit
             system_prompt: Optional[str] - The optional system prompt to use for the response. It will override the system prompt in the VCacheConfig if provided.
-        
+
         Returns:
             tuple[bool, str, str] - [is_cache_hit, actual_response, nn_response]
         """

@@ -1,5 +1,5 @@
-from typing import List
 import threading
+from typing import List
 
 import chromadb
 
@@ -22,31 +22,31 @@ class ChromaVectorDB(VectorDB):
     def add(self, embedding: List[float]) -> int:
         """
         Thread-safe addition of embedding to the vector database.
-        
+
         Args:
             embedding: List[float] - The embedding vector to add
-            
+
         Returns:
             int - The unique ID assigned to the embedding
         """
         with self._operation_lock:
             if self.collection is None:
                 self._init_vector_store(len(embedding))
-            
+
             # Atomic ID generation and assignment
             embedding_id = self.__next_embedding_id
             self.collection.add(embeddings=[embedding], ids=[str(embedding_id)])
             self.__next_embedding_id += 1
-            
+
             return embedding_id
 
     def remove(self, embedding_id: int) -> int:
         """
         Thread-safe removal of embedding from the vector database.
-        
+
         Args:
             embedding_id: int - The ID of the embedding to remove
-            
+
         Returns:
             int - The ID of the removed embedding
         """
@@ -59,11 +59,11 @@ class ChromaVectorDB(VectorDB):
     def get_knn(self, embedding: List[float], k: int) -> List[tuple[float, int]]:
         """
         Thread-safe k-nearest neighbors search.
-        
+
         Args:
             embedding: List[float] - The query embedding
             k: int - Number of nearest neighbors to return
-            
+
         Returns:
             List[tuple[float, int]] - List of (similarity_score, embedding_id) tuples
         """
@@ -100,7 +100,7 @@ class ChromaVectorDB(VectorDB):
     def _init_vector_store(self, embedding_dim: int):
         """
         Initialize the vector store. Should be called within a lock context.
-        
+
         Args:
             embedding_dim: int - The dimension of the embedding vectors
         """
@@ -123,7 +123,7 @@ class ChromaVectorDB(VectorDB):
     def is_empty(self) -> bool:
         """
         Thread-safe check if the vector database is empty.
-        
+
         Returns:
             bool - True if the database is empty, False otherwise
         """

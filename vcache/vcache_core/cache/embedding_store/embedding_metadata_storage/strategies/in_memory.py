@@ -1,5 +1,5 @@
 import threading
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage.embedding_metadata_obj import (
     EmbeddingMetadataObj,
@@ -21,9 +21,7 @@ class InMemoryEmbeddingMetadataStorage(EmbeddingMetadataStorage):
                 self._entry_locks[embedding_id] = threading.Lock()
             return self._entry_locks[embedding_id]
 
-    def add_metadata(
-        self, embedding_id: int, metadata: EmbeddingMetadataObj
-    ) -> None:
+    def add_metadata(self, embedding_id: int, metadata: EmbeddingMetadataObj) -> None:
         with self._store_lock:
             self.metadata_storage[embedding_id] = metadata
         return embedding_id

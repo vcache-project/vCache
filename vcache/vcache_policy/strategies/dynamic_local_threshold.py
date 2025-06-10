@@ -97,7 +97,8 @@ class DynamicLocalThresholdPolicy(VCachePolicy):
                     nn_response=metadata.response,
                     similarity_score=similarity_score,
                     embedding_id=embedding_id,
-                    prompt=prompt)
+                    prompt=prompt,
+                )
 
                 return False, response, metadata.response
 
@@ -113,7 +114,7 @@ class DynamicLocalThresholdPolicy(VCachePolicy):
         Generate the label for the response and update the metadata using asynchronous processing. Evaluating whether the nearest neighbor
         response matches the expected response can require an LLM inference. Consequently, the evaluation should be done in the background
         because it does not impact the response tuple of its parent function.
-        
+
         Args:
             response: str - The response to generate the label for
             nn_response: str - The response of the nearest neighbor embedding.
@@ -128,7 +129,9 @@ class DynamicLocalThresholdPolicy(VCachePolicy):
 
             label: int = 1 if should_have_exploited else 0
             observation: Tuple[float, int] = (round(similarity_score, 3), label)
-            self.cache.add_observation(embedding_id=embedding_id, observation=observation)
+            self.cache.add_observation(
+                embedding_id=embedding_id, observation=observation
+            )
 
             if not should_have_exploited:
                 self.cache.add(prompt=prompt, response=response)
@@ -159,10 +162,10 @@ class _Algorithm:
         )
 
         self.variance_map: Dict[int, List[float]] = {
-            6:  0.035445,
-            7:  0.028285,
-            8:  0.026436,
-            9:  0.021349,
+            6: 0.035445,
+            7: 0.028285,
+            8: 0.026436,
+            9: 0.021349,
             10: 0.019371,
             11: 0.012615,
             12: 0.011433,

@@ -27,7 +27,7 @@ class DynamicGlobalThresholdPolicy(VCachePolicy):
     ):
         """
         IMPORTANT: This policy is used as an ablation for the DynamicLocalThresholdPolicy and should not be used in production.
-        
+
         This policy uses the vCache algorithm to compute the optimal threshold across all embeddings.
         Each threshold is used to determine if a response is a cache hit.
         This is suboptimal in cases when the embeddings cannot seperate correct from incorrect responses.

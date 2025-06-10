@@ -125,15 +125,15 @@ RUN_COMBINATIONS: List[
         LargeLanguageModel.LLAMA_3_8B,
         Dataset.SEM_BENCHMARK_CLASSIFICATION,
         GeneratePlotsOnly.NO,
-        StringComparisonSimilarityEvaluator()
+        StringComparisonSimilarityEvaluator(),
     ),
     (
         EmbeddingModel.GTE,
         LargeLanguageModel.GPT_4O_MINI,
         Dataset.SEM_BENCHMARK_ARENA,
         GeneratePlotsOnly.NO,
-        LLMComparisonSimilarityEvaluator()
-    )
+        LLMComparisonSimilarityEvaluator(),
+    ),
 ]
 
 BASELINES_TO_RUN: List[Baseline] = [
@@ -519,7 +519,13 @@ def main():
 
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
 
-    for embedding_model, llm_model, dataset, generate_plots_only, similarity_evaluator in RUN_COMBINATIONS:
+    for (
+        embedding_model,
+        llm_model,
+        dataset,
+        generate_plots_only,
+        similarity_evaluator,
+    ) in RUN_COMBINATIONS:
         try:
             print(f"DatasetPath: {datasets_dir}, Dataset: {dataset.value}")
             dataset_file = os.path.join(datasets_dir, f"{dataset.value}.json")
@@ -530,7 +536,10 @@ def main():
 
             #####################################################
             ### Baseline: vCache Local
-            if Baseline.VCacheLocal in BASELINES_TO_RUN and not generate_plots_only.value:
+            if (
+                Baseline.VCacheLocal in BASELINES_TO_RUN
+                and not generate_plots_only.value
+            ):
                 for delta in DELTAS:
                     for i in range(0, CONFIDENCE_INTERVALS_ITERATIONS):
                         path = os.path.join(
@@ -561,7 +570,10 @@ def main():
 
             #####################################################
             ### Baseline: vCache Global
-            if Baseline.VCacheGlobal in BASELINES_TO_RUN and not generate_plots_only.value:
+            if (
+                Baseline.VCacheGlobal in BASELINES_TO_RUN
+                and not generate_plots_only.value
+            ):
                 for delta in DELTAS:
                     path = os.path.join(
                         results_dir,
