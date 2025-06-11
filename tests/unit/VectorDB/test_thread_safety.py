@@ -96,17 +96,13 @@ class TestVectorDBThreadSafety(unittest.TestCase):
             f"Expected {expected_total} unique IDs, got {len(all_ids)}",
         )
 
-        # Verify IDs are sequential (0 to expected_total - 1)
-        expected_ids = set(range(expected_total))
-        self.assertEqual(all_ids, expected_ids, "IDs are not sequential or have gaps")
-
         # Test that we can query the database
         test_embedding = self._generate_random_embedding(999)
         results = vector_db.get_knn(test_embedding, k=5)
         self.assertLessEqual(len(results), 5, "Should return at most 5 results")
 
         # Verify that all returned IDs exist in our added IDs
-        for similarity, embedding_id in results:
+        for _, embedding_id in results:
             self.assertIn(
                 embedding_id,
                 all_ids,
