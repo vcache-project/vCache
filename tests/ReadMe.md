@@ -25,7 +25,11 @@ vCache includes both **unit tests** and **integration tests** to ensure correctn
 Unit tests verify the **logic of individual module strategies** (e.g., caching policies, embedding engines, similarity evaluators) in isolation.  
 They are designed to be fast, deterministic, and independent of external services.
 
+#### Running Unit Tests
 
+```bash
+python -m pytest tests/unit/
+```
 
 ### Integration Tests
 

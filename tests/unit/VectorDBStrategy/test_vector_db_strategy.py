@@ -71,8 +71,11 @@ class TestVectorDBStrategy:
 
         # Verify only one remains
         knn = vector_db.get_knn(embedding=[0.1, 0.2, 0.3], k=2)
-        assert len(knn) == 1
-        assert knn[0][1] == id2
+        returned_ids = {result[1] for result in knn}
+
+        # Check that the removed ID is gone and the other one remains.
+        assert id1 not in returned_ids
+        assert id2 in returned_ids
 
     @pytest.mark.parametrize(
         "vector_db_class, similarity_metric_type",

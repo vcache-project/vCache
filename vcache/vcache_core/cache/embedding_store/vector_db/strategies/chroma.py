@@ -84,7 +84,8 @@ class ChromaVectorDB(VectorDB):
         """
         with self._operation_lock:
             if self.collection is None:
-                raise ValueError("Collection is not initialized")
+                # Initialize the store with the dimension of the query embedding
+                self._init_vector_store(len(embedding))
             if self.collection.count() == 0:
                 return []
             k_ = min(k, self.collection.count())
@@ -133,7 +134,7 @@ class ChromaVectorDB(VectorDB):
                 raise ValueError(f"Invalid similarity metric type: {metric_type}")
         self.collection = self.client.create_collection(
             name=collection_name,
-            metadata={"dimension": embedding_dim, "hnsw:space": space},
+            metadata={"hnsw:space": space},
             get_or_create=True,
         )
 
