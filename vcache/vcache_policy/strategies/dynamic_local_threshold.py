@@ -25,15 +25,25 @@ from vcache.vcache_policy.vcache_policy import VCachePolicy
 
 
 class DynamicLocalThresholdPolicy(VCachePolicy):
-    def __init__(self, delta: float = 0.01, max_background_workers: int = 1000):
-        """
-        This policy uses the vCache algorithm to compute the optimal threshold for each
-        embedding in the cache.
-        Each threshold is used to determine if a response is a cache hit.
+    """A policy that uses a dynamic, per-embedding threshold to make cache decisions.
 
-        Args
-            delta: float - The delta value to use
-            max_background_workers: int - Maximum number of background threads for async processing
+    This policy implements the vCache algorithm, which uses a probabilistic approach
+    to learn an optimal similarity threshold for each cached item. It balances
+    exploiting the cache and exploring new responses to refine its decision boundaries.
+
+    Attributes:
+        bayesian (_Algorithm): The core algorithm for action selection and updates.
+        similarity_evaluator (SimilarityEvaluator): Component for comparing responses.
+        inference_engine (InferenceEngine): The LLM for generating new responses.
+        cache (Cache): The vCache instance.
+    """
+
+    def __init__(self, delta: float = 0.01, max_background_workers: int = 4):
+        """Initializes the policy.
+
+        Args:
+            delta (float): The desired error bound the cache needs to maintain.
+            max_background_workers (int): Max threads for background processing.
         """
         self.bayesian = _Algorithm(delta=delta)
         self.similarity_evaluator: SimilarityEvaluator = None
@@ -46,6 +56,7 @@ class DynamicLocalThresholdPolicy(VCachePolicy):
 
     @override
     def setup(self, config: VCacheConfig):
+        """Configure the policy with the necessary components from VCacheConfig."""
         self.similarity_evaluator = config.similarity_evaluator
         self.inference_engine = config.inference_engine
         self.cache = Cache(
@@ -61,12 +72,22 @@ class DynamicLocalThresholdPolicy(VCachePolicy):
     def process_request(
         self, prompt: str, system_prompt: Optional[str]
     ) -> tuple[bool, str, str]:
-        """
-        Args
-            prompt: str - The prompt to check for cache hit
-            system_prompt: Optional[str] - The optional system prompt to use for the response. It will override the system prompt in the VCacheConfig if provided.
-        Returns
-            tuple[bool, str, str] - [is_cache_hit, actual_response, nn_response]
+        """Process a request to decide whether to serve from cache or generate a new response.
+
+        This method finds the nearest neighbor in the cache. If none exists, it
+        generates a new response. Otherwise, it uses the Bayesian algorithm to
+        decide whether to EXPLOIT (use the cached response) or EXPLORE (generate a
+        new one). In the EXPLORE case, label generation happens in the background.
+
+        Args:
+            prompt (str): The user's prompt.
+            system_prompt (str, optional): An optional system prompt to guide the LLM.
+
+        Returns:
+            tuple[bool, str, str]: A tuple containing:
+                - is_cache_hit (bool): True if the response is from the cache (EXPLOIT).
+                - actual_response (str): The response served.
+                - nn_response (str): The nearest neighbor's response, if one was found.
         """
         if self.inference_engine is None or self.cache is None:
             raise ValueError("Policy has not been setup")
@@ -110,17 +131,19 @@ class DynamicLocalThresholdPolicy(VCachePolicy):
         embedding_id: int,
         prompt: str,
     ):
-        """
-        Generate the label for the response and update the metadata using asynchronous processing. Evaluating whether the nearest neighbor
-        response matches the expected response can require an LLM inference. Consequently, the evaluation should be done in the background
-        because it does not impact the response tuple of its parent function.
+        """Generate a label for a response and update metadata.
+
+        This function runs in a background thread. It compares the newly generated
+        response with the nearest neighbor's response to determine if the cache
+        *should* have been hit. It then updates the metadata with this new
+        observation and adds the new response to the cache if it was dissimilar.
 
         Args:
-            response: str - The response to generate the label for
-            nn_response: str - The response of the nearest neighbor embedding.
-            similarity_score: float - The similarity score between the query and the embedding
-            embedding_id: int - The id of the embedding to update the metadata for
-            prompt: str - The prompt to add to the cache if the response is not similar to the metadata response
+            response (str): The newly generated response.
+            nn_response (str): The cached response of the nearest neighbor.
+            similarity_score (float): The similarity between the query and the neighbor.
+            embedding_id (int): The ID of the nearest neighbor embedding to update.
+            prompt (str): The original prompt, to be cached if the new response is kept.
         """
         try:
             should_have_exploited = self.similarity_evaluator.answers_similar(
@@ -153,7 +176,14 @@ class _Action(Enum):
 
 
 class _Algorithm:
+    """Implements the Bayesian algorithm for the DynamicLocalThresholdPolicy."""
+
     def __init__(self, delta: float):
+        """Initializes the algorithm.
+
+        Args:
+            delta (float): The desired error bound the cache needs to maintain.
+        """
         self.delta: float = delta
         self.P_c: float = 1.0 - self.delta
         self.epsilon_grid: np.ndarray = np.linspace(1e-6, 1 - 1e-6, 50)
@@ -210,13 +240,18 @@ class _Algorithm:
     def select_action(
         self, similarity_score: float, metadata: EmbeddingMetadataObj
     ) -> _Action:
-        """
-        Select the action to take based on the similarity score, observations, and accuracy target
-        Args
-            similarity_score: float - The similarity score between the query and the embedding
-            metadata: EmbeddingMetadataObj - The metadata of the embedding
-        Returns
-            Action - Explore or Exploit
+        """Select whether to EXPLORE or EXPLOIT based on the learned threshold.
+
+        This method estimates the current threshold `t_hat` from observations,
+        calculates a confidence-based exploration probability `tau`, and then
+        randomly decides whether to explore or exploit.
+
+        Args:
+            similarity_score (float): The similarity of the current prompt to the cache entry.
+            metadata (EmbeddingMetadataObj): The metadata of the cache entry.
+
+        Returns:
+            _Action: The action to perform, either EXPLORE or EXPLOIT.
         """
         similarity_score = round(similarity_score, 3)
         similarities: np.ndarray = np.array([obs[0] for obs in metadata.observations])
@@ -248,16 +283,20 @@ class _Algorithm:
     def _estimate_parameters(
         self, similarities: np.ndarray, labels: np.ndarray
     ) -> Tuple[float, float, float]:
-        """
-        Optimize parameters with logistic regression
-        Args
-            similarities: np.ndarray - The similarities of the embeddings
-            labels: np.ndarray - The labels of the embeddings
-            metadata: EmbeddingMetadataObj - The metadata of the embedding
-        Returns
-            t_hat: float - The estimated threshold
-            gamma: float - The estimated gamma
-            var_t: float - The estimated variance of t
+        """Estimate logistic regression parameters from observations.
+
+        This method fits a logistic regression model to the similarity scores and
+        labels to estimate the decision boundary parameters.
+
+        Args:
+            similarities (np.ndarray): The observed similarity scores.
+            labels (np.ndarray): The observed labels (1 for correct, 0 for incorrect).
+
+        Returns:
+            Tuple[float, float, float]: A tuple containing:
+                - t_hat: The estimated similarity threshold.
+                - gamma: The steepness of the logistic curve.
+                - var_t: The variance of the threshold estimate.
         """
 
         similarities = sm.add_constant(similarities)
@@ -300,19 +339,21 @@ class _Algorithm:
         gamma: float,
         intercept: float,
     ) -> float:
-        """
-        Compute the variance of t using the delta method
-        Args
-            perfect_seperation: bool - Whether the data is perfectly separable
-            n_observations: int - The number of observations
-            X: np.ndarray - The design matrix
-            gamma: float - The gamma parameter
-            intercept: float - The intercept parameter
-        Returns
-            float - The variance of t
-        Note:
-            If the data is perfectly separable, we use the variance map to estimate the variance of t
-            Otherwise, we use the delta method to estimate the variance of t
+        """Compute the variance of the threshold estimate `t_hat`.
+
+        If the data is perfectly separable, it uses a pre-computed variance map.
+        Otherwise, it uses the delta method to approximate the variance from the
+        logistic regression's covariance matrix.
+
+        Args:
+            perfect_seperation (bool): True if the data is perfectly separable.
+            n_observations (int): The number of observations.
+            X (np.ndarray): The design matrix for the regression.
+            gamma (float): The gamma parameter from the regression.
+            intercept (float): The intercept from the regression.
+
+        Returns:
+            float: The variance of the threshold estimate.
         """
         if perfect_seperation:
             if n_observations in self.variance_map:
@@ -341,15 +382,20 @@ class _Algorithm:
         t_hat: float,
         metadata: EmbeddingMetadataObj,
     ) -> float:
-        """
-        Find the minimum tau value for the given similarity score
-        Args
-            var_t: float - The variance of t
-            s: float - The similarity score between the query and the nearest neighbor
-            t_hat: float - The estimated threshold
-            metadata: EmbeddingMetadataObj - The metadata of the nearest neighbor
-        Returns
-            float - The minimum tau value
+        """Calculate the exploration probability `tau`.
+
+        This method computes `tau`, the probability of choosing to EXPLORE. It's
+        based on finding the worst-case (minimum) confidence that the current
+        action is correct, considering the uncertainty in the threshold `t_hat`.
+
+        Args:
+            var_t (float): The variance of the threshold estimate.
+            s (float): The similarity score of the current request.
+            t_hat (float): The estimated threshold.
+            metadata (EmbeddingMetadataObj): The metadata of the cache entry.
+
+        Returns:
+            float: The calculated exploration probability, `tau`.
         """
         t_primes: List[float] = self._get_t_primes(t_hat=t_hat, var_t=var_t)
         likelihoods = self._likelihood(s=s, t=t_primes, gamma=metadata.gamma)
@@ -360,13 +406,14 @@ class _Algorithm:
         return round(np.min(taus), 5)
 
     def _get_t_primes(self, t_hat: float, var_t: float) -> List[float]:
-        """
-        Compute all possible t_prime values.
-        Args
-            t_hat: float - The estimated threshold
-            var_t: float - The variance of t
-        Returns
-            List[float] - The t_prime values
+        """Compute a grid of possible threshold values based on the confidence interval.
+
+        Args:
+            t_hat (float): The estimated threshold.
+            var_t (float): The variance of the threshold estimate.
+
+        Returns:
+            List[float]: A list of potential threshold values (`t_prime`).
         """
         t_primes: List[float] = np.array(
             [
@@ -381,29 +428,37 @@ class _Algorithm:
     def _confidence_interval(
         self, t_hat: float, var_t: float, quantile: float
     ) -> float:
-        """
-        Return the (upper) quantile-threshold t' such that
-          P_est( t > t' ) <= 1 - quantile
-        Args
-            t_hat: float - The estimated threshold
-            var_t: float - The variance of t
-            quantile: float - The quantile
-        Returns
-            float - The t_prime value
+        """Calculate the upper bound of a confidence interval for the threshold `t`.
+
+        This computes a threshold `t'` such that the estimated probability of the true
+        threshold being greater than `t'` is less than or equal to `1 - quantile`.
+
+        Args:
+            t_hat (float): The estimated threshold.
+            var_t (float): The variance of the threshold estimate.
+            quantile (float): The desired quantile for the confidence interval.
+
+        Returns:
+            float: The upper bound of the confidence interval (`t_prime`).
         """
         z = norm.ppf(quantile)
         t_prime = t_hat + z * np.sqrt(var_t)
         return float(np.clip(t_prime, 0.0, 1.0))
 
     def _likelihood(self, s: float, t: float, gamma: float) -> float:
-        """
-        Compute the likelihood of the given similarity score and threshold
-        Args
-            s: float - The similarity score between the query and the nearest neighbor
-            t: float - The threshold
-            gamma: float - The gamma parameter
-        Returns
-            float - The likelihood of the given similarity score and threshold
+        """Compute the likelihood of a correct cache hit given a similarity score.
+
+        This function uses the logistic (sigmoid) function to model the
+        probability of a correct match based on the similarity `s`, a threshold
+        `t`, and a steepness parameter `gamma`.
+
+        Args:
+            s (float): The similarity score.
+            t (float): The decision threshold.
+            gamma (float): The steepness of the logistic curve.
+
+        Returns:
+            float: The likelihood of a correct match.
         """
         z = gamma * (s - t)
         return expit(z)

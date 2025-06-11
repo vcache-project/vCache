@@ -7,20 +7,30 @@ from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage.embeddi
 
 
 class EmbeddingMetadataStorage(ABC):
+    """Abstract base class for embedding metadata storage."""
+
     @abstractmethod
     def add_metadata(self, embedding_id: int, metadata: EmbeddingMetadataObj) -> int:
-        """
-        embedding_id: int - The id of the embedding to add the metadata for
-        metadata: EmbeddingMetadataObj - The metadata to add to the embedding
-        returns: int - The id of the embedding
+        """Add metadata entry for an embedding.
+
+        Args:
+            embedding_id (int): The ID of the embedding.
+            metadata (EmbeddingMetadataObj): The metadata to add.
+
+        Returns:
+            int: The ID of the embedding.
         """
         pass
 
     @abstractmethod
     def get_metadata(self, embedding_id: int) -> EmbeddingMetadataObj:
-        """
-        embedding_id: int - The id of the embedding to get the metadata for
-        returns: EmbeddingMetadataObj - The metadata of the embedding
+        """Retrieve metadata for an embedding.
+
+        Args:
+            embedding_id (int): The ID of the embedding.
+
+        Returns:
+            EmbeddingMetadataObj: The metadata for the embedding.
         """
         pass
 
@@ -28,10 +38,14 @@ class EmbeddingMetadataStorage(ABC):
     def update_metadata(
         self, embedding_id: int, metadata: EmbeddingMetadataObj
     ) -> EmbeddingMetadataObj:
-        """
-        embedding_id: int - The id of the embedding to update the metadata for
-        metadata: EmbeddingMetadataObj - The metadata to update the embedding with
-        returns: EmbeddingMetadataObj - The updated metadata of the embedding
+        """Update metadata for an existing embedding.
+
+        Args:
+            embedding_id (int): The ID of the embedding.
+            metadata (EmbeddingMetadataObj): The new metadata object.
+
+        Returns:
+            EmbeddingMetadataObj: The updated metadata object.
         """
         pass
 
@@ -39,32 +53,33 @@ class EmbeddingMetadataStorage(ABC):
     def add_observation(
         self, embedding_id: int, observation: Tuple[float, int]
     ) -> None:
-        """
-        Atomically adds a new observation to an embedding's metadata to avoid race conditions.
+        """Atomically add an observation to an embedding's metadata.
 
         Args:
-            embedding_id: int - The id of the embedding to add the observation to.
-            observation: Tuple[float, int] - The observation tuple (similarity_score, label).
+            embedding_id (int): The ID of the embedding.
+            observation (Tuple[float, int]): A tuple (similarity_score, label).
         """
         pass
 
     @abstractmethod
     def remove_metadata(self, embedding_id: int) -> None:
-        """
-        embedding_id: int - The id of the embedding to remove the metadata for
+        """Remove metadata for an embedding.
+
+        Args:
+            embedding_id (int): The ID of the embedding.
         """
         pass
 
     @abstractmethod
     def flush(self) -> None:
-        """
-        Flushes the metadata storage
-        """
+        """Clear all metadata from storage."""
         pass
 
     @abstractmethod
     def get_all_embedding_metadata_objects(self) -> List[EmbeddingMetadataObj]:
-        """
-        returns: List["EmbeddingMetadataObj"] - A list of all the embedding metadata objects in the storage
+        """Retrieve all metadata objects in storage.
+
+        Returns:
+            List[EmbeddingMetadataObj]: All metadata objects in storage.
         """
         pass

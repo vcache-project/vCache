@@ -10,6 +10,17 @@ from vcache.vcache_core.cache.embedding_store.vector_db.vector_db import (
 
 
 class ChromaVectorDB(VectorDB):
+    """A vector database implementation using ChromaDB.
+
+    This class provides a thread-safe vector database that stores embeddings and
+    performs k-nearest neighbor searches using the ChromaDB library.
+
+    Attributes:
+        collection (chromadb.Collection): The ChromaDB collection object.
+        client (chromadb.Client): The ChromaDB client instance.
+        similarity_metric_type (SimilarityMetricType): The metric for measuring similarity.
+    """
+
     def __init__(
         self, similarity_metric_type: SimilarityMetricType = SimilarityMetricType.COSINE
     ):
@@ -20,14 +31,15 @@ class ChromaVectorDB(VectorDB):
         self._operation_lock = threading.RLock()
 
     def add(self, embedding: List[float]) -> int:
-        """
-        Thread-safe addition of embedding to the vector database.
+        """Add an embedding to the database, initializing the collection if needed.
+
+        This method is thread-safe.
 
         Args:
-            embedding: List[float] - The embedding vector to add
+            embedding (List[float]): The embedding vector to add.
 
         Returns:
-            int - The unique ID assigned to the embedding
+            int: The unique ID assigned to the added embedding.
         """
         with self._operation_lock:
             if self.collection is None:
@@ -41,14 +53,15 @@ class ChromaVectorDB(VectorDB):
             return embedding_id
 
     def remove(self, embedding_id: int) -> int:
-        """
-        Thread-safe removal of embedding from the vector database.
+        """Remove an embedding from the database by its ID.
+
+        This method is thread-safe.
 
         Args:
-            embedding_id: int - The ID of the embedding to remove
+            embedding_id (int): The ID of the embedding to remove.
 
         Returns:
-            int - The ID of the removed embedding
+            int: The ID of the removed embedding.
         """
         with self._operation_lock:
             if self.collection is None:
@@ -57,15 +70,17 @@ class ChromaVectorDB(VectorDB):
             return embedding_id
 
     def get_knn(self, embedding: List[float], k: int) -> List[tuple[float, int]]:
-        """
-        Thread-safe k-nearest neighbors search.
+        """Find the k-nearest neighbors for a given embedding.
+
+        This method is thread-safe. If `k` is larger than the number of items,
+        it returns the maximum number of neighbors possible.
 
         Args:
-            embedding: List[float] - The query embedding
-            k: int - Number of nearest neighbors to return
+            embedding (List[float]): The query embedding.
+            k (int): The number of nearest neighbors to return.
 
         Returns:
-            List[tuple[float, int]] - List of (similarity_score, embedding_id) tuples
+            List[tuple[float, int]]: List of (similarity_score, embedding_id) tuples.
         """
         with self._operation_lock:
             if self.collection is None:
@@ -89,20 +104,22 @@ class ChromaVectorDB(VectorDB):
             ]
 
     def reset(self) -> None:
-        """
-        Thread-safe reset of the vector database.
-        """
+        """Clear all embeddings from the collection."""
         with self._operation_lock:
             if self.collection is not None:
                 self.collection.delete(ids=self.collection.get()["ids"])
             self.__next_embedding_id = 0
 
     def _init_vector_store(self, embedding_dim: int):
-        """
-        Initialize the vector store. Should be called within a lock context.
+        """Initialize the ChromaDB client and collection.
+
+        This method creates a ChromaDB client and a new collection with a unique
+        name. It configures the collection's metadata to use the specified
+        similarity metric ('cosine' or 'l2'). This method should be called
+        within a locked context.
 
         Args:
-            embedding_dim: int - The dimension of the embedding vectors
+            embedding_dim (int): The dimension of the embedding vectors.
         """
         self.client = chromadb.Client()
         collection_name = f"vcache_collection_{id(self)}"
@@ -121,11 +138,12 @@ class ChromaVectorDB(VectorDB):
         )
 
     def is_empty(self) -> bool:
-        """
-        Thread-safe check if the vector database is empty.
+        """Check if the collection contains any embeddings.
+
+        This method is thread-safe.
 
         Returns:
-            bool - True if the database is empty, False otherwise
+            bool: True if the collection has no embeddings, False otherwise.
         """
         with self._operation_lock:
             if self.collection is None:

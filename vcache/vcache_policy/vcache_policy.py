@@ -5,11 +5,17 @@ from vcache.config import VCacheConfig
 
 
 class VCachePolicy(ABC):
+    """Abstract base class for vCache caching policies."""
+
     @abstractmethod
     def setup(self, config: VCacheConfig):
-        """
-        Setup the policy with the given config.
-        config: VCacheConfig - The config to setup the policy with.
+        """Configure the policy with the necessary components.
+
+        This method is called once to initialize the policy with inference engines,
+        cache configurations, and other required components.
+
+        Args:
+            config (VCacheConfig): The configuration object for the policy.
         """
         pass
 
@@ -17,14 +23,19 @@ class VCachePolicy(ABC):
     def process_request(
         self, prompt: str, system_prompt: Optional[str]
     ) -> tuple[bool, str, str]:
-        """
-        Process a request and either return the cached response or generate a new one with an LLM inference.
+        """Process a request to decide whether to use a cached response.
+
+        This method determines if a prompt can be served from the cache (a hit)
+        or if it requires a new generation from the inference engine (a miss).
 
         Args:
-            prompt: str - The prompt to check for cache hit
-            system_prompt: Optional[str] - The optional system prompt to use for the response. It will override the system prompt in the VCacheConfig if provided.
+            prompt (str): The user's prompt.
+            system_prompt (str, optional): An optional system prompt to guide the LLM.
 
         Returns:
-            tuple[bool, str, str] - [is_cache_hit, actual_response, nn_response]
+            tuple[bool, str, str]: A tuple containing:
+                - is_cache_hit (bool): True if the response is from the cache.
+                - actual_response (str): The response served (from cache or new).
+                - nn_response (str): The nearest neighbor's response if one was found.
         """
         pass

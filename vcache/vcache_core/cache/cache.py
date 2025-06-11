@@ -9,6 +9,8 @@ from vcache.vcache_core.cache.eviction_policy.eviction_policy import EvictionPol
 
 
 class Cache:
+    """Cache that manages prompt embeddings and responses using a vector database and metadata store."""
+
     def __init__(
         self,
         embedding_store: EmbeddingStore,
@@ -20,109 +22,109 @@ class Cache:
         self.eviction_policy = eviction_policy
 
     def add(self, prompt: str, response: str) -> int:
-        """
-        Generates an embedding for the prompt and adds it to the vector database.
-        Initializes the metadata object using the response and stores it in the embedding metadata storage.
+        """Generate an embedding for the prompt and add it to the cache.
+
+        This method obtains an embedding for the prompt via the embedding engine,
+        stores it in the vector database, and initializes its metadata with the response.
 
         Args:
-            prompt: str - The prompt to add to the cache
-            response: str - The response to add to the cache
+            prompt (str): The prompt to cache.
+            response (str): The generated response for the prompt.
 
         Returns:
-            int - The id of the embedding
+            int: The unique ID of the new embedding.
         """
         embedding = self.embedding_engine.get_embedding(prompt)
-        self.embedding_store.add_embedding(embedding, response)
+        return self.embedding_store.add_embedding(embedding, response)
 
     def remove(self, embedding_id: int) -> int:
-        """
-        Removes the embedding from the vector database and the embedding metadata storage.
+        """Remove an embedding and its metadata from the cache.
 
         Args:
-            embedding_id: int - The id of the embedding to remove
+            embedding_id (int): The ID of the embedding to remove.
 
         Returns:
-            int - The id of the embedding
+            int: The ID of the removed embedding.
         """
-        self.embedding_store.remove(embedding_id)
+        return self.embedding_store.remove(embedding_id)
 
     def get_knn(self, prompt: str, k: int) -> List[tuple[float, int]]:
-        """
-        Generates an embedding for the prompt and returns the k-nearest neighbors.
+        """Retrieve the k closest embeddings for a prompt.
+
+        This method encodes the prompt to a vector and queries the vector database
+        for its k nearest neighbors.
 
         Args:
-            prompt: str - The prompt to get the k-nearest neighbors for
-            k: int - The number of nearest neighbors to get
+            prompt (str): The prompt to query.
+            k (int): Number of nearest neighbors to return.
 
         Returns:
-            List[tuple[float, int]] - A list of tuples, each containing a similarity score and an embedding id
+            List[tuple[float, int]]: List of (similarity_score, embedding_id) tuples.
         """
         embedding = self.embedding_engine.get_embedding(prompt)
         return self.embedding_store.get_knn(embedding, k)
 
     def flush(self) -> None:
-        """
-        Flushes the cache
-        """
+        """Clear all embeddings and metadata from the cache."""
         self.embedding_store.reset()
 
     def get_metadata(self, embedding_id: int) -> EmbeddingMetadataObj:
-        """
-        Retrieves the metadata object for the given embedding id.
+        """Get metadata associated with a specific embedding.
 
         Args:
-            embedding_id: int - The id of the embedding to get the metadata for
+            embedding_id (int): The ID of the embedding.
 
         Returns:
-            EmbeddingMetadataObj - The metadata of the embedding
+            EmbeddingMetadataObj: The metadata for the embedding.
         """
         return self.embedding_store.get_metadata(embedding_id)
 
     def update_metadata(
         self, embedding_id: int, embedding_metadata: EmbeddingMetadataObj
     ) -> EmbeddingMetadataObj:
-        """
-        Updates the metadata object for the given embedding id.
+        """Update metadata for an existing embedding.
 
         Args:
-            embedding_id: int - The id of the embedding to update
-            embedding_metadata: EmbeddingMetadataObj - The metadata to update the embedding with
+            embedding_id (int): The ID of the embedding.
+            embedding_metadata (EmbeddingMetadataObj): The new metadata object.
 
         Returns:
-            EmbeddingMetadataObj - The updated metadata of the embedding
+            EmbeddingMetadataObj: The updated metadata object.
         """
-        self.embedding_store.update_metadata(embedding_id, embedding_metadata)
+        return self.embedding_store.update_metadata(embedding_id, embedding_metadata)
 
     def add_observation(
         self, embedding_id: int, observation: Tuple[float, int]
     ) -> None:
-        """
-        Atomically adds a new observation to an embedding's metadata.
+        """Atomically add an observation to an embedding's metadata.
 
         Args:
-            embedding_id: int - The id of the embedding to add the observation to.
-            observation: Tuple[float, int] - The observation tuple (similarity_score, label).
+            embedding_id (int): The ID of the embedding.
+            observation (Tuple[float, int]): A tuple (similarity_score, label).
         """
         self.embedding_store.add_observation(embedding_id, observation)
 
     def get_current_capacity(self) -> int:
-        """
-        returns: int - The current capacity of the cache
+        """Return the current capacity of the cache.
+
+        Returns:
+            int: The number of embeddings currently stored.
         """
         # TODO
         return None
 
     def is_empty(self) -> bool:
-        """
-        returns: bool - Whether the cache is empty
+        """Check if the cache has no embeddings.
+
+        Returns:
+            bool: True if empty, False otherwise.
         """
         return self.embedding_store.is_empty()
 
     def get_all_embedding_metadata_objects(self) -> List[EmbeddingMetadataObj]:
-        """
-        Retrieves all the embedding metadata objects from the embedding metadata storage.
+        """Retrieve all embedding metadata objects.
 
         Returns:
-            List["EmbeddingMetadataObj"] - A list of all the embedding metadata objects in the cache
+            List[EmbeddingMetadataObj]: All metadata objects in the cache.
         """
         return self.embedding_store.embedding_metadata_storage.get_all_embedding_metadata_objects()

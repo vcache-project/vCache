@@ -11,6 +11,17 @@ from vcache.vcache_core.cache.embedding_store.vector_db.vector_db import (
 
 
 class FAISSVectorDB(VectorDB):
+    """A vector database implementation using FAISS.
+
+    This class provides a thread-safe vector database that stores embeddings and
+    performs k-nearest neighbor searches using the FAISS library. It supports
+    both cosine similarity and L2 (Euclidean) distance.
+
+    Attributes:
+        similarity_metric_type (SimilarityMetricType): The metric for measuring similarity.
+        index (faiss.Index): The underlying FAISS index.
+    """
+
     def __init__(
         self, similarity_metric_type: SimilarityMetricType = SimilarityMetricType.COSINE
     ):
@@ -22,7 +33,19 @@ class FAISSVectorDB(VectorDB):
     def transform_similarity_score(
         self, similarity_score: float, metric_type: str
     ) -> float:
-        # Override the default transform_similarity_score method
+        """Transform a raw score from FAISS to a normalized similarity score.
+
+        For cosine similarity, FAISS's IndexFlatIP returns the inner product, which
+        is already the similarity, so no transformation is needed. For L2 distance,
+        the raw distance is converted to a similarity score.
+
+        Args:
+            similarity_score (float): The raw score from the FAISS index.
+            metric_type (str): The similarity metric used ('cosine' or 'euclidean').
+
+        Returns:
+            float: The transformed similarity score, normalized to [0, 1].
+        """
         match metric_type:
             case "cosine":
                 return similarity_score
@@ -32,14 +55,16 @@ class FAISSVectorDB(VectorDB):
                 raise ValueError(f"Invalid similarity metric type: {metric_type}")
 
     def add(self, embedding: List[float]) -> int:
-        """
-        Thread-safe addition of embedding to the vector database.
+        """Add an embedding to the database, initializing the index if needed.
+
+        This method is thread-safe. For cosine similarity, embeddings are
+        L2-normalized before being added to the index.
 
         Args:
-            embedding: List[float] - The embedding vector to add
+            embedding (List[float]): The embedding vector to add.
 
         Returns:
-            int - The unique ID assigned to the embedding
+            int: The unique ID assigned to the added embedding.
         """
         with self._operation_lock:
             if self.index is None:
@@ -59,14 +84,15 @@ class FAISSVectorDB(VectorDB):
             return embedding_id
 
     def remove(self, embedding_id: int) -> int:
-        """
-        Thread-safe removal of embedding from the vector database.
+        """Remove an embedding from the database by its ID.
+
+        This method is thread-safe.
 
         Args:
-            embedding_id: int - The ID of the embedding to remove
+            embedding_id (int): The ID of the embedding to remove.
 
         Returns:
-            int - The ID of the removed embedding
+            int: The ID of the removed embedding.
         """
         with self._operation_lock:
             if self.index is None:
@@ -78,15 +104,17 @@ class FAISSVectorDB(VectorDB):
             return embedding_id
 
     def get_knn(self, embedding: List[float], k: int) -> List[tuple[float, int]]:
-        """
-        Thread-safe k-nearest neighbors search.
+        """Find the k-nearest neighbors for a given embedding.
+
+        This method is thread-safe. For cosine similarity, the query embedding is
+        L2-normalized before searching. Invalid IDs (-1) are filtered from results.
 
         Args:
-            embedding: List[float] - The query embedding
-            k: int - Number of nearest neighbors to return
+            embedding (List[float]): The query embedding.
+            k (int): The number of nearest neighbors to return.
 
         Returns:
-            List[tuple[float, int]] - List of (similarity_score, embedding_id) tuples
+            List[tuple[float, int]]: List of (similarity_score, embedding_id) tuples.
         """
         with self._operation_lock:
             if self.index is None:
@@ -108,19 +136,21 @@ class FAISSVectorDB(VectorDB):
             return list(zip(similarity_scores[: len(id_list)], id_list))
 
     def reset(self) -> None:
-        """
-        Thread-safe reset of the vector database.
-        """
+        """Clear all embeddings from the database and reset the index."""
         with self._operation_lock:
             self.index = None
             self.__next_embedding_id = 0
 
     def _init_vector_store(self, embedding_dim: int):
-        """
-        Initialize the vector store. Should be called within a lock context.
+        """Initialize the FAISS index.
+
+        This method selects the appropriate FAISS index type based on the
+        similarity metric (IndexFlatIP for cosine, IndexFlatL2 for Euclidean)
+        and wraps it with an IDMap to support custom embedding IDs. It must be
+        called within a locked context.
 
         Args:
-            embedding_dim: int - The dimension of the embedding vectors
+            embedding_dim (int): The dimension of the embedding vectors.
         """
         metric_type = self.similarity_metric_type.value
         match metric_type:
@@ -137,11 +167,12 @@ class FAISSVectorDB(VectorDB):
         self.index = faiss.IndexIDMap(self.index)
 
     def is_empty(self) -> bool:
-        """
-        Thread-safe check if the vector database is empty.
+        """Check if the database contains any embeddings.
+
+        This method is thread-safe.
 
         Returns:
-            bool - True if the database is empty, False otherwise
+            bool: True if the database has no embeddings, False otherwise.
         """
         with self._operation_lock:
             if self.index is None:
