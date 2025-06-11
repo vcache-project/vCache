@@ -25,13 +25,19 @@ class Cache:
         Initializes the metadata object using the response and stores it in the embedding metadata storage.
 
         Args:
-            prompt: str - The prompt to add to the cache
-            response: str - The response to add to the cache
+            prompt (str): The prompt to add to the cache
+            response (str): The response to add to the cache
             
         Returns:
-            int - The id of the embedding
+            int: The id of the embedding
+            
+        # REVIEW COMMENT: Docstring format should follow Google style guide:
+        # - Use (type) instead of : type - format
+        # - Use Returns: type instead of returns: type
         """
         embedding = self.embedding_engine.get_embedding(prompt)
+        # REVIEW COMMENT: Missing return statement - method should return the embedding ID
+        # as documented in the docstring
         self.embedding_store.add_embedding(embedding, response)
 
     def remove(self, embedding_id: int) -> int:

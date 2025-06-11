@@ -29,6 +29,8 @@ class HNSWLibVectorDB(VectorDB):
         self.M = None
         self.ef = None
         self.index = None
+        # REVIEW COMMENT: Consider using threading.Lock() instead of RLock() for better performance
+        # RLock allows recursive locking which may mask potential issues and is slower
         self._operation_lock = threading.RLock()
 
     def add(self, embedding: List[float]) -> int:
@@ -140,5 +142,7 @@ class HNSWLibVectorDB(VectorDB):
         Returns:
             bool - True if the database is empty, False otherwise
         """
+        # REVIEW COMMENT: Consider if locking is necessary for simple read operations
+        # This might impact performance unnecessarily
         with self._operation_lock:
             return self.embedding_count == 0

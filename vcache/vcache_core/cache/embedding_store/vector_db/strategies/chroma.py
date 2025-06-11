@@ -17,6 +17,8 @@ class ChromaVectorDB(VectorDB):
         self.collection = None
         self.client = None
         self.similarity_metric_type = similarity_metric_type
+        # REVIEW COMMENT: Consider using threading.Lock() instead of RLock() for better performance
+        # RLock allows recursive locking which may mask potential issues and is slower
         self._operation_lock = threading.RLock()
 
     def add(self, embedding: List[float]) -> int:

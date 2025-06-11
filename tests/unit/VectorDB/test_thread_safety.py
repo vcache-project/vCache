@@ -93,6 +93,9 @@ class TestVectorDBThreadSafety(unittest.TestCase):
             f"Expected {expected_total} unique IDs, got {len(all_ids)}"
         )
         
+        # REVIEW COMMENT: This test assumes sequential ID generation (0 to n-1)
+        # This assumption may not hold for all vector DB implementations
+        # Consider testing uniqueness instead of specific ID values
         # Verify IDs are sequential (0 to expected_total - 1)
         expected_ids = set(range(expected_total))
         self.assertEqual(

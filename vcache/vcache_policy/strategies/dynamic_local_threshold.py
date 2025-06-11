@@ -1,5 +1,7 @@
 import logging
 import random
+# REVIEW COMMENT: ThreadPoolExecutor is imported but not used (commented out below)
+# Consider removing unused imports
 from concurrent.futures import ThreadPoolExecutor
 from enum import Enum
 from typing import Dict, List, Optional, Tuple
@@ -39,6 +41,8 @@ class DynamicLocalThresholdPolicy(VCachePolicy):
         self.similarity_evaluator: SimilarityEvaluator = None
         self.inference_engine: InferenceEngine = None
         self.cache: Cache = None
+        # REVIEW COMMENT: Commented out code should be removed or properly implemented
+        # If async processing is intended, implement it properly or remove the code
         # self._executor = ThreadPoolExecutor(
         #     max_workers=max_background_workers, thread_name_prefix="vcache-bg"
         # )
@@ -92,6 +96,8 @@ class DynamicLocalThresholdPolicy(VCachePolicy):
                 response = self.inference_engine.create(
                     prompt=prompt, system_prompt=system_prompt
                 )
+                # REVIEW COMMENT: Commented out async processing - this defeats the purpose
+                # of the background processing optimization. Either implement properly or remove.
                 # self._executor.submit(
                 #     self._generate_label,
                 #     response=response,
@@ -148,6 +154,7 @@ class DynamicLocalThresholdPolicy(VCachePolicy):
                 f"Error in background label generation: {e}", exc_info=True
             )
 
+    # REVIEW COMMENT: Commented out cleanup code should be removed if not used
     # def __del__(self):
     #     """Cleanup the ThreadPoolExecutor when the policy is destroyed."""
     #     if hasattr(self, "_executor") and self._executor:

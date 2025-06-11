@@ -17,6 +17,8 @@ class FAISSVectorDB(VectorDB):
         self.similarity_metric_type = similarity_metric_type
         self.__next_embedding_id = 0
         self.index = None
+        # REVIEW COMMENT: Consider using threading.Lock() instead of RLock() for better performance
+        # RLock allows recursive locking which may mask potential issues and is slower
         self._operation_lock = threading.RLock()
 
     def transform_similarity_score(
@@ -100,6 +102,8 @@ class FAISSVectorDB(VectorDB):
             if metric_type == "cosine":
                 faiss.normalize_L2(embedding_array)
             similarities, ids = self.index.search(embedding_array, k_)
+            # REVIEW COMMENT: Potential bug - filtering IDs after transforming similarities
+            # can cause index mismatch. Filter both arrays together or use enumerate.
             similarity_scores = [
                 self.transform_similarity_score(sim, metric_type) for sim in similarities[0]
             ]
@@ -111,6 +115,8 @@ class FAISSVectorDB(VectorDB):
         Thread-safe reset of the vector database.
         """
         with self._operation_lock:
+            # REVIEW COMMENT: Setting index to None loses dimension info.
+            # Consider storing dim separately or reinitializing with previous dim
             self.index = None
             self.__next_embedding_id = 0
 
