@@ -2,6 +2,12 @@
 vCache: Reliable and Efficient Semantic Prompt Caching
 """
 
+import os
+
+# Disable Hugging Face tokenizer parallelism to prevent deadlocks when using
+# vCache in multi-threaded applications. This is a library-level fix.
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
 # Main vCache classes
 from vcache.config import VCacheConfig
 

@@ -50,7 +50,7 @@ class InMemoryEmbeddingMetadataStorage(EmbeddingMetadataStorage):
         """
         with self._store_lock:
             self.metadata_storage[embedding_id] = metadata
-        return embedding_id
+            return embedding_id
 
     def get_metadata(self, embedding_id: int) -> EmbeddingMetadataObj:
         """Retrieve metadata for an embedding from the in-memory store.
@@ -124,10 +124,10 @@ class InMemoryEmbeddingMetadataStorage(EmbeddingMetadataStorage):
         with self._store_lock:
             if embedding_id in self.metadata_storage:
                 del self.metadata_storage[embedding_id]
-            # Also remove the associated lock
-            if embedding_id in self._entry_locks:
-                del self._entry_locks[embedding_id]
-            return True
+                # Also remove the associated lock
+                if embedding_id in self._entry_locks:
+                    del self._entry_locks[embedding_id]
+                return True
         return False
 
     def flush(self) -> None:

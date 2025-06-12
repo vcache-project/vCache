@@ -38,7 +38,7 @@ class DynamicLocalThresholdPolicy(VCachePolicy):
         cache (Cache): The vCache instance.
     """
 
-    def __init__(self, delta: float = 0.01, max_background_workers: int = 4):
+    def __init__(self, delta: float = 0.01, max_background_workers: int = 100):
         """Initializes the policy.
 
         Args:
@@ -113,7 +113,9 @@ class DynamicLocalThresholdPolicy(VCachePolicy):
                 response = self.inference_engine.create(
                     prompt=prompt, system_prompt=system_prompt
                 )
-                self._generate_label(
+
+                self._executor.submit(
+                    self._generate_label,
                     response=response,
                     nn_response=metadata.response,
                     similarity_score=similarity_score,
@@ -164,10 +166,14 @@ class DynamicLocalThresholdPolicy(VCachePolicy):
                 f"Error in background label generation: {e}", exc_info=True
             )
 
-    def __del__(self):
-        """Cleanup the ThreadPoolExecutor when the policy is destroyed."""
+    def __enter__(self):
+        """Enter the runtime context related to this object."""
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        """Exit the runtime context and shutdown the thread pool."""
         if hasattr(self, "_executor") and self._executor:
-            self._executor.shutdown(wait=False)
+            self._executor.shutdown(wait=True)
 
 
 class _Action(Enum):
