@@ -16,7 +16,7 @@ class LLMComparisonSimilarityEvaluator(SimilarityEvaluator):
 
     def answers_similar(self, a: str, b: str) -> bool:
         """
-        Check if two answers are similar using LLM comparison.
+        Check if two answers are similar using LLM-judge comparison.
 
         Args:
             a: The first answer to compare.
@@ -25,8 +25,17 @@ class LLMComparisonSimilarityEvaluator(SimilarityEvaluator):
         Returns:
             True if the answers are similar, False otherwise.
         """
-        # TODO
-        # @Alex: You can access the inference engine via:
-        # self.inference_engine
-        print("TODO: Embedding-based Answer similarity check not implemented")
-        return False
+        if not self.inference_engine:
+            return False
+
+        system_prompt: str = "You are a judge evaluating whether two answers are semantically equivalent. Respond with only 'YES' if they convey the same meaning, or 'NO' if they differ significantly."
+
+        user_prompt: str = f"Answer 1: {a}\n\nAnswer 2: {b}\n\nAre these answers semantically equivalent?"
+
+        try:
+            response: str = (
+                self.inference_engine.create(user_prompt, system_prompt).strip().upper()
+            )
+            return "YES" in response
+        except Exception:
+            return False
