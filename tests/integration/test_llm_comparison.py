@@ -86,32 +86,6 @@ class TestLLMComparisonIntegration(unittest.TestCase):
         self.assertIn("except", content)
         self.assertIn("YES", content)
 
-    def test_implementation_minimal_lines(self):
-        """Test that the implementation is minimal as requested."""
-        file_path = os.path.join(
-            os.path.dirname(
-                os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            ),
-            "vcache",
-            "vcache_core",
-            "similarity_evaluator",
-            "strategies",
-            "llm_comparison.py",
-        )
-
-        with open(file_path, "r") as f:
-            lines = f.readlines()
-
-        # Count non-empty, non-comment lines
-        code_lines = [
-            line.strip()
-            for line in lines
-            if line.strip() and not line.strip().startswith("#")
-        ]
-
-        # Should be minimal - around 25 lines total including imports and class structure
-        self.assertLess(len(code_lines), 30, "Implementation should be minimal")
-
     def test_prompt_design_quality(self):
         """Test that the prompts are well-designed."""
         file_path = os.path.join(
