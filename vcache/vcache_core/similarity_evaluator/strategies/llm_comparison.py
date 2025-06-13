@@ -11,14 +11,14 @@ class LLMComparisonSimilarityEvaluator(SimilarityEvaluator):
         if not self.inference_engine:
             return False
 
-        system_prompt = "You are a judge evaluating whether two answers are semantically equivalent. Respond with only 'YES' if they convey the same meaning, or 'NO' if they differ significantly."
+        system_prompt: str = "You are a judge evaluating whether two answers are semantically equivalent. Respond with only 'YES' if they convey the same meaning, or 'NO' if they differ significantly."
 
-        user_prompt = f"Answer 1: {a}\n\nAnswer 2: {b}\n\nAre these answers semantically equivalent?"
+        user_prompt: str = f"Answer 1: {a}\n\nAnswer 2: {b}\n\nAre these answers semantically equivalent?"
 
         try:
-            response = (
+            response: str = (
                 self.inference_engine.create(user_prompt, system_prompt).strip().upper()
             )
-            return response.startswith("YES")
+            return "YES" in response
         except Exception:
             return False
