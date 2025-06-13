@@ -1,3 +1,4 @@
+import threading
 from typing import List
 
 from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage import (
@@ -28,10 +29,14 @@ class EmbeddingStore:
         """
         self.vector_db = vector_db
         self.embedding_metadata_storage = embedding_metadata_storage
+        self._add_lock = threading.Lock()
+        self._remove_lock = threading.Lock()
 
     def add_embedding(self, embedding: List[float], response: str) -> int:
         """
-        Add an embedding and its associated response to the store.
+        Add an embedding to the vector database and a new metadata object.
+
+        This operation is thread-safe.
 
         Args:
             embedding: The embedding vector to add.
@@ -40,19 +45,22 @@ class EmbeddingStore:
         Returns:
             The ID of the added embedding.
         """
-        embedding_id = self.vector_db.add(embedding)
-        metadata = EmbeddingMetadataObj(
-            embedding_id=embedding_id,
-            response=response,
-        )
-        self.embedding_metadata_storage.add_metadata(
-            embedding_id=embedding_id, metadata=metadata
-        )
-        return embedding_id
+        with self._add_lock:
+            embedding_id = self.vector_db.add(embedding)
+            metadata = EmbeddingMetadataObj(
+                embedding_id=embedding_id,
+                response=response,
+            )
+            self.embedding_metadata_storage.add_metadata(
+                embedding_id=embedding_id, metadata=metadata
+            )
+            return embedding_id
 
     def remove(self, embedding_id: int) -> int:
         """
         Remove an embedding and its metadata from the store.
+
+        This operation is thread-safe.
 
         Args:
             embedding_id: The ID of the embedding to remove.
@@ -60,8 +68,9 @@ class EmbeddingStore:
         Returns:
             The ID of the removed embedding.
         """
-        self.embedding_metadata_storage.remove_metadata(embedding_id)
-        return self.vector_db.remove(embedding_id)
+        with self._remove_lock:
+            self.embedding_metadata_storage.remove_metadata(embedding_id)
+            return self.vector_db.remove(embedding_id)
 
     def get_knn(self, embedding: List[float], k: int) -> List[tuple[float, int]]:
         """

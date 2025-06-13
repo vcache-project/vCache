@@ -33,7 +33,11 @@ class Cache:
 
     def add(self, prompt: str, response: str) -> int:
         """
-        Add a prompt-response pair to the cache.
+        Compute the embedding for the prompt, add an embedding to the vector database and a new metadata object.
+
+        IMPORTANT: The embedding is computed first and then added to the vector database.
+        The metadata object is added last.
+        Consider this when implementing asynchronous logic to prevent race conditions.
 
         Args:
             prompt: The prompt to add to the cache.
