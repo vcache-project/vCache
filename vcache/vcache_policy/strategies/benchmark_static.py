@@ -8,9 +8,11 @@ from vcache.vcache_core.cache.embedding_store.embedding_store import EmbeddingSt
 from vcache.vcache_policy.vcache_policy import VCachePolicy
 
 
-class StaticGlobalThresholdPolicy(VCachePolicy):
+class BenchmarkStaticDecisionPolicy(VCachePolicy):
     """
     Policy that uses a static global threshold to determine cache hits.
+
+    IMPORTANT: This policy is used for benchmark purposes and should not be used in production.
     """
 
     def __init__(

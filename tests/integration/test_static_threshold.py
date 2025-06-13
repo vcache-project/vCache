@@ -3,11 +3,11 @@ import unittest
 from dotenv import load_dotenv
 
 from vcache import (
+    BenchmarkStaticDecisionPolicy,
     HNSWLibVectorDB,
     InMemoryEmbeddingMetadataStorage,
     LangChainEmbeddingEngine,
     OpenAIInferenceEngine,
-    StaticGlobalThresholdPolicy,
     VCache,
     VCacheConfig,
 )
@@ -27,7 +27,7 @@ def create_default_config_and_policy():
         vector_db=HNSWLibVectorDB(),
         embedding_metadata_storage=InMemoryEmbeddingMetadataStorage(),
     )
-    policy = StaticGlobalThresholdPolicy(threshold=0.8)
+    policy = BenchmarkStaticDecisionPolicy(threshold=0.8)
     return config, policy
 
 

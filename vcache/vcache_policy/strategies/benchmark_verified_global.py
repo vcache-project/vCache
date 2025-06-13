@@ -20,9 +20,11 @@ from vcache.vcache_core.similarity_evaluator import SimilarityEvaluator
 from vcache.vcache_policy.vcache_policy import VCachePolicy
 
 
-class DynamicGlobalThresholdPolicy(VCachePolicy):
+class BenchmarkVerifiedGlobalDecisionPolicy(VCachePolicy):
     """
     Policy that uses the vCache algorithm to compute optimal global thresholds across all embeddings.
+
+    IMPORTANT: This policy is used for benchmark purposes and should not be used in production.
     """
 
     def __init__(

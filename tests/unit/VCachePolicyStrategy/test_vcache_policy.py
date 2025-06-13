@@ -6,13 +6,13 @@ from vcache.config import VCacheConfig
 from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage.embedding_metadata_obj import (
     EmbeddingMetadataObj,
 )
-from vcache.vcache_policy.strategies.dynamic_local_threshold import (
-    DynamicLocalThresholdPolicy,
+from vcache.vcache_policy.strategies.verified import (
+    VerifiedDecisionPolicy,
     _Action,
 )
 
 
-class TestDynamicLocalThresholdPolicy(unittest.TestCase):
+class TestVerifiedDecisionPolicy(unittest.TestCase):
     def setUp(self):
         """Set up a new policy and mock dependencies for each test."""
         self.mock_inference_engine = MagicMock()
@@ -54,7 +54,7 @@ class TestDynamicLocalThresholdPolicy(unittest.TestCase):
         mock_config.vector_db = MagicMock()
         mock_config.eviction_policy = MagicMock()
 
-        self.policy = DynamicLocalThresholdPolicy()
+        self.policy = VerifiedDecisionPolicy()
         self.policy.setup(mock_config)
 
         # After setup, replace the real cache with our stateful mock
@@ -77,9 +77,7 @@ class TestDynamicLocalThresholdPolicy(unittest.TestCase):
             prompt="prompt", response="new response"
         )
 
-    @patch(
-        "vcache.vcache_policy.strategies.dynamic_local_threshold._Algorithm.select_action"
-    )
+    @patch("vcache.vcache_policy.strategies.verified._Algorithm.select_action")
     def test_exploit_is_cache_hit(self, mock_select_action):
         """Test that an EXPLOIT action results in a cache hit."""
         mock_select_action.return_value = _Action.EXPLOIT
@@ -96,9 +94,7 @@ class TestDynamicLocalThresholdPolicy(unittest.TestCase):
         self.assertEqual(response, "cached response")
         self.mock_inference_engine.create.assert_not_called()
 
-    @patch(
-        "vcache.vcache_policy.strategies.dynamic_local_threshold._Algorithm.select_action"
-    )
+    @patch("vcache.vcache_policy.strategies.verified._Algorithm.select_action")
     def test_explore_updates_in_background(self, mock_select_action):
         """Test that an EXPLORE action queues a background update."""
         mock_select_action.return_value = _Action.EXPLORE

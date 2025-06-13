@@ -1,8 +1,8 @@
 from typing import List, Optional, Tuple
 
 from vcache.config import VCacheConfig
-from vcache.vcache_policy.strategies.dynamic_local_threshold import (
-    DynamicLocalThresholdPolicy,
+from vcache.vcache_policy.strategies.verified import (
+    VerifiedDecisionPolicy,
 )
 from vcache.vcache_policy.vcache_policy import VCachePolicy
 
@@ -15,7 +15,7 @@ class VCache:
     def __init__(
         self,
         config: VCacheConfig = VCacheConfig(),
-        policy: VCachePolicy = DynamicLocalThresholdPolicy(delta=0.02),
+        policy: VCachePolicy = VerifiedDecisionPolicy(delta=0.02),
     ):
         """
         Initialize VCache with configuration and policy.

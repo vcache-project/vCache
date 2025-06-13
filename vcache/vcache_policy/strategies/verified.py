@@ -1,3 +1,4 @@
+import os
 import queue
 import random
 import threading
@@ -23,6 +24,10 @@ from vcache.vcache_core.similarity_evaluator import (
     SimilarityEvaluator,
 )
 from vcache.vcache_policy.vcache_policy import VCachePolicy
+
+# Disable Hugging Face tokenizer parallelism to prevent deadlocks when using
+# vCache in multi-threaded applications. This is a library-level fix.
+os.environ["TOKENIZERS_PARALLELISM"] = "true"
 
 
 class CallbackQueue(queue.Queue):
@@ -76,7 +81,7 @@ class CallbackQueue(queue.Queue):
             self.worker_thread.join()
 
 
-class DynamicLocalThresholdPolicy(VCachePolicy):
+class VerifiedDecisionPolicy(VCachePolicy):
     """
     Dynamic local threshold policy that computes optimal thresholds for each embedding.
     """
@@ -98,6 +103,14 @@ class DynamicLocalThresholdPolicy(VCachePolicy):
 
         self.executor: Optional[ThreadPoolExecutor] = None
         self.callback_queue: Optional[CallbackQueue] = None
+
+    def __enter__(self):
+        """Enter the context manager."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Exit the context manager and shutdown the policy."""
+        self.shutdown()
 
     @override
     def setup(self, config: VCacheConfig):
@@ -133,10 +146,11 @@ class DynamicLocalThresholdPolicy(VCachePolicy):
         """
         Shuts down the thread pool and callback queue gracefully.
         """
-        if self.callback_queue:
-            self.callback_queue.stop()
         if self.executor:
             self.executor.shutdown(wait=True)
+
+        if self.callback_queue:
+            self.callback_queue.stop()
 
     @override
     def process_request(

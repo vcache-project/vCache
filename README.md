@@ -59,7 +59,7 @@ By default, vCache uses:
 - `InMemoryEmbeddingMetadataStorage`
 - `NoEvictionPolicy`
 - `StringComparisonSimilarityEvaluator`
-- `DynamicLocalThresholdPolicy` with a maximum failure rate of 2%
+- `VerifiedDecisionPolicy` with a maximum failure rate of 2%
 
 
 
@@ -77,14 +77,14 @@ from vcache.inference_engine.strategies.open_ai import OpenAIInferenceEngine
 from vcache.vcache_core.cache.embedding_engine.strategies.open_ai import OpenAIEmbeddingEngine
 from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage.strategies.in_memory import InMemoryEmbeddingMetadataStorage
 from vcache.vcache_core.similarity_evaluator.strategies.string_comparison import StringComparisonSimilarityEvaluator
-from vcache.vcache_policy.strategies.dynamic_local_threshold import DynamicLocalThresholdPolicy
+from vcache.vcache_policy.strategies.dynamic_local_threshold import VerifiedDecisionPolicy
 from vcache.vcache_policy.vcache_policy import VCachePolicy
 from vcache.vcache_core.cache.embedding_store.vector_db import HNSWLibVectorDB, SimilarityMetricType
 ```
 </details>
 
 ```python
-vcache_policy: VCachePolicy = DynamicLocalThresholdPolicy(delta=0.02)
+vcache_policy: VCachePolicy = VerifiedDecisionPolicy(delta=0.02)
 vcache_config: VCacheConfig = VCacheConfig(
     inference_engine=OpenAIInferenceEngine(),
     embedding_engine=OpenAIEmbeddingEngine(),

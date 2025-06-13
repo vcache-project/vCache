@@ -40,17 +40,17 @@ from vcache.vcache_core.similarity_evaluator.strategies.llm_comparison import (
 from vcache.vcache_core.similarity_evaluator.strategies.string_comparison import (
     StringComparisonSimilarityEvaluator,
 )
-from vcache.vcache_policy.strategies.dynamic_global_threshold import (
-    DynamicGlobalThresholdPolicy,
+from vcache.vcache_policy.strategies.benchmark_iid_verified import (
+    BenchmarkVerifiedIIDDecisionPolicy,
 )
-from vcache.vcache_policy.strategies.dynamic_local_threshold import (
-    DynamicLocalThresholdPolicy,
+from vcache.vcache_policy.strategies.benchmark_static import (
+    BenchmarkStaticDecisionPolicy,
 )
-from vcache.vcache_policy.strategies.iid_local_threshold import (
-    IIDLocalThresholdPolicy,
+from vcache.vcache_policy.strategies.benchmark_verified_global import (
+    BenchmarkVerifiedGlobalDecisionPolicy,
 )
-from vcache.vcache_policy.strategies.static_global_threshold import (
-    StaticGlobalThresholdPolicy,
+from vcache.vcache_policy.strategies.verified import (
+    VerifiedDecisionPolicy,
 )
 from vcache.vcache_policy.vcache_policy import VCachePolicy
 
@@ -560,7 +560,7 @@ def main():
                         )
 
                         __run_baseline(
-                            vcache_policy=DynamicLocalThresholdPolicy(delta=delta),
+                            vcache_policy=VerifiedDecisionPolicy(delta=delta),
                             path=path,
                             dataset_file=dataset_file,
                             embedding_model=embedding_model.value,
@@ -593,7 +593,9 @@ def main():
                     )
 
                     __run_baseline(
-                        vcache_policy=DynamicGlobalThresholdPolicy(delta=delta),
+                        vcache_policy=BenchmarkVerifiedGlobalDecisionPolicy(
+                            delta=delta
+                        ),
                         path=path,
                         dataset_file=dataset_file,
                         embedding_model=embedding_model.value,
@@ -640,7 +642,9 @@ def main():
                     logging.info(f"Using static threshold: {threshold}")
 
                     __run_baseline(
-                        vcache_policy=StaticGlobalThresholdPolicy(threshold=threshold),
+                        vcache_policy=BenchmarkStaticDecisionPolicy(
+                            threshold=threshold
+                        ),
                         path=path,
                         dataset_file=dataset_file,
                         embedding_model=berkeley_embedding_model.value,
@@ -690,7 +694,7 @@ def main():
                         )
 
                         __run_baseline(
-                            vcache_policy=DynamicLocalThresholdPolicy(delta=delta),
+                            vcache_policy=VerifiedDecisionPolicy(delta=delta),
                             path=path,
                             dataset_file=dataset_file,
                             embedding_model=berkeley_embedding_model.value,
@@ -721,7 +725,9 @@ def main():
                         )
 
                         __run_baseline(
-                            vcache_policy=IIDLocalThresholdPolicy(delta=delta),
+                            vcache_policy=BenchmarkVerifiedIIDDecisionPolicy(
+                                delta=delta
+                            ),
                             path=path,
                             dataset_file=dataset_file,
                             embedding_model=embedding_model.value,
@@ -749,7 +755,9 @@ def main():
                     logging.info(f"Using static threshold: {threshold}")
 
                     __run_baseline(
-                        vcache_policy=StaticGlobalThresholdPolicy(threshold=threshold),
+                        vcache_policy=BenchmarkStaticDecisionPolicy(
+                            threshold=threshold
+                        ),
                         path=path,
                         dataset_file=dataset_file,
                         embedding_model=embedding_model.value,
