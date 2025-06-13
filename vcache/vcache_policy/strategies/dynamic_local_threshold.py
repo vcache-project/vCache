@@ -23,14 +23,16 @@ from vcache.vcache_policy.vcache_policy import VCachePolicy
 
 
 class DynamicLocalThresholdPolicy(VCachePolicy):
+    """
+    Dynamic local threshold policy that computes optimal thresholds for each embedding.
+    """
+
     def __init__(self, delta: float = 0.01):
         """
-        This policy uses the vCache algorithm to compute the optimal threshold for each
-        embedding in the cache.
-        Each threshold is used to determine if a response is a cache hit.
+        Initialize dynamic local threshold policy.
 
-        Args
-            delta: float - The delta value to use
+        Args:
+            delta: The delta value to use for threshold computation.
         """
         self.bayesian = _Algorithm(delta=delta)
         self.similarity_evaluator: SimilarityEvaluator = None
@@ -39,6 +41,12 @@ class DynamicLocalThresholdPolicy(VCachePolicy):
 
     @override
     def setup(self, config: VCacheConfig):
+        """
+        Setup the policy with the given configuration.
+
+        Args:
+            config: The VCache configuration to use.
+        """
         self.similarity_evaluator = config.similarity_evaluator
         self.inference_engine = config.inference_engine
         self.cache = Cache(
@@ -55,11 +63,14 @@ class DynamicLocalThresholdPolicy(VCachePolicy):
         self, prompt: str, system_prompt: Optional[str]
     ) -> tuple[bool, str, str]:
         """
-        Args
-            prompt: str - The prompt to check for cache hit
-            system_prompt: Optional[str] - The optional system prompt to use for the response. It will override the system prompt in the VCacheConfig if provided.
-        Returns
-            tuple[bool, str, str] - [is_cache_hit, actual_response, nn_response]
+        Process a request using dynamic local threshold policy.
+
+        Args:
+            prompt: The prompt to check for cache hit.
+            system_prompt: The optional system prompt to use for the response. It will override the system prompt in the VCacheConfig if provided.
+
+        Returns:
+            Tuple containing [is_cache_hit, actual_response, nn_response].
         """
         if self.inference_engine is None or self.cache is None:
             raise ValueError("Policy has not been setup")
@@ -102,12 +113,26 @@ class DynamicLocalThresholdPolicy(VCachePolicy):
 
 
 class _Action(Enum):
+    """
+    Enumeration of possible actions for the algorithm.
+    """
+
     EXPLORE = "explore"
     EXPLOIT = "exploit"
 
 
 class _Algorithm:
+    """
+    Internal algorithm implementation for dynamic threshold computation.
+    """
+
     def __init__(self, delta: float):
+        """
+        Initialize the algorithm with the given delta value.
+
+        Args:
+            delta: The delta value for confidence computation.
+        """
         self.delta: float = delta
         self.P_c: float = 1.0 - self.delta
         self.epsilon_grid: np.ndarray = np.linspace(1e-6, 1 - 1e-6, 50)

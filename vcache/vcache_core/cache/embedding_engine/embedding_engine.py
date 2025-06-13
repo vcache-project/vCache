@@ -4,13 +4,18 @@ from typing import List
 
 class EmbeddingEngine(ABC):
     """
-    Abstract base class for embedding engines
+    Abstract base class for embedding engines.
     """
 
     @abstractmethod
     def get_embedding(self, text: str) -> List[float]:
         """
-        text: str - The text to get the embedding for
-        returns: List[float] - The embedding of the text
+        Get the embedding for the given text.
+
+        Args:
+            text: The text to get the embedding for.
+
+        Returns:
+            The embedding of the text as a list of floats.
         """
         raise NotImplementedError("Subclasses must implement this method")

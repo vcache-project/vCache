@@ -19,19 +19,21 @@ from vcache.vcache_policy.vcache_policy import VCachePolicy
 
 
 class IIDLocalThresholdPolicy(VCachePolicy):
+    """
+    Policy that uses the vCache IID algorithm to compute optimal thresholds for each embedding.
+    """
+
     def __init__(
         self,
         similarity_evaluator: SimilarityEvaluator = StringComparisonSimilarityEvaluator(),
         delta: float = 0.01,
     ):
         """
-        This policy uses the vCache IID algorithm to compute the optimal threshold for each
-        embedding in the cache.
-        Each threshold is used to determine if a response is a cache hit.
+        Initialize IID local threshold policy.
 
-        Args
-            similarity_evaluator: SimilarityEvaluator - The similarity evaluator to use
-            delta: float - The delta value to use
+        Args:
+            similarity_evaluator: The similarity evaluator to use for response comparison.
+            delta: The delta value for the algorithm.
         """
         self.similarity_evaluator = similarity_evaluator
         self.bayesian = _Algorithm(delta=delta)
@@ -40,6 +42,12 @@ class IIDLocalThresholdPolicy(VCachePolicy):
 
     @override
     def setup(self, config: VCacheConfig):
+        """
+        Setup the policy with the given configuration.
+
+        Args:
+            config: The VCache configuration to use.
+        """
         self.inference_engine = config.inference_engine
         self.cache = Cache(
             embedding_engine=config.embedding_engine,
@@ -55,11 +63,17 @@ class IIDLocalThresholdPolicy(VCachePolicy):
         self, prompt: str, system_prompt: Optional[str]
     ) -> tuple[bool, str, str]:
         """
-        Args
-            prompt: str - The prompt to check for cache hit
-            system_prompt: Optional[str] - The optional system prompt to use for the response. It will override the system prompt in the VCacheConfig if provided.
-        Returns
-            tuple[bool, str, str] - [is_cache_hit, actual_response, nn_response]
+        Process a request using IID local threshold policy.
+
+        Args:
+            prompt: The prompt to check for cache hit.
+            system_prompt: The optional system prompt to use for the response. It will override the system prompt in the VCacheConfig if provided.
+
+        Returns:
+            Tuple containing [is_cache_hit, actual_response, nn_response].
+
+        Raises:
+            ValueError: If policy has not been setup.
         """
         if self.inference_engine is None or self.cache is None:
             raise ValueError("Policy has not been setup")
@@ -102,12 +116,26 @@ class IIDLocalThresholdPolicy(VCachePolicy):
 
 
 class _Action(Enum):
+    """
+    Actions that can be taken by the IID algorithm.
+    """
+
     EXPLORE = "explore"
     EXPLOIT = "exploit"
 
 
 class _Algorithm:
+    """
+    IID algorithm implementation for computing optimal thresholds.
+    """
+
     def __init__(self, delta: float):
+        """
+        Initialize the IID algorithm.
+
+        Args:
+            delta: The delta parameter for the algorithm.
+        """
         self.delta: float = delta
         self.epsilon_grid: np.ndarray = np.linspace(1e-6, 1 - 1e-6, 50)
         self.thold_grid: np.ndarray = np.linspace(0, 1, 20)
@@ -116,11 +144,12 @@ class _Algorithm:
         self, similarity_score: float, is_correct: bool, metadata: EmbeddingMetadataObj
     ) -> None:
         """
-        Update the metadata with the new observation
-        Args
-            similarity_score: float - The similarity score between the query and the embedding
-            is_correct: bool - Whether the query was correct
-            metadata: EmbeddingMetadataObj - The metadata of the embedding
+        Update the metadata with the new observation.
+
+        Args:
+            similarity_score: The similarity score between the query and the embedding.
+            is_correct: Whether the query was correct.
+            metadata: The metadata of the embedding.
         """
         if is_correct:
             metadata.observations.append((round(similarity_score, 3), 1))
@@ -131,13 +160,13 @@ class _Algorithm:
         """
         Vectorized Wilson score confidence interval for binomial proportions.
 
-        Parameters:
-        - k : array_like, number of successes (1,tholds,1)
-        - n : array_like, number of trials (1)
-        - confidence_level : float, confidence level for the interval (1,1,epsilons)
+        Args:
+            cdf_estimates: Array of CDF estimates (1,tholds,1).
+            n: Number of trials (1).
+            confidence: Confidence level for the interval (1,1,epsilons).
 
         Returns:
-        - ci_low, ci_upp : np.ndarray, lower and upper bounds of the confidence interval
+            Tuple of lower and upper bounds of the confidence interval.
         """
         k = np.asarray((cdf_estimates * n).astype(int))  # (1, tholds,1)
         n = np.asarray(n)  # 1
@@ -161,12 +190,14 @@ class _Algorithm:
         self, similarity_score: float, metadata: EmbeddingMetadataObj
     ) -> _Action:
         """
-        Select the action to take based on the similarity score, observations, and accuracy target
-        Args
-            similarity_score: float - The similarity score between the query and the embedding
-            metadata: EmbeddingMetadataObj - The metadata of the embedding
-        Returns
-            Action - Explore or Exploit
+        Select the action to take based on the similarity score and observations.
+
+        Args:
+            similarity_score: The similarity score between the query and the embedding.
+            metadata: The metadata of the embedding.
+
+        Returns:
+            The action to take (EXPLORE or EXPLOIT).
         """
 
         similarity_score = round(similarity_score, 3)

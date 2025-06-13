@@ -9,51 +9,83 @@ from vcache.vcache_core.cache.eviction_policy.eviction_policy import EvictionPol
 
 
 class Cache:
+    """
+    Cache class that manages embeddings and their associated responses.
+    """
+
     def __init__(
         self,
         embedding_store: EmbeddingStore,
         embedding_engine: EmbeddingEngine,
         eviction_policy: EvictionPolicy,
     ):
+        """
+        Initialize cache with embedding store, engine, and eviction policy.
+
+        Args:
+            embedding_store: Store for managing embeddings and metadata.
+            embedding_engine: Engine for generating embeddings from text.
+            eviction_policy: Policy for removing items when cache is full.
+        """
         self.embedding_store = embedding_store
         self.embedding_engine = embedding_engine
         self.eviction_policy = eviction_policy
 
     def add(self, prompt: str, response: str) -> int:
         """
-        prompt: str - The prompt to add to the cache
-        response: str - The response to add to the cache
-        returns: int - The id of the embedding
+        Add a prompt-response pair to the cache.
+
+        Args:
+            prompt: The prompt to add to the cache.
+            response: The response to add to the cache.
+
+        Returns:
+            The id of the embedding.
         """
         embedding = self.embedding_engine.get_embedding(prompt)
         self.embedding_store.add_embedding(embedding, response)
 
     def remove(self, embedding_id: int) -> int:
         """
-        embedding_id: int - The id of the embedding to remove
-        returns: int - The id of the embedding
+        Remove an embedding from the cache.
+
+        Args:
+            embedding_id: The id of the embedding to remove.
+
+        Returns:
+            The id of the embedding.
         """
         self.embedding_store.remove(embedding_id)
 
     def get_knn(self, prompt: str, k: int) -> List[tuple[float, int]]:
         """
-        prompt: str - The prompt to get the k-nearest neighbors for
-        k: int - The number of nearest neighbors to get
-        returns: List[tuple[float, int]] - A list of tuples, each containing a similarity score and an embedding id
+        Get k-nearest neighbors for a given prompt.
+
+        Args:
+            prompt: The prompt to get the k-nearest neighbors for.
+            k: The number of nearest neighbors to get.
+
+        Returns:
+            A list of tuples, each containing a similarity score and an embedding id.
         """
         embedding = self.embedding_engine.get_embedding(prompt)
         return self.embedding_store.get_knn(embedding, k)
 
     def flush(self) -> None:
         """
-        Flushes the cache
+        Flush all data from the cache.
         """
         self.embedding_store.reset()
 
     def get_metadata(self, embedding_id: int) -> EmbeddingMetadataObj:
         """
-        embedding_id: int - The id of the embedding to get the metadata for
-        returns: EmbeddingMetadataObj - The metadata of the embedding
+        Get metadata for a specific embedding.
+
+        Args:
+            embedding_id: The id of the embedding to get the metadata for.
+
+        Returns:
+            The metadata of the embedding.
         """
         return self.embedding_store.get_metadata(embedding_id)
 
@@ -61,27 +93,41 @@ class Cache:
         self, embedding_id: int, embedding_metadata: EmbeddingMetadataObj
     ) -> EmbeddingMetadataObj:
         """
-        embedding_id: int - The id of the embedding to update
-        embedding_metadata: EmbeddingMetadataObj - The metadata to update the embedding with
-        returns: EmbeddingMetadataObj - The updated metadata of the embedding
+        Update metadata for a specific embedding.
+
+        Args:
+            embedding_id: The id of the embedding to update.
+            embedding_metadata: The metadata to update the embedding with.
+
+        Returns:
+            The updated metadata of the embedding.
         """
         self.embedding_store.update_metadata(embedding_id, embedding_metadata)
 
     def get_current_capacity(self) -> int:
         """
-        returns: int - The current capacity of the cache
+        Get the current capacity of the cache.
+
+        Returns:
+            The current capacity of the cache.
         """
         # TODO
         return None
 
     def is_empty(self) -> bool:
         """
-        returns: bool - Whether the cache is empty
+        Check if the cache is empty.
+
+        Returns:
+            True if the cache is empty, False otherwise.
         """
         return self.embedding_store.is_empty()
 
     def get_all_embedding_metadata_objects(self) -> List[EmbeddingMetadataObj]:
         """
-        returns: List["EmbeddingMetadataObj"] - A list of all the embedding metadata objects in the cache
+        Get all embedding metadata objects in the cache.
+
+        Returns:
+            A list of all the embedding metadata objects in the cache.
         """
         return self.embedding_store.embedding_metadata_storage.get_all_embedding_metadata_objects()

@@ -6,12 +6,24 @@ from vcache.inference_engine.inference_engine import InferenceEngine
 
 
 class OpenAIInferenceEngine(InferenceEngine):
+    """
+    OpenAI-based inference engine for generating responses using OpenAI's API.
+    """
+
     def __init__(
         self,
         model_name: str = "gpt-4.1-nano",
         temperature: float = 1,
         api_key: Optional[str] = None,
     ):
+        """
+        Initialize OpenAI inference engine.
+
+        Args:
+            model_name: Name of the OpenAI model to use.
+            temperature: Temperature parameter for response generation.
+            api_key: OpenAI API key for authentication.
+        """
         super().__init__()
         self.model_name = model_name
         self.temperature = temperature
@@ -20,12 +32,27 @@ class OpenAIInferenceEngine(InferenceEngine):
 
     @property
     def client(self) -> OpenAIClient:
-        """Lazily initialize the OpenAI client only when needed."""
+        """
+        Get the OpenAI client, initializing it lazily when needed.
+
+        Returns:
+            The OpenAI client instance.
+        """
         if self._client is None:
             self._client = OpenAIClient(api_key=self.api_key)
         return self._client
 
     def create(self, prompt: str, system_prompt: Optional[str] = None) -> str:
+        """
+        Create a response for the given prompt using OpenAI's API.
+
+        Args:
+            prompt: The prompt to create an answer for.
+            system_prompt: The optional system prompt to use for the response.
+
+        Returns:
+            The answer to the prompt.
+        """
         try:
             messages = []
             if system_prompt:

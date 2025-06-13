@@ -13,11 +13,22 @@ Run 'sudo apt-get install build-essential' on Linux Debian/Ubuntu to install the
 
 
 class HNSWLibVectorDB(VectorDB):
+    """
+    HNSWLib-based vector database implementation for efficient similarity search.
+    """
+
     def __init__(
         self,
         similarity_metric_type: SimilarityMetricType = SimilarityMetricType.COSINE,
         max_capacity: int = 100000,
     ):
+        """
+        Initialize HNSWLib vector database.
+
+        Args:
+            similarity_metric_type: The similarity metric to use for comparisons.
+            max_capacity: Maximum number of vectors the database can store.
+        """
         self.embedding_count = 0
         self.__next_embedding_id = 0
         self.similarity_metric_type = similarity_metric_type
@@ -30,6 +41,15 @@ class HNSWLibVectorDB(VectorDB):
         self.index = None
 
     def add(self, embedding: List[float]) -> int:
+        """
+        Add an embedding vector to the database.
+
+        Args:
+            embedding: The embedding vector to add.
+
+        Returns:
+            The unique ID assigned to the added embedding.
+        """
         if self.index is None:
             self._init_vector_store(len(embedding))
         self.index.add_items(embedding, self.__next_embedding_id)
@@ -38,6 +58,18 @@ class HNSWLibVectorDB(VectorDB):
         return self.__next_embedding_id - 1
 
     def remove(self, embedding_id: int) -> int:
+        """
+        Remove an embedding from the database.
+
+        Args:
+            embedding_id: The ID of the embedding to remove.
+
+        Returns:
+            The ID of the removed embedding.
+
+        Raises:
+            ValueError: If the index is not initialized.
+        """
         if self.index is None:
             raise ValueError("Index is not initialized")
         self.index.mark_deleted(embedding_id)
@@ -45,6 +77,16 @@ class HNSWLibVectorDB(VectorDB):
         return embedding_id
 
     def get_knn(self, embedding: List[float], k: int) -> List[tuple[float, int]]:
+        """
+        Get k-nearest neighbors for the given embedding.
+
+        Args:
+            embedding: The query embedding vector.
+            k: The number of nearest neighbors to return.
+
+        Returns:
+            List of tuples containing similarity scores and embedding IDs.
+        """
         if self.index is None:
             return []
         k_ = min(k, self.embedding_count)
@@ -59,6 +101,9 @@ class HNSWLibVectorDB(VectorDB):
         return list(zip(similarity_scores, id_list))
 
     def reset(self) -> None:
+        """
+        Reset the vector database to empty state.
+        """
         if self.dim is None:
             return
         self._init_vector_store(self.dim)
@@ -66,6 +111,15 @@ class HNSWLibVectorDB(VectorDB):
         self.__next_embedding_id = 0
 
     def _init_vector_store(self, embedding_dim: int):
+        """
+        Initialize the HNSWLib index with the given embedding dimension.
+
+        Args:
+            embedding_dim: The dimension of the embedding vectors.
+
+        Raises:
+            ValueError: If the similarity metric type is invalid.
+        """
         metric_type = self.similarity_metric_type.value
         match metric_type:
             case "cosine":
@@ -87,4 +141,10 @@ class HNSWLibVectorDB(VectorDB):
         self.index.set_ef(self.ef)
 
     def is_empty(self) -> bool:
+        """
+        Check if the vector database is empty.
+
+        Returns:
+            True if the database contains no embeddings, False otherwise.
+        """
         return self.embedding_count == 0
