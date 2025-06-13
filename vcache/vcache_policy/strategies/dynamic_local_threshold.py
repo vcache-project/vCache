@@ -1,4 +1,7 @@
+import queue
 import random
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from enum import Enum
 from typing import Dict, List, Optional, Tuple
 
@@ -22,6 +25,57 @@ from vcache.vcache_core.similarity_evaluator import (
 from vcache.vcache_policy.vcache_policy import VCachePolicy
 
 
+class CallbackQueue(queue.Queue):
+    """
+    A queue that processes items with a callback function in a worker thread.
+    """
+
+    def __init__(self, callback_function):
+        """
+        Initializes the CallbackQueue.
+
+        Args:
+            callback_function: The function to call for each item in the queue.
+                               It will be executed by the worker thread.
+        """
+        super().__init__()
+        self.callback_function = callback_function
+        self._stop_event = threading.Event()
+        self.worker_thread = threading.Thread(target=self._worker, daemon=True)
+
+    def _worker(self):
+        """
+        The main loop for the worker thread.
+
+        It continuously fetches items from the queue and processes them using the
+        callback function. The loop includes a timeout to allow for graceful
+        shutdown checks.
+        """
+        while True:
+            should_stop = self._stop_event.is_set()
+            if should_stop:
+                break
+
+            try:
+                item = self.get(timeout=1)
+                if item is None:  # Sentinel value to stop
+                    break
+                self.callback_function(item)
+                self.task_done()
+            except queue.Empty:
+                continue
+
+    def start(self):
+        """Starts the worker thread."""
+        self.worker_thread.start()
+
+    def stop(self):
+        """Stops the worker thread gracefully."""
+        if self.worker_thread.is_alive():
+            self.put(None)
+            self.worker_thread.join()
+
+
 class DynamicLocalThresholdPolicy(VCachePolicy):
     """
     Dynamic local threshold policy that computes optimal thresholds for each embedding.
@@ -31,18 +85,29 @@ class DynamicLocalThresholdPolicy(VCachePolicy):
         """
         Initialize dynamic local threshold policy.
 
+        Initializes the core algorithm and sets up placeholders for the thread
+        pool executor and callback queue which will be created in `setup`.
+
         Args:
             delta: The delta value to use for threshold computation.
         """
         self.bayesian = _Algorithm(delta=delta)
-        self.similarity_evaluator: SimilarityEvaluator = None
-        self.inference_engine: InferenceEngine = None
-        self.cache: Cache = None
+        self.similarity_evaluator: Optional[SimilarityEvaluator] = None
+        self.inference_engine: Optional[InferenceEngine] = None
+        self.cache: Optional[Cache] = None
+
+        self.executor: Optional[ThreadPoolExecutor] = None
+        self.callback_queue: Optional[CallbackQueue] = None
 
     @override
     def setup(self, config: VCacheConfig):
         """
         Setup the policy with the given configuration.
+
+        This method initializes the cache, similarity evaluator, and inference
+        engine. It also sets up and starts the background processing components:
+        a ThreadPoolExecutor for concurrent tasks and a CallbackQueue for
+        serialized cache updates.
 
         Args:
             config: The VCache configuration to use.
@@ -58,12 +123,32 @@ class DynamicLocalThresholdPolicy(VCachePolicy):
             eviction_policy=config.eviction_policy,
         )
 
+        self.callback_queue = CallbackQueue(
+            callback_function=self.__perform_cache_update
+        )
+        self.callback_queue.start()
+        self.executor = ThreadPoolExecutor(max_workers=64)
+
+    def shutdown(self):
+        """
+        Shuts down the thread pool and callback queue gracefully.
+        """
+        if self.callback_queue:
+            self.callback_queue.stop()
+        if self.executor:
+            self.executor.shutdown(wait=True)
+
     @override
     def process_request(
         self, prompt: str, system_prompt: Optional[str]
     ) -> tuple[bool, str, str]:
         """
         Process a request using dynamic local threshold policy.
+
+        It determines whether to serve a cached response or generate a new one.
+        If the policy decides to 'explore', it generates a new response and
+        triggers an asynchronous background task to evaluate the decision and
+        update the cache, without blocking the current request.
 
         Args:
             prompt: The prompt to check for cache hit.
@@ -96,20 +181,131 @@ class DynamicLocalThresholdPolicy(VCachePolicy):
                 response = self.inference_engine.create(
                     prompt=prompt, system_prompt=system_prompt
                 )
-                should_have_exploited = self.similarity_evaluator.answers_similar(
-                    a=response, b=metadata.response
-                )
-                self.bayesian.update_metadata(
-                    similarity_score=similarity_score,
-                    is_correct=should_have_exploited,
+
+                self.__update_cache(
+                    response=response,
                     metadata=metadata,
+                    similarity_score=similarity_score,
+                    embedding_id=embedding_id,
+                    prompt=prompt,
                 )
-                if not should_have_exploited:
-                    self.cache.add(prompt=prompt, response=response)
-                self.cache.update_metadata(
-                    embedding_id=embedding_id, embedding_metadata=metadata
-                )
+
                 return False, response, metadata.response
+
+    def __update_cache(
+        self,
+        response: str,
+        metadata: EmbeddingMetadataObj,
+        similarity_score: float,
+        embedding_id: int,
+        prompt: str,
+    ) -> None:
+        """
+        Asynchronously validates the correctness of the cached response and updates the cache.
+
+        The validation whether the response is correct can involve a latency expensive LLM-judge call.
+        Because this evaluation does not impact the returned response, we process it in the background.
+        The LLM-judge call (or any other strategy like an embedding or string-based similarity check) in its own thread
+        and returns a label (True/False) whether the response is correct.
+        vCache maintains a global queue that waits for the labels. When a label gets available,
+        vCache updates the metadata and the vector database accordingly.
+
+        Args:
+            response: The response to check for correctness.
+            metadata: The metadata of the embedding.
+            similarity_score: The similarity score between the query and the embedding.
+            embedding_id: The id of the embedding.
+            prompt: The prompt that was used to generate the response.
+        """
+        if self.executor is None:
+            raise ValueError("Executor not initialized. Call setup() first.")
+
+        self.executor.submit(
+            self.__submit_for_background_update,
+            response,
+            metadata,
+            similarity_score,
+            embedding_id,
+            prompt,
+        )
+
+    def __submit_for_background_update(
+        self,
+        response: str,
+        metadata: EmbeddingMetadataObj,
+        similarity_score: float,
+        embedding_id: int,
+        prompt: str,
+    ):
+        """
+        Submits a task to check answer similarity and queue a cache update.
+
+        This method is executed by the ThreadPoolExecutor. It performs the
+        potentially slow `answers_similar` check and then puts the result
+        and context onto the `callback_queue` for sequential processing.
+
+        Args:
+            response: The newly generated response.
+            metadata: The metadata of the nearest neighbor embedding from the cache.
+            similarity_score: The similarity between the prompt and the nearest neighbor.
+            embedding_id: The ID of the nearest neighbor embedding.
+            prompt: The original user prompt.
+        """
+        should_have_exploited = self.similarity_evaluator.answers_similar(
+            a=response, b=metadata.response
+        )
+        self.callback_queue.put(
+            (
+                should_have_exploited,
+                response,
+                metadata,
+                similarity_score,
+                embedding_id,
+                prompt,
+            )
+        )
+
+    def __perform_cache_update(self, update_args: tuple) -> None:
+        """
+        Performs the actual cache update based on the background check.
+
+        This method is executed sequentially by the CallbackQueue's worker
+        thread, ensuring thread-safe updates to the cache metadata and
+        vector database.
+
+        Args:
+            update_args: A tuple containing the context required for the update,
+                         as passed from `__submit_for_background_update`. It
+                         contains the following elements in order:
+
+            - should_have_exploited (bool): Whether the cache hit
+            should have been exploited.
+            - response (str): The newly generated response.
+            - metadata (EmbeddingMetadataObj): The metadata of the
+            nearest neighbor.
+            - similarity_score (float): The similarity score.
+            - embedding_id (int): The ID of the nearest neighbor.
+            - prompt (str): The original user prompt.
+        """
+        (
+            should_have_exploited,
+            response,
+            metadata,
+            similarity_score,
+            embedding_id,
+            prompt,
+        ) = update_args
+
+        self.bayesian.update_metadata(
+            similarity_score=similarity_score,
+            is_correct=should_have_exploited,
+            metadata=metadata,
+        )
+        if not should_have_exploited:
+            self.cache.add(prompt=prompt, response=response)
+        self.cache.update_metadata(
+            embedding_id=embedding_id, embedding_metadata=metadata
+        )
 
 
 class _Action(Enum):
