@@ -169,7 +169,17 @@ class DynamicLocalThresholdPolicy(VCachePolicy):
             return False, response, ""
 
         similarity_score, embedding_id = knn[0]
-        metadata = self.cache.get_metadata(embedding_id=embedding_id)
+
+        try:
+            metadata = self.cache.get_metadata(embedding_id=embedding_id)
+        except Exception:
+            # Cache eviction fallback
+            new_response = self.inference_engine.create(
+                prompt=prompt, system_prompt=system_prompt
+            )
+            self.cache.add(prompt=prompt, response=new_response)
+            return False, new_response, new_response
+
         action = self.bayesian.select_action(
             similarity_score=similarity_score, metadata=metadata
         )

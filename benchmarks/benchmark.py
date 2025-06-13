@@ -267,6 +267,9 @@ class Benchmark(unittest.TestCase):
                     if not is_cache_hit:
                         latency_vcache += llm_generation_latency
 
+                    # This is important for the async logic
+                    time.sleep(0.002)
+
                     # 3) Update Stats
                     self.update_stats(
                         is_cache_hit=is_cache_hit,
