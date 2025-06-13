@@ -223,19 +223,19 @@ class DynamicLocalThresholdPolicy(VCachePolicy):
         self.executor.submit(
             self.__submit_for_background_update,
             response,
-            metadata,
             similarity_score,
             embedding_id,
             prompt,
+            metadata.response,
         )
 
     def __submit_for_background_update(
         self,
-        response: str,
-        metadata: EmbeddingMetadataObj,
+        new_response: str,
         similarity_score: float,
         embedding_id: int,
         prompt: str,
+        cached_response: str,
     ):
         """
         Submits a task to check answer similarity and queue a cache update.
@@ -245,20 +245,19 @@ class DynamicLocalThresholdPolicy(VCachePolicy):
         and context onto the `callback_queue` for sequential processing.
 
         Args:
-            response: The newly generated response.
-            metadata: The metadata of the nearest neighbor embedding from the cache.
+            new_response: The newly generated response.
             similarity_score: The similarity between the prompt and the nearest neighbor.
             embedding_id: The ID of the nearest neighbor embedding.
             prompt: The original user prompt.
+            cached_response: The response from the cached nearest neighbor.
         """
         should_have_exploited = self.similarity_evaluator.answers_similar(
-            a=response, b=metadata.response
+            a=new_response, b=cached_response
         )
         self.callback_queue.put(
             (
                 should_have_exploited,
-                response,
-                metadata,
+                new_response,
                 similarity_score,
                 embedding_id,
                 prompt,
@@ -271,40 +270,45 @@ class DynamicLocalThresholdPolicy(VCachePolicy):
 
         This method is executed sequentially by the CallbackQueue's worker
         thread, ensuring thread-safe updates to the cache metadata and
-        vector database.
+        vector database. It fetches the latest metadata before updating to
+        prevent race conditions with evictions or other updates.
 
         Args:
             update_args: A tuple containing the context required for the update,
                          as passed from `__submit_for_background_update`. It
                          contains the following elements in order:
-
-            - should_have_exploited (bool): Whether the cache hit
-            should have been exploited.
-            - response (str): The newly generated response.
-            - metadata (EmbeddingMetadataObj): The metadata of the
-            nearest neighbor.
-            - similarity_score (float): The similarity score.
-            - embedding_id (int): The ID of the nearest neighbor.
-            - prompt (str): The original user prompt.
+                         - should_have_exploited (bool): Whether the cache hit
+                           should have been exploited.
+                         - new_response (str): The newly generated response.
+                         - similarity_score (float): The similarity score.
+                         - embedding_id (int): The ID of the nearest neighbor.
+                         - prompt (str): The original user prompt.
         """
         (
             should_have_exploited,
-            response,
-            metadata,
+            new_response,
             similarity_score,
             embedding_id,
             prompt,
         ) = update_args
 
+        # Fetch the latest metadata within the synchronized queue to avoid race conditions
+        latest_metdata_object = self.cache.get_metadata(embedding_id=embedding_id)
+        item_was_evicted = latest_metdata_object is None
+        if item_was_evicted:
+            return
+
         self.bayesian.update_metadata(
             similarity_score=similarity_score,
             is_correct=should_have_exploited,
-            metadata=metadata,
+            metadata=latest_metdata_object,
         )
+
         if not should_have_exploited:
-            self.cache.add(prompt=prompt, response=response)
+            self.cache.add(prompt=prompt, response=new_response)
+
         self.cache.update_metadata(
-            embedding_id=embedding_id, embedding_metadata=metadata
+            embedding_id=embedding_id, embedding_metadata=latest_metdata_object
         )
 
 
