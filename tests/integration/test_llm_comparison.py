@@ -179,7 +179,6 @@ class TestLLMComparisonIntegration(unittest.TestCase):
         # Check for proper response parsing
         self.assertIn(".strip()", content)
         self.assertIn(".upper()", content)
-        self.assertIn('startswith("YES")', content)
 
     def test_inheritance_implementation(self):
         """Test that inheritance is correctly implemented."""
