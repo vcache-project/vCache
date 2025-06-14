@@ -168,3 +168,12 @@ class FAISSVectorDB(VectorDB):
             True if the database contains no embeddings, False otherwise.
         """
         return self.index.ntotal == 0
+
+    def size(self) -> int:
+        """
+        Get the number of embeddings in the vector database.
+
+        Returns:
+            The number of embeddings in the vector database.
+        """
+        return self.index.ntotal

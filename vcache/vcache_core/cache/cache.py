@@ -127,6 +127,15 @@ class Cache:
         """
         return self.embedding_store.is_empty()
 
+    def vector_db_size(self) -> int:
+        """
+        Get the number of embeddings in the vector database.
+
+        Returns:
+            The number of embeddings in the vector database.
+        """
+        return self.embedding_store.vector_db_size()
+
     def get_all_embedding_metadata_objects(self) -> List[EmbeddingMetadataObj]:
         """
         Get all embedding metadata objects in the cache.

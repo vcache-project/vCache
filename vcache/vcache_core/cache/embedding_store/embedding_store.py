@@ -137,3 +137,12 @@ class EmbeddingStore:
             True if the store is empty, False otherwise.
         """
         return self.vector_db.is_empty()
+
+    def vector_db_size(self) -> int:
+        """
+        Get the number of embeddings in the vector database.
+
+        Returns:
+            The number of embeddings in the vector database.
+        """
+        return self.vector_db.size()
