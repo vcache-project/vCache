@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import threading
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor
@@ -52,6 +53,7 @@ class EvictionPolicy(ABC):
         self.eviction_percentage = eviction_percentage
         self.is_evicting_lock = threading.Lock()
         self.executor = ThreadPoolExecutor(max_workers=1)
+        self.logger = logging.getLogger(__name__)
 
     def shutdown(self):
         """Shuts down the eviction thread pool gracefully."""
@@ -164,4 +166,7 @@ class EvictionPolicy(ABC):
 
             evicted_count = len(victims)
             remaining_count = cache.vector_db_size()
+            self.logger.info(
+                f"Evicted {evicted_count} items from cache. {remaining_count} items remaining."
+            )
             return evicted_count, remaining_count
