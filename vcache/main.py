@@ -1,9 +1,6 @@
 from typing import List, Optional, Tuple
 
 from vcache.config import VCacheConfig
-from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage.embedding_metadata_obj import (
-    EmbeddingMetadataObj,
-)
 from vcache.vcache_policy.strategies.verified import (
     VerifiedDecisionPolicy,
 )
@@ -78,22 +75,13 @@ class VCache:
         self.vcache_config.eviction_policy.update_eviction_metadata(nn_metadata)
 
         if self.vcache_config.eviction_policy.ready_to_evict(self.vcache_policy.cache):
-            self.__start_eviction_cycle()
+            self.vcache_config.eviction_policy.evict(self.vcache_policy.cache)
 
         return is_cache_hit, response, nn_metadata.response
 
     def __generate_response(self, prompt: str, system_prompt: str) -> str:
         response = self.vcache_policy.inference_engine.create(prompt, system_prompt)
         return response
-
-    def __start_eviction_cycle(self) -> None:
-        all_metadata: List[EmbeddingMetadataObj] = (
-            self.vcache_policy.cache.get_all_embedding_metadata_objects()
-        )
-        victims: List[int] = self.vcache_config.eviction_policy.select_victims(
-            all_metadata
-        )
-        self.vcache_config.eviction_policy.evict(self.vcache_policy.cache, victims)
 
     def import_data(self, data: List[str]) -> bool:
         """
