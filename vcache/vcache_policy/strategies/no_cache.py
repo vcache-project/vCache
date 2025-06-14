@@ -3,6 +3,9 @@ from typing import Optional
 from typing_extensions import override
 
 from vcache.config import VCacheConfig
+from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage.embedding_metadata_obj import (
+    EmbeddingMetadataObj,
+)
 from vcache.vcache_policy.vcache_policy import VCachePolicy
 
 
@@ -30,7 +33,7 @@ class NoCachePolicy(VCachePolicy):
     @override
     def process_request(
         self, prompt: str, system_prompt: Optional[str]
-    ) -> tuple[bool, str, str]:
+    ) -> tuple[bool, str, EmbeddingMetadataObj]:
         """
         Process a request without using cache.
 
@@ -39,7 +42,7 @@ class NoCachePolicy(VCachePolicy):
             system_prompt: The optional system prompt to use for the response. It will override the system prompt in the VCacheConfig if provided.
 
         Returns:
-            Tuple containing [is_cache_hit, actual_response, nn_response].
+            Tuple containing [is_cache_hit, actual_response, nn_metadata_object].
 
         Raises:
             ValueError: If inference engine has not been setup.
@@ -47,7 +50,8 @@ class NoCachePolicy(VCachePolicy):
         if self.inference_engine is None:
             raise ValueError("Inference engine has not been setup")
 
-        response = self.inference_engine.create(
+        response: str = self.inference_engine.create(
             prompt=prompt, system_prompt=system_prompt
         )
-        return False, response, ""
+
+        return False, response, EmbeddingMetadataObj(embedding_id=-1, response="")
