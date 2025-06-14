@@ -79,6 +79,7 @@ class EvictionPolicy(ABC):
         """
         if self.is_evicting():
             return False
+
         number_of_embeddings_in_cache = cache.vector_db_size()
         watermark_threshold = self.max_size * self.watermark
         return number_of_embeddings_in_cache > watermark_threshold

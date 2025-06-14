@@ -27,9 +27,9 @@ class Cache:
             embedding_engine: Engine for generating embeddings from text.
             eviction_policy: Policy for removing items when cache is full.
         """
-        self.embedding_store = embedding_store
-        self.embedding_engine = embedding_engine
-        self.eviction_policy = eviction_policy
+        self.embedding_store: EmbeddingStore = embedding_store
+        self.embedding_engine: EmbeddingEngine = embedding_engine
+        self.eviction_policy: EvictionPolicy = eviction_policy
 
     def add(self, prompt: str, response: str) -> int:
         """

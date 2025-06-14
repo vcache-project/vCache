@@ -2,12 +2,23 @@ from abc import ABC, abstractmethod
 from typing import Optional
 
 from vcache.config import VCacheConfig
+from vcache.inference_engine import InferenceEngine
+from vcache.vcache_core.cache.cache import Cache
+from vcache.vcache_core.cache.eviction_policy.eviction_policy import EvictionPolicy
 
 
 class VCachePolicy(ABC):
     """
     Abstract base class for VCache policies.
     """
+
+    def __init__(self):
+        """
+        Initialize the VCache policy.
+        """
+        self.inference_engine: Optional[InferenceEngine] = None
+        self.cache: Optional[Cache] = None
+        self.eviction_policy: Optional[EvictionPolicy] = None
 
     @abstractmethod
     def setup(self, config: VCacheConfig):

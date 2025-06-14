@@ -3,6 +3,7 @@ from typing import Optional
 from typing_extensions import override
 
 from vcache.config import VCacheConfig
+from vcache.inference_engine import InferenceEngine
 from vcache.vcache_core.cache.cache import Cache
 from vcache.vcache_core.cache.embedding_store.embedding_store import EmbeddingStore
 from vcache.vcache_policy.vcache_policy import VCachePolicy
@@ -25,9 +26,9 @@ class BenchmarkStaticDecisionPolicy(VCachePolicy):
         Args:
             threshold: The similarity threshold to use for cache hits.
         """
-        self.threshold = threshold
-        self.inference_engine = None
-        self.cache = None
+        self.threshold: float = threshold
+        self.inference_engine: Optional[InferenceEngine] = None
+        self.cache: Optional[Cache] = None
 
     @override
     def setup(self, config: VCacheConfig):

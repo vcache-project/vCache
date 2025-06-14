@@ -24,8 +24,8 @@ class VCache:
             config: VCache configuration object containing system settings.
             policy: VCache policy for determining cache behavior.
         """
-        self.vcache_config = config
-        self.vcache_policy = policy
+        self.vcache_config: VCacheConfig = config
+        self.vcache_policy: VCachePolicy = policy
         self.vcache_policy.setup(config)
 
     def infer(

@@ -6,6 +6,7 @@ from scipy.stats import norm
 from typing_extensions import override
 
 from vcache.config import VCacheConfig
+from vcache.inference_engine import InferenceEngine
 from vcache.vcache_core.cache.cache import Cache
 from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage.embedding_metadata_obj import (
     EmbeddingMetadataObj,
@@ -37,10 +38,10 @@ class BenchmarkVerifiedIIDDecisionPolicy(VCachePolicy):
             similarity_evaluator: The similarity evaluator to use for response comparison.
             delta: The delta value for the algorithm.
         """
-        self.similarity_evaluator = similarity_evaluator
+        self.similarity_evaluator: SimilarityEvaluator = similarity_evaluator
         self.bayesian = _Algorithm(delta=delta)
-        self.inference_engine = None
-        self.cache = None
+        self.inference_engine: Optional[InferenceEngine] = None
+        self.cache: Optional[Cache] = None
 
     @override
     def setup(self, config: VCacheConfig):
