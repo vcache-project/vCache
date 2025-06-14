@@ -131,13 +131,13 @@ class EvictionPolicy(ABC):
         """
         Asynchronously triggers the eviction process if not already running.
 
-        This method submits the eviction task to a background thread and
-        returns immediately, preventing the caller from being blocked.
+        This method acquires a lock to set the evicting state immediately,
+        then submits the eviction task to a background thread.
 
         Args:
             cache: The cache instance to perform eviction on.
         """
-        if not self.is_evicting():
+        if self.is_evicting_lock.acquire(blocking=False):
             start_time: float = time.time()
             all_metadata = cache.get_all_embedding_metadata_objects()
             victims = self.select_victims(all_metadata)
@@ -149,9 +149,8 @@ class EvictionPolicy(ABC):
         """
         Performs the thread-safe, batch removal of selected items from the cache.
 
-        This method acquires a lock to ensure that the eviction process is
-        atomic and does not conflict with other concurrent operations. It
-        iterates through the list of victim IDs and removes each one.
+        This method is responsible for the core eviction logic and releasing the
+        eviction lock upon completion.
 
         Args:
             cache: The cache instance from which to evict items.
@@ -163,7 +162,7 @@ class EvictionPolicy(ABC):
               - The number of items successfully evicted.
               - The number of items remaining in the cache post-eviction.
         """
-        with self.is_evicting_lock:
+        try:
             if not victims:
                 self.logger.info("No victims to evict")
                 return 0, cache.vector_db_size()
@@ -180,3 +179,5 @@ class EvictionPolicy(ABC):
                 f"Evicted {evicted_count} items from cache. {remaining_count} items remaining. Time taken: {stop_time - start_time:.5f} seconds."
             )
             return evicted_count, remaining_count
+        finally:
+            self.is_evicting_lock.release()
