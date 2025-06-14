@@ -33,10 +33,9 @@ from vcache.vcache_core.cache.embedding_store.vector_db import (
     HNSWLibVectorDB,
     SimilarityMetricType,
 )
+from vcache.vcache_core.cache.eviction_policy.eviction_policy import EvictionPolicy
+from vcache.vcache_core.cache.eviction_policy.strategies.lru import LRUEvictionPolicy
 from vcache.vcache_core.similarity_evaluator import SimilarityEvaluator
-from vcache.vcache_core.similarity_evaluator.strategies.llm_comparison import (
-    LLMComparisonSimilarityEvaluator,
-)
 from vcache.vcache_core.similarity_evaluator.strategies.string_comparison import (
     StringComparisonSimilarityEvaluator,
 )
@@ -112,8 +111,8 @@ class GeneratePlotsOnly(Enum):
 ########################################################################################################################
 
 
-MAX_SAMPLES: int = 60000
-CONFIDENCE_INTERVALS_ITERATIONS: int = 2
+MAX_SAMPLES: int = 20000
+CONFIDENCE_INTERVALS_ITERATIONS: int = 5
 DISABLE_PROGRESS_BAR: bool = False
 KEEP_SPLIT: int = 100
 
@@ -126,14 +125,8 @@ RUN_COMBINATIONS: List[
         Dataset.SEM_BENCHMARK_CLASSIFICATION,
         GeneratePlotsOnly.NO,
         StringComparisonSimilarityEvaluator(),
-    ),
-    (
-        EmbeddingModel.GTE,
-        LargeLanguageModel.GPT_4O_MINI,
-        Dataset.SEM_BENCHMARK_ARENA,
-        GeneratePlotsOnly.NO,
-        LLMComparisonSimilarityEvaluator(),
-    ),
+        LRUEvictionPolicy(max_size=200, watermark=0.99, eviction_percentage=0.2),
+    )
 ]
 
 BASELINES_TO_RUN: List[Baseline] = [
@@ -166,7 +159,9 @@ STATIC_THRESHOLDS: List[float] = [
     0.98,
 ]
 
-DELTAS: List[float] = [0.01, 0.015, 0.02, 0.025, 0.03, 0.035, 0.04, 0.05, 0.06, 0.07]
+DELTAS: List[float] = [
+    0.01
+]  # , 0.015, 0.02, 0.025, 0.03, 0.035, 0.04, 0.05, 0.06, 0.07]
 
 MAX_VECTOR_DB_CAPACITY: int = 100000
 PLOT_FONT_SIZE: int = 50
@@ -478,6 +473,7 @@ def __run_baseline(
     delta: float,
     threshold: float,
     similarity_evaluator: SimilarityEvaluator,
+    eviction_policy: EvictionPolicy,
 ):
     vcache_config: VCacheConfig = VCacheConfig(
         inference_engine=BenchmarkInferenceEngine(),
@@ -488,6 +484,7 @@ def __run_baseline(
         ),
         embedding_metadata_storage=InMemoryEmbeddingMetadataStorage(),
         similarity_evaluator=similarity_evaluator,
+        eviction_policy=eviction_policy,
     )
     vcache: VCache = VCache(vcache_config, vcache_policy)
 
@@ -528,6 +525,7 @@ def main():
         dataset,
         generate_plots_only,
         similarity_evaluator,
+        eviction_policy,
     ) in RUN_COMBINATIONS:
         try:
             print(f"DatasetPath: {datasets_dir}, Dataset: {dataset.value}")
@@ -569,6 +567,7 @@ def main():
                             delta=delta,
                             threshold=-1,
                             similarity_evaluator=similarity_evaluator,
+                            eviction_policy=eviction_policy,
                         )
 
             #####################################################
@@ -604,6 +603,7 @@ def main():
                         delta=delta,
                         threshold=-1,
                         similarity_evaluator=similarity_evaluator,
+                        eviction_policy=eviction_policy,
                     )
 
             #####################################################
@@ -653,6 +653,7 @@ def main():
                         delta=-1,
                         threshold=threshold,
                         similarity_evaluator=similarity_evaluator,
+                        eviction_policy=eviction_policy,
                     )
 
             #####################################################
@@ -703,6 +704,7 @@ def main():
                             delta=delta,
                             threshold=-1,
                             similarity_evaluator=similarity_evaluator,
+                            eviction_policy=eviction_policy,
                         )
 
             #####################################################
@@ -736,6 +738,7 @@ def main():
                             delta=delta,
                             threshold=-1,
                             similarity_evaluator=similarity_evaluator,
+                            eviction_policy=eviction_policy,
                         )
 
             #####################################################
@@ -766,6 +769,7 @@ def main():
                         delta=-1,
                         threshold=threshold,
                         similarity_evaluator=similarity_evaluator,
+                        eviction_policy=eviction_policy,
                     )
 
             #####################################################

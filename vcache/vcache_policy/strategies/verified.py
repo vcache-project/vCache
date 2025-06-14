@@ -170,7 +170,7 @@ class VerifiedDecisionPolicy(VCachePolicy):
     @override
     def process_request(
         self, prompt: str, system_prompt: Optional[str]
-    ) -> tuple[bool, str, str]:
+    ) -> tuple[bool, str, EmbeddingMetadataObj]:
         """
         Process a request using dynamic local threshold policy.
 
@@ -186,7 +186,7 @@ class VerifiedDecisionPolicy(VCachePolicy):
             system_prompt: The optional system prompt to use for the response. It will override the system prompt in the VCacheConfig if provided.
 
         Returns:
-            Tuple containing [is_cache_hit, actual_response, nn_response].
+            Tuple containing [is_cache_hit, actual_response, nn_metadata_object].
         """
         if self.inference_engine is None or self.cache is None:
             raise ValueError("Policy has not been setup")
@@ -197,7 +197,7 @@ class VerifiedDecisionPolicy(VCachePolicy):
                 prompt=prompt, system_prompt=system_prompt
             )
             self.cache.add(prompt=prompt, response=response)
-            return False, response, ""
+            return False, response, EmbeddingMetadataObj(embedding_id=-1, response="")
 
         similarity_score, embedding_id = knn[0]
 
@@ -209,7 +209,11 @@ class VerifiedDecisionPolicy(VCachePolicy):
                 prompt=prompt, system_prompt=system_prompt
             )
             self.cache.add(prompt=prompt, response=new_response)
-            return False, new_response, new_response
+            return (
+                False,
+                new_response,
+                EmbeddingMetadataObj(embedding_id=-1, response=""),
+            )
 
         action = self.bayesian.select_action(
             similarity_score=similarity_score, metadata=metadata
@@ -217,7 +221,7 @@ class VerifiedDecisionPolicy(VCachePolicy):
 
         match action:
             case _Action.EXPLOIT:
-                return True, metadata.response, metadata.response
+                return True, metadata.response, metadata
             case _Action.EXPLORE:
                 response = self.inference_engine.create(
                     prompt=prompt, system_prompt=system_prompt
@@ -231,7 +235,7 @@ class VerifiedDecisionPolicy(VCachePolicy):
                     prompt=prompt,
                 )
 
-                return False, response, metadata.response
+                return False, response, metadata
 
     def __update_cache(
         self,

@@ -24,8 +24,8 @@ class VCache:
             config: VCache configuration object containing system settings.
             policy: VCache policy for determining cache behavior.
         """
-        self.vcache_config = config
-        self.vcache_policy = policy
+        self.vcache_config: VCacheConfig = config
+        self.vcache_policy: VCachePolicy = policy
         self.vcache_policy.setup(config)
 
     def infer(
@@ -64,7 +64,24 @@ class VCache:
         if system_prompt is None:
             system_prompt = self.vcache_config.system_prompt
 
-        return self.vcache_policy.process_request(prompt, system_prompt)
+        if self.vcache_config.eviction_policy.is_evicting():
+            response = self.__generate_response(prompt, system_prompt)
+            return False, response, response
+
+        is_cache_hit, response, nn_metadata = self.vcache_policy.process_request(
+            prompt, system_prompt
+        )
+
+        self.vcache_config.eviction_policy.update_eviction_metadata(nn_metadata)
+
+        if self.vcache_config.eviction_policy.ready_to_evict(self.vcache_policy.cache):
+            self.vcache_config.eviction_policy.evict(self.vcache_policy.cache)
+
+        return is_cache_hit, response, nn_metadata.response
+
+    def __generate_response(self, prompt: str, system_prompt: str) -> str:
+        response = self.vcache_policy.inference_engine.create(prompt, system_prompt)
+        return response
 
     def import_data(self, data: List[str]) -> bool:
         """

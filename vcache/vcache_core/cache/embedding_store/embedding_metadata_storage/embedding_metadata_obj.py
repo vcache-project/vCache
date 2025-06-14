@@ -1,8 +1,6 @@
 from datetime import datetime
 from typing import List, Tuple
 
-import numpy as np
-
 
 class EmbeddingMetadataObj:
     """
@@ -13,9 +11,6 @@ class EmbeddingMetadataObj:
         self,
         embedding_id: int,
         response: str,
-        prior: np.ndarray = None,
-        posterior: np.ndarray = None,
-        region_reject: List[str] = None,
         last_accessed: datetime = None,
     ):
         """
@@ -29,11 +24,12 @@ class EmbeddingMetadataObj:
             region_reject: List of rejection regions for heuristic policy.
             last_accessed: Timestamp of last access to this embedding.
         """
+
+        #### Core metadata ###################################################
         self.embedding_id: int = embedding_id
         self.response: str = response
-        self.last_accessed: datetime = last_accessed
 
-        # vCache Bayesian Policy ########################
+        #### vCache Bayesian Policy ##########################################
         self.observations: List[Tuple[float, int]] = []  # (similarity, label)
         self.observations.append((0.0, 0))
         self.observations.append((1.0, 1))
@@ -43,16 +39,10 @@ class EmbeddingMetadataObj:
         self.var_t: float = None
         self.gamma: float = None
         self.t_hat: float = None
-        ##################################################
 
-        # vCache Heuristic Policy #######################
-        self.prior: np.ndarray = prior
-        self.posterior: np.ndarray = posterior
-        self.region_reject: List[float] = region_reject
-        self.correct_similarities: List[float] = []
-        self.incorrect_similarities: List[float] = []
-        self.posteriors: List[float] = []
-        ##################################################
+        #### Metadata for the eviction policy ################################
+        self.last_accessed: datetime = last_accessed
+        self.usage_count: int = 0
 
     def __eq__(self, other):
         """
@@ -69,9 +59,6 @@ class EmbeddingMetadataObj:
         return (
             self.embedding_id == other.embedding_id
             and self.response == other.response
-            and np.array_equal(self.prior, other.prior)
-            and np.array_equal(self.posterior, other.posterior)
-            and self.region_reject == other.region_reject
             and self.last_accessed == other.last_accessed
         )
 
@@ -92,21 +79,3 @@ class EmbeddingMetadataObj:
             gamma={self.gamma},
         )
         """
-
-    def add_correct_similarity(self, similarity: float):
-        """
-        Add a correct similarity score to the metadata.
-
-        Args:
-            similarity: The similarity score to add.
-        """
-        self.correct_similarities.append(similarity)
-
-    def add_incorrect_similarity(self, similarity: float):
-        """
-        Add an incorrect similarity score to the metadata.
-
-        Args:
-            similarity: The similarity score to add.
-        """
-        self.incorrect_similarities.append(similarity)

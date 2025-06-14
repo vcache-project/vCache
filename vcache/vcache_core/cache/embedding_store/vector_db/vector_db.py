@@ -104,3 +104,13 @@ class VectorDB(ABC):
             True if the vector db is empty, False otherwise.
         """
         pass
+
+    @abstractmethod
+    def size(self) -> int:
+        """
+        Get the number of embeddings in the vector database.
+
+        Returns:
+            The number of embeddings in the vector database.
+        """
+        pass
