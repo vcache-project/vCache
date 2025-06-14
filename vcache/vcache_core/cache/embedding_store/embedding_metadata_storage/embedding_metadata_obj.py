@@ -24,11 +24,12 @@ class EmbeddingMetadataObj:
             region_reject: List of rejection regions for heuristic policy.
             last_accessed: Timestamp of last access to this embedding.
         """
+
+        #### Core metadata ###################################################
         self.embedding_id: int = embedding_id
         self.response: str = response
-        self.last_accessed: datetime = last_accessed
 
-        # vCache Bayesian Policy ########################
+        #### vCache Bayesian Policy ##########################################
         self.observations: List[Tuple[float, int]] = []  # (similarity, label)
         self.observations.append((0.0, 0))
         self.observations.append((1.0, 1))
@@ -38,7 +39,10 @@ class EmbeddingMetadataObj:
         self.var_t: float = None
         self.gamma: float = None
         self.t_hat: float = None
-        ##################################################
+
+        #### Metadata for the eviction policy ################################
+        self.last_accessed: datetime = last_accessed
+        self.usage_count: int = 0
 
     def __eq__(self, other):
         """

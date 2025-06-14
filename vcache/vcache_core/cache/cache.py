@@ -51,7 +51,7 @@ class Cache:
 
     def remove(self, embedding_id: int) -> int:
         """
-        Remove an embedding from the cache.
+        Remove an embedding and its metadata from the cache.
 
         Args:
             embedding_id: The id of the embedding to remove.
