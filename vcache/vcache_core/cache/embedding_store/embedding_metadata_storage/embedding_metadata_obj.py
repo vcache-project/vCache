@@ -1,8 +1,6 @@
 from datetime import datetime
 from typing import List, Tuple
 
-import numpy as np
-
 
 class EmbeddingMetadataObj:
     """
@@ -13,9 +11,6 @@ class EmbeddingMetadataObj:
         self,
         embedding_id: int,
         response: str,
-        prior: np.ndarray = None,
-        posterior: np.ndarray = None,
-        region_reject: List[str] = None,
         last_accessed: datetime = None,
     ):
         """
@@ -45,15 +40,6 @@ class EmbeddingMetadataObj:
         self.t_hat: float = None
         ##################################################
 
-        # vCache Heuristic Policy #######################
-        self.prior: np.ndarray = prior
-        self.posterior: np.ndarray = posterior
-        self.region_reject: List[float] = region_reject
-        self.correct_similarities: List[float] = []
-        self.incorrect_similarities: List[float] = []
-        self.posteriors: List[float] = []
-        ##################################################
-
     def __eq__(self, other):
         """
         Check equality with another EmbeddingMetadataObj.
@@ -69,9 +55,6 @@ class EmbeddingMetadataObj:
         return (
             self.embedding_id == other.embedding_id
             and self.response == other.response
-            and np.array_equal(self.prior, other.prior)
-            and np.array_equal(self.posterior, other.posterior)
-            and self.region_reject == other.region_reject
             and self.last_accessed == other.last_accessed
         )
 
@@ -92,21 +75,3 @@ class EmbeddingMetadataObj:
             gamma={self.gamma},
         )
         """
-
-    def add_correct_similarity(self, similarity: float):
-        """
-        Add a correct similarity score to the metadata.
-
-        Args:
-            similarity: The similarity score to add.
-        """
-        self.correct_similarities.append(similarity)
-
-    def add_incorrect_similarity(self, similarity: float):
-        """
-        Add an incorrect similarity score to the metadata.
-
-        Args:
-            similarity: The similarity score to add.
-        """
-        self.incorrect_similarities.append(similarity)
