@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, List, Tuple
@@ -87,6 +88,7 @@ class EvictionPolicy(ABC):
 
         number_of_embeddings_in_cache = cache.vector_db_size()
         watermark_threshold = self.max_size * self.watermark
+
         return number_of_embeddings_in_cache > watermark_threshold
 
     @abstractmethod
@@ -136,11 +138,14 @@ class EvictionPolicy(ABC):
             cache: The cache instance to perform eviction on.
         """
         if not self.is_evicting():
+            start_time: float = time.time()
             all_metadata = cache.get_all_embedding_metadata_objects()
             victims = self.select_victims(all_metadata)
-            self.executor.submit(self._evict_victims, cache, victims)
+            self.executor.submit(self._evict_victims, cache, victims, start_time)
 
-    def _evict_victims(self, cache: "Cache", victims: List[int]) -> Tuple[int, int]:
+    def _evict_victims(
+        self, cache: "Cache", victims: List[int], start_time: float
+    ) -> Tuple[int, int]:
         """
         Performs the thread-safe, batch removal of selected items from the cache.
 
@@ -151,6 +156,7 @@ class EvictionPolicy(ABC):
         Args:
             cache: The cache instance from which to evict items.
             victims: A list of `embedding_id`s for the items to be evicted.
+            start_time: The time when the eviction process started.
 
         Returns:
             A tuple containing:
@@ -159,14 +165,18 @@ class EvictionPolicy(ABC):
         """
         with self.is_evicting_lock:
             if not victims:
+                self.logger.info("No victims to evict")
                 return 0, cache.vector_db_size()
 
             for victim_id in victims:
                 cache.remove(victim_id)
+                self.logger.info(f"Removed item with embedding_id: {victim_id}")
 
             evicted_count = len(victims)
             remaining_count = cache.vector_db_size()
+
+            stop_time: float = time.time()
             self.logger.info(
-                f"Evicted {evicted_count} items from cache. {remaining_count} items remaining."
+                f"Evicted {evicted_count} items from cache. {remaining_count} items remaining. Time taken: {stop_time - start_time:.5f} seconds."
             )
             return evicted_count, remaining_count
