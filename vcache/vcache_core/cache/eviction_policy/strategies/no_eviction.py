@@ -1,9 +1,12 @@
-from typing import List
+from typing import TYPE_CHECKING, List
 
 from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage.embedding_metadata_obj import (
     EmbeddingMetadataObj,
 )
 from vcache.vcache_core.cache.eviction_policy.eviction_policy import EvictionPolicy
+
+if TYPE_CHECKING:
+    from vcache.vcache_core.cache.cache import Cache
 
 
 class NoEvictionPolicy(EvictionPolicy):
@@ -20,6 +23,10 @@ class NoEvictionPolicy(EvictionPolicy):
         # Intentionally override the parent __init__ to ignore sizing parameters.
         pass
 
+    def is_evicting(self) -> bool:
+        """This policy is never evicting."""
+        return False
+
     def ready_to_evict(self, cache) -> bool:
         """This policy is never ready to evict."""
         return False
@@ -31,3 +38,7 @@ class NoEvictionPolicy(EvictionPolicy):
     def select_victims(self, all_metadata: List[EmbeddingMetadataObj]) -> List[int]:
         """Never selects any victims, always returns an empty list."""
         return []
+
+    def evict(self, cache: "Cache", victims: List[int]) -> None:
+        """Does nothing, as no eviction is needed for this policy."""
+        pass
