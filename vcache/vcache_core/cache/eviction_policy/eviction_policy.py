@@ -1,9 +1,12 @@
+from __future__ import annotations
+
 import threading
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor
-from typing import List, Tuple
+from typing import TYPE_CHECKING, List, Tuple
 
-from vcache.vcache_core.cache.cache import Cache
+if TYPE_CHECKING:
+    from vcache.vcache_core.cache.cache import Cache
 from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage.embedding_metadata_obj import (
     EmbeddingMetadataObj,
 )
@@ -63,7 +66,7 @@ class EvictionPolicy(ABC):
         """
         return self.is_evicting_lock.locked()
 
-    def ready_to_evict(self, cache: Cache) -> bool:
+    def ready_to_evict(self, cache: "Cache") -> bool:
         """
         Determines if the cache has breached its high-watermark.
 
@@ -120,7 +123,7 @@ class EvictionPolicy(ABC):
         """
         pass
 
-    def evict(self, cache: Cache):
+    def evict(self, cache: "Cache"):
         """
         Asynchronously triggers the eviction process if not already running.
 
@@ -135,7 +138,7 @@ class EvictionPolicy(ABC):
             victims = self.select_victims(all_metadata)
             self.executor.submit(self._evict_victims, cache, victims)
 
-    def _evict_victims(self, cache: Cache, victims: List[int]) -> Tuple[int, int]:
+    def _evict_victims(self, cache: "Cache", victims: List[int]) -> Tuple[int, int]:
         """
         Performs the thread-safe, batch removal of selected items from the cache.
 
