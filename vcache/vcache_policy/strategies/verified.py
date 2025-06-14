@@ -105,11 +105,26 @@ class VerifiedDecisionPolicy(VCachePolicy):
         self.callback_queue: Optional[CallbackQueue] = None
 
     def __enter__(self):
-        """Enter the context manager."""
+        """
+        Allows the policy to be used as a context manager.
+
+        Returns:
+            The policy instance itself.
+        """
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """Exit the context manager and shutdown the policy."""
+        """
+        Ensures graceful shutdown of background threads when exiting the context.
+
+        This method is called automatically when exiting a `with` block,
+        triggering the shutdown of the ThreadPoolExecutor and CallbackQueue.
+
+        Args:
+            exc_type: The exception type if an exception was raised in the `with` block.
+            exc_val: The exception value if an exception was raised.
+            exc_tb: The traceback if an exception was raised.
+        """
         self.shutdown()
 
     @override
@@ -162,7 +177,9 @@ class VerifiedDecisionPolicy(VCachePolicy):
         It determines whether to serve a cached response or generate a new one.
         If the policy decides to 'explore', it generates a new response and
         triggers an asynchronous background task to evaluate the decision and
-        update the cache, without blocking the current request.
+        update the cache, without blocking the current request. The functions returns
+        the actual response and some metadata information—whether the response is a
+        cache hit and the nearest neighbor response—to enable further analysis.
 
         Args:
             prompt: The prompt to check for cache hit.
