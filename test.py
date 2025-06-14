@@ -14,12 +14,12 @@ from vcache.vcache_core.cache.embedding_store.vector_db import (
 from vcache.vcache_core.similarity_evaluator.strategies.string_comparison import (
     StringComparisonSimilarityEvaluator,
 )
-from vcache.vcache_policy.strategies.dynamic_local_threshold import (
-    DynamicLocalThresholdPolicy,
+from vcache.vcache_policy.strategies.verified import (
+    VerifiedDecisionPolicy,
 )
 from vcache.vcache_policy.vcache_policy import VCachePolicy
 
-vcache_policy: VCachePolicy = DynamicLocalThresholdPolicy(delta=0.02)
+vcache_policy: VCachePolicy = VerifiedDecisionPolicy(delta=0.02)
 vcache_config: VCacheConfig = VCacheConfig(
     inference_engine=OpenAIInferenceEngine(),
     embedding_engine=OpenAIEmbeddingEngine(),

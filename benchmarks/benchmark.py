@@ -33,23 +33,24 @@ from vcache.vcache_core.cache.embedding_store.vector_db import (
     HNSWLibVectorDB,
     SimilarityMetricType,
 )
+from vcache.vcache_core.similarity_evaluator import SimilarityEvaluator
 from vcache.vcache_core.similarity_evaluator.strategies.llm_comparison import (
     LLMComparisonSimilarityEvaluator,
 )
 from vcache.vcache_core.similarity_evaluator.strategies.string_comparison import (
     StringComparisonSimilarityEvaluator,
 )
-from vcache.vcache_policy.strategies.dynamic_global_threshold import (
-    DynamicGlobalThresholdPolicy,
+from vcache.vcache_policy.strategies.benchmark_iid_verified import (
+    BenchmarkVerifiedIIDDecisionPolicy,
 )
-from vcache.vcache_policy.strategies.dynamic_local_threshold import (
-    DynamicLocalThresholdPolicy,
+from vcache.vcache_policy.strategies.benchmark_static import (
+    BenchmarkStaticDecisionPolicy,
 )
-from vcache.vcache_policy.strategies.iid_local_threshold import (
-    IIDLocalThresholdPolicy,
+from vcache.vcache_policy.strategies.benchmark_verified_global import (
+    BenchmarkVerifiedGlobalDecisionPolicy,
 )
-from vcache.vcache_policy.strategies.static_global_threshold import (
-    StaticGlobalThresholdPolicy,
+from vcache.vcache_policy.strategies.verified import (
+    VerifiedDecisionPolicy,
 )
 from vcache.vcache_policy.vcache_policy import VCachePolicy
 
@@ -101,7 +102,7 @@ class Dataset(Enum):
     ECOMMERCE_DATASET = "ecommerce_dataset"
 
 
-class GenerateResultsOnly(Enum):
+class GeneratePlotsOnly(Enum):
     YES = True
     NO = False
 
@@ -112,61 +113,36 @@ class GenerateResultsOnly(Enum):
 
 
 MAX_SAMPLES: int = 60000
-CONFIDENCE_INTERVALS_ITERATIONS: int = 5
-IS_LLM_JUDGE_BENCHMARK: bool = False
-DISABLE_PROGRESS_BAR: bool = True
+CONFIDENCE_INTERVALS_ITERATIONS: int = 2
+DISABLE_PROGRESS_BAR: bool = False
 KEEP_SPLIT: int = 100
 
 RUN_COMBINATIONS: List[
-    Tuple[EmbeddingModel, LargeLanguageModel, Dataset, GenerateResultsOnly]
+    Tuple[EmbeddingModel, LargeLanguageModel, Dataset, GeneratePlotsOnly]
 ] = [
     (
         EmbeddingModel.GTE,
         LargeLanguageModel.LLAMA_3_8B,
-        Dataset.SEM_BENCHMARK_SEARCH_QUERIES,
-        GenerateResultsOnly.YES,
+        Dataset.SEM_BENCHMARK_CLASSIFICATION,
+        GeneratePlotsOnly.NO,
+        StringComparisonSimilarityEvaluator(),
     ),
     (
         EmbeddingModel.GTE,
         LargeLanguageModel.GPT_4O_MINI,
         Dataset.SEM_BENCHMARK_ARENA,
-        GenerateResultsOnly.YES,
-    ),
-    (
-        EmbeddingModel.E5_LARGE_V2,
-        LargeLanguageModel.GPT_4O_MINI,
-        Dataset.SEM_BENCHMARK_ARENA,
-        GenerateResultsOnly.YES,
-    ),
-    (
-        EmbeddingModel.E5_LARGE_V2,
-        LargeLanguageModel.LLAMA_3_8B,
-        Dataset.SEM_BENCHMARK_CLASSIFICATION,
-        GenerateResultsOnly.YES,
-    ),
-    (
-        EmbeddingModel.GTE,
-        LargeLanguageModel.LLAMA_3_8B,
-        Dataset.SEM_BENCHMARK_CLASSIFICATION,
-        GenerateResultsOnly.YES,
-    ),
-    (
-        EmbeddingModel.GTE,
-        LargeLanguageModel.LLAMA_3_70B,
-        Dataset.SEM_BENCHMARK_CLASSIFICATION,
-        GenerateResultsOnly.YES,
+        GeneratePlotsOnly.NO,
+        LLMComparisonSimilarityEvaluator(),
     ),
 ]
 
 BASELINES_TO_RUN: List[Baseline] = [
     # Baseline.IID,
     # Baseline.GPTCache,
-    # Baseline.VCacheLocal,
+    Baseline.VCacheLocal,
     # Baseline.BerkeleyEmbedding,
     # Baseline.VCacheBerkeleyEmbedding,
 ]
-
-DATASETS_TO_RUN: List[str] = [Dataset.SEM_BENCHMARK_SEARCH_QUERIES]
 
 STATIC_THRESHOLDS: List[float] = [
     0.80,
@@ -220,7 +196,7 @@ class Benchmark(unittest.TestCase):
         self.tn_list: List[int] = []
         self.fn_list: List[int] = []
         self.latency_direct_list: List[float] = []
-        self.latency_vcach_list: List[float] = []
+        self.latency_vcache_list: List[float] = []
         self.observations_dict: Dict[str, Dict[str, float]] = {}
         self.gammas_dict: Dict[str, float] = {}
         self.t_hats_dict: Dict[str, float] = {}
@@ -290,6 +266,9 @@ class Benchmark(unittest.TestCase):
                     )
                     if not is_cache_hit:
                         latency_vcache += llm_generation_latency
+
+                    # This is important for the async logic
+                    time.sleep(0.002)
 
                     # 3) Update Stats
                     self.update_stats(
@@ -465,7 +444,7 @@ class Benchmark(unittest.TestCase):
             "tn_list": self.tn_list,
             "fn_list": self.fn_list,
             "latency_direct_list": self.latency_direct_list,
-            "latency_vectorq_list": self.latency_vcach_list,
+            "latency_vectorq_list": self.latency_vcache_list,
             "observations_dict": self.observations_dict,
             "gammas_dict": self.gammas_dict,
             "t_hats_dict": self.t_hats_dict,
@@ -498,12 +477,8 @@ def __run_baseline(
     timestamp: str,
     delta: float,
     threshold: float,
+    similarity_evaluator: SimilarityEvaluator,
 ):
-    if IS_LLM_JUDGE_BENCHMARK:
-        similarity_evaluator = LLMComparisonSimilarityEvaluator()
-    else:
-        similarity_evaluator = StringComparisonSimilarityEvaluator()
-
     vcache_config: VCacheConfig = VCacheConfig(
         inference_engine=BenchmarkInferenceEngine(),
         embedding_engine=BenchmarkEmbeddingEngine(),
@@ -547,8 +522,15 @@ def main():
 
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
 
-    for embedding_model, llm_model, dataset, generate_results_only in RUN_COMBINATIONS:
+    for (
+        embedding_model,
+        llm_model,
+        dataset,
+        generate_plots_only,
+        similarity_evaluator,
+    ) in RUN_COMBINATIONS:
         try:
+            print(f"DatasetPath: {datasets_dir}, Dataset: {dataset.value}")
             dataset_file = os.path.join(datasets_dir, f"{dataset.value}.json")
             logging.info(
                 f"Running benchmark for dataset: {dataset}, embedding model: {embedding_model.value[1]}, LLM model: {llm_model.value[1]}\n"
@@ -557,7 +539,10 @@ def main():
 
             #####################################################
             ### Baseline: vCache Local
-            if Baseline.VCacheLocal in BASELINES_TO_RUN and not generate_results_only:
+            if (
+                Baseline.VCacheLocal in BASELINES_TO_RUN
+                and not generate_plots_only.value
+            ):
                 for delta in DELTAS:
                     for i in range(0, CONFIDENCE_INTERVALS_ITERATIONS):
                         path = os.path.join(
@@ -575,7 +560,7 @@ def main():
                         )
 
                         __run_baseline(
-                            vcache_policy=DynamicLocalThresholdPolicy(delta=delta),
+                            vcache_policy=VerifiedDecisionPolicy(delta=delta),
                             path=path,
                             dataset_file=dataset_file,
                             embedding_model=embedding_model.value,
@@ -583,11 +568,15 @@ def main():
                             timestamp=timestamp,
                             delta=delta,
                             threshold=-1,
+                            similarity_evaluator=similarity_evaluator,
                         )
 
             #####################################################
             ### Baseline: vCache Global
-            if Baseline.VCacheGlobal in BASELINES_TO_RUN and not generate_results_only:
+            if (
+                Baseline.VCacheGlobal in BASELINES_TO_RUN
+                and not generate_plots_only.value
+            ):
                 for delta in DELTAS:
                     path = os.path.join(
                         results_dir,
@@ -604,7 +593,9 @@ def main():
                     )
 
                     __run_baseline(
-                        vcache_policy=DynamicGlobalThresholdPolicy(delta=delta),
+                        vcache_policy=BenchmarkVerifiedGlobalDecisionPolicy(
+                            delta=delta
+                        ),
                         path=path,
                         dataset_file=dataset_file,
                         embedding_model=embedding_model.value,
@@ -612,13 +603,14 @@ def main():
                         timestamp=timestamp,
                         delta=delta,
                         threshold=-1,
+                        similarity_evaluator=similarity_evaluator,
                     )
 
             #####################################################
             ### Baseline: Berkeley Embedding
             if (
                 Baseline.BerkeleyEmbedding in BASELINES_TO_RUN
-                and not generate_results_only
+                and not generate_plots_only.value
             ):
                 for threshold in STATIC_THRESHOLDS:
                     if embedding_model == EmbeddingModel.E5_MISTRAL_7B:
@@ -650,7 +642,9 @@ def main():
                     logging.info(f"Using static threshold: {threshold}")
 
                     __run_baseline(
-                        vcache_policy=StaticGlobalThresholdPolicy(threshold=threshold),
+                        vcache_policy=BenchmarkStaticDecisionPolicy(
+                            threshold=threshold
+                        ),
                         path=path,
                         dataset_file=dataset_file,
                         embedding_model=berkeley_embedding_model.value,
@@ -658,13 +652,14 @@ def main():
                         timestamp=timestamp,
                         delta=-1,
                         threshold=threshold,
+                        similarity_evaluator=similarity_evaluator,
                     )
 
             #####################################################
             ### Baseline: vCache + Berkeley Embedding
             if (
                 Baseline.VCacheBerkeleyEmbedding in BASELINES_TO_RUN
-                and not generate_results_only
+                and not generate_plots_only.value
             ):
                 for delta in DELTAS:
                     for i in range(0, CONFIDENCE_INTERVALS_ITERATIONS):
@@ -699,7 +694,7 @@ def main():
                         )
 
                         __run_baseline(
-                            vcache_policy=DynamicLocalThresholdPolicy(delta=delta),
+                            vcache_policy=VerifiedDecisionPolicy(delta=delta),
                             path=path,
                             dataset_file=dataset_file,
                             embedding_model=berkeley_embedding_model.value,
@@ -707,11 +702,12 @@ def main():
                             timestamp=timestamp,
                             delta=delta,
                             threshold=-1,
+                            similarity_evaluator=similarity_evaluator,
                         )
 
             #####################################################
             ### Baseline: IID Local
-            if Baseline.IID in BASELINES_TO_RUN and not generate_results_only:
+            if Baseline.IID in BASELINES_TO_RUN and not generate_plots_only.value:
                 for delta in DELTAS:
                     for i in range(0, CONFIDENCE_INTERVALS_ITERATIONS):
                         path = os.path.join(
@@ -729,7 +725,9 @@ def main():
                         )
 
                         __run_baseline(
-                            vcache_policy=IIDLocalThresholdPolicy(delta=delta),
+                            vcache_policy=BenchmarkVerifiedIIDDecisionPolicy(
+                                delta=delta
+                            ),
                             path=path,
                             dataset_file=dataset_file,
                             embedding_model=embedding_model.value,
@@ -737,11 +735,12 @@ def main():
                             timestamp=timestamp,
                             delta=delta,
                             threshold=-1,
+                            similarity_evaluator=similarity_evaluator,
                         )
 
             #####################################################
             ### Baseline: GPTCache
-            if Baseline.GPTCache in BASELINES_TO_RUN and not generate_results_only:
+            if Baseline.GPTCache in BASELINES_TO_RUN and not generate_plots_only.value:
                 for threshold in STATIC_THRESHOLDS:
                     path = os.path.join(
                         results_dir,
@@ -756,7 +755,9 @@ def main():
                     logging.info(f"Using static threshold: {threshold}")
 
                     __run_baseline(
-                        vcache_policy=StaticGlobalThresholdPolicy(threshold=threshold),
+                        vcache_policy=BenchmarkStaticDecisionPolicy(
+                            threshold=threshold
+                        ),
                         path=path,
                         dataset_file=dataset_file,
                         embedding_model=embedding_model.value,
@@ -764,6 +765,7 @@ def main():
                         timestamp=timestamp,
                         delta=-1,
                         threshold=threshold,
+                        similarity_evaluator=similarity_evaluator,
                     )
 
             #####################################################

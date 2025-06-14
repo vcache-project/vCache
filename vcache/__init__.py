@@ -49,12 +49,12 @@ from vcache.vcache_core.similarity_evaluator import (
 
 # vCache Policies
 from vcache.vcache_policy import (
-    DynamicGlobalThresholdPolicy,
-    DynamicLocalThresholdPolicy,
-    IIDLocalThresholdPolicy,
+    BenchmarkStaticDecisionPolicy,
+    BenchmarkVerifiedGlobalDecisionPolicy,
+    BenchmarkVerifiedIIDDecisionPolicy,
     NoCachePolicy,
-    StaticGlobalThresholdPolicy,
     VCachePolicy,
+    VerifiedDecisionPolicy,
 )
 
 __all__ = [
@@ -86,9 +86,9 @@ __all__ = [
     "InMemoryEmbeddingMetadataStorage",
     # vCache Policies
     "VCachePolicy",
-    "DynamicLocalThresholdPolicy",
-    "DynamicGlobalThresholdPolicy",
-    "StaticGlobalThresholdPolicy",
+    "VerifiedDecisionPolicy",
+    "BenchmarkVerifiedGlobalDecisionPolicy",
+    "BenchmarkStaticDecisionPolicy",
     "NoCachePolicy",
-    "IIDLocalThresholdPolicy",
+    "BenchmarkVerifiedIIDDecisionPolicy",
 ]

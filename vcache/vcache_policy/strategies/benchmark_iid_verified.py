@@ -18,9 +18,11 @@ from vcache.vcache_core.similarity_evaluator import (
 from vcache.vcache_policy.vcache_policy import VCachePolicy
 
 
-class IIDLocalThresholdPolicy(VCachePolicy):
+class BenchmarkVerifiedIIDDecisionPolicy(VCachePolicy):
     """
     Policy that uses the vCache IID algorithm to compute optimal thresholds for each embedding.
+
+    IMPORTANT: This policy is used for benchmark purposes and should not be used in production.
     """
 
     def __init__(

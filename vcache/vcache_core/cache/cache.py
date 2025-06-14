@@ -33,7 +33,11 @@ class Cache:
 
     def add(self, prompt: str, response: str) -> int:
         """
-        Add a prompt-response pair to the cache.
+        Compute the embedding for the prompt, add an embedding to the vector database and a new metadata object.
+
+        IMPORTANT: The embedding is computed first and then added to the vector database.
+        The metadata object is added last.
+        Consider this when implementing asynchronous logic to prevent race conditions.
 
         Args:
             prompt: The prompt to add to the cache.
@@ -43,7 +47,7 @@ class Cache:
             The id of the embedding.
         """
         embedding = self.embedding_engine.get_embedding(prompt)
-        self.embedding_store.add_embedding(embedding, response)
+        return self.embedding_store.add_embedding(embedding, response)
 
     def remove(self, embedding_id: int) -> int:
         """
@@ -55,7 +59,7 @@ class Cache:
         Returns:
             The id of the embedding.
         """
-        self.embedding_store.remove(embedding_id)
+        return self.embedding_store.remove(embedding_id)
 
     def get_knn(self, prompt: str, k: int) -> List[tuple[float, int]]:
         """
@@ -102,7 +106,7 @@ class Cache:
         Returns:
             The updated metadata of the embedding.
         """
-        self.embedding_store.update_metadata(embedding_id, embedding_metadata)
+        return self.embedding_store.update_metadata(embedding_id, embedding_metadata)
 
     def get_current_capacity(self) -> int:
         """

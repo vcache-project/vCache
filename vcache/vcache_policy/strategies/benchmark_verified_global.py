@@ -16,23 +16,26 @@ from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage.embeddi
     EmbeddingMetadataObj,
 )
 from vcache.vcache_core.cache.embedding_store.embedding_store import EmbeddingStore
-from vcache.vcache_core.similarity_evaluator import (
-    SimilarityEvaluator,
-)
+from vcache.vcache_core.similarity_evaluator import SimilarityEvaluator
 from vcache.vcache_policy.vcache_policy import VCachePolicy
 
 
-class DynamicLocalThresholdPolicy(VCachePolicy):
+class BenchmarkVerifiedGlobalDecisionPolicy(VCachePolicy):
     """
-    Dynamic local threshold policy that computes optimal thresholds for each embedding.
+    Policy that uses the vCache algorithm to compute optimal global thresholds across all embeddings.
+
+    IMPORTANT: This policy is used for benchmark purposes and should not be used in production.
     """
 
-    def __init__(self, delta: float = 0.01):
+    def __init__(
+        self,
+        delta: float = 0.01,
+    ):
         """
-        Initialize dynamic local threshold policy.
+        Initialize dynamic global threshold policy.
 
         Args:
-            delta: The delta value to use for threshold computation.
+            delta: The delta value for the algorithm.
         """
         self.bayesian = _Algorithm(delta=delta)
         self.similarity_evaluator: SimilarityEvaluator = None
@@ -63,7 +66,7 @@ class DynamicLocalThresholdPolicy(VCachePolicy):
         self, prompt: str, system_prompt: Optional[str]
     ) -> tuple[bool, str, str]:
         """
-        Process a request using dynamic local threshold policy.
+        Process a request using dynamic global threshold policy.
 
         Args:
             prompt: The prompt to check for cache hit.
@@ -71,6 +74,9 @@ class DynamicLocalThresholdPolicy(VCachePolicy):
 
         Returns:
             Tuple containing [is_cache_hit, actual_response, nn_response].
+
+        Raises:
+            ValueError: If policy has not been setup.
         """
         if self.inference_engine is None or self.cache is None:
             raise ValueError("Policy has not been setup")
@@ -114,7 +120,7 @@ class DynamicLocalThresholdPolicy(VCachePolicy):
 
 class _Action(Enum):
     """
-    Enumeration of possible actions for the algorithm.
+    Actions that can be taken by the dynamic global threshold algorithm.
     """
 
     EXPLORE = "explore"
@@ -123,15 +129,15 @@ class _Action(Enum):
 
 class _Algorithm:
     """
-    Internal algorithm implementation for dynamic threshold computation.
+    Dynamic global threshold algorithm implementation.
     """
 
     def __init__(self, delta: float):
         """
-        Initialize the algorithm with the given delta value.
+        Initialize the dynamic global threshold algorithm.
 
         Args:
-            delta: The delta value for confidence computation.
+            delta: The delta parameter for the algorithm.
         """
         self.delta: float = delta
         self.P_c: float = 1.0 - self.delta
@@ -139,6 +145,14 @@ class _Algorithm:
         self.logistic_regression: LogisticRegression = LogisticRegression(
             penalty=None, solver="lbfgs", tol=1e-8, max_iter=1000, fit_intercept=False
         )
+
+        self.global_observations: List[Tuple[float, int]] = []
+        self.global_observations.append((0.0, 0))
+        self.global_observations.append((1.0, 1))
+        self.global_gamma: float = None
+        self.global_t_hat: float = None
+        self.global_t_prime: float = None
+        self.global_var_t: float = None
 
         self.variance_map: Dict[int, List[float]] = {
             6: 0.035445,
@@ -190,31 +204,37 @@ class _Algorithm:
         self, similarity_score: float, is_correct: bool, metadata: EmbeddingMetadataObj
     ) -> None:
         """
-        Update the metadata with the new observation
-        Args
-            similarity_score: float - The similarity score between the query and the embedding
-            is_correct: bool - Whether the query was correct
-            metadata: EmbeddingMetadataObj - The metadata of the embedding
+        Update the metadata with the new observation.
+
+        Args:
+            similarity_score: The similarity score between the query and the embedding.
+            is_correct: Whether the query was correct.
+            metadata: The metadata of the embedding.
         """
         if is_correct:
-            metadata.observations.append((round(similarity_score, 3), 1))
+            self.global_observations.append((round(similarity_score, 3), 1))
         else:
-            metadata.observations.append((round(similarity_score, 3), 0))
+            self.global_observations.append((round(similarity_score, 3), 0))
 
     def select_action(
         self, similarity_score: float, metadata: EmbeddingMetadataObj
     ) -> _Action:
         """
-        Select the action to take based on the similarity score, observations, and accuracy target
-        Args
-            similarity_score: float - The similarity score between the query and the embedding
-            metadata: EmbeddingMetadataObj - The metadata of the embedding
-        Returns
-            Action - Explore or Exploit
+        Select the action to take based on the similarity score and observations.
+
+        Args:
+            similarity_score: The similarity score between the query and the embedding.
+            metadata: The metadata of the embedding.
+
+        Returns:
+            The action to take (EXPLORE or EXPLOIT).
         """
         similarity_score = round(similarity_score, 3)
-        similarities: np.ndarray = np.array([obs[0] for obs in metadata.observations])
-        labels: np.ndarray = np.array([obs[1] for obs in metadata.observations])
+
+        similarities: np.ndarray = np.array(
+            [obs[0] for obs in self.global_observations]
+        )
+        labels: np.ndarray = np.array([obs[1] for obs in self.global_observations])
 
         if len(similarities) < 6 or len(labels) < 6:
             return _Action.EXPLORE
@@ -225,9 +245,10 @@ class _Algorithm:
 
         if t_hat == -1:
             return _Action.EXPLORE
-        metadata.gamma = gamma
-        metadata.t_hat = t_hat
-        metadata.var_t = var_t
+
+        self.global_gamma = gamma
+        self.global_t_hat = t_hat
+        self.global_var_t = var_t
 
         tau: float = self._get_tau(
             var_t=var_t, s=similarity_score, t_hat=t_hat, metadata=metadata
@@ -346,11 +367,11 @@ class _Algorithm:
             float - The minimum tau value
         """
         t_primes: List[float] = self._get_t_primes(t_hat=t_hat, var_t=var_t)
-        likelihoods = self._likelihood(s=s, t=t_primes, gamma=metadata.gamma)
+        likelihoods = self._likelihood(s=s, t=t_primes, gamma=self.global_gamma)
         alpha_lower_bounds = (1 - self.epsilon_grid) * likelihoods
 
         taus = 1 - (1 - self.P_c) / (1 - alpha_lower_bounds)
-        metadata.t_prime = t_primes[np.argmin(taus)]
+        self.global_t_prime = t_primes[np.argmin(taus)]
         return round(np.min(taus), 5)
 
     def _get_t_primes(self, t_hat: float, var_t: float) -> List[float]:

@@ -19,7 +19,7 @@ def convert_to_dataframe_from_benchmark(benchmark: "Benchmark") -> tuple:
         "tn_list": benchmark.tn_list,
         "fn_list": benchmark.fn_list,
         "latency_direct_list": benchmark.latency_direct_list,
-        "latency_vectorq_list": benchmark.latency_vcach_list,
+        "latency_vectorq_list": benchmark.latency_vcache_list,
     }
     df = pd.DataFrame(data)
 

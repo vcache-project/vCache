@@ -1,23 +1,23 @@
-from vcache.vcache_policy.strategies.dynamic_global_threshold import (
-    DynamicGlobalThresholdPolicy,
+from vcache.vcache_policy.strategies.benchmark_iid_verified import (
+    BenchmarkVerifiedIIDDecisionPolicy,
 )
-from vcache.vcache_policy.strategies.dynamic_local_threshold import (
-    DynamicLocalThresholdPolicy,
+from vcache.vcache_policy.strategies.benchmark_static import (
+    BenchmarkStaticDecisionPolicy,
 )
-from vcache.vcache_policy.strategies.iid_local_threshold import (
-    IIDLocalThresholdPolicy,
+from vcache.vcache_policy.strategies.benchmark_verified_global import (
+    BenchmarkVerifiedGlobalDecisionPolicy,
 )
 from vcache.vcache_policy.strategies.no_cache import NoCachePolicy
-from vcache.vcache_policy.strategies.static_global_threshold import (
-    StaticGlobalThresholdPolicy,
+from vcache.vcache_policy.strategies.verified import (
+    VerifiedDecisionPolicy,
 )
 from vcache.vcache_policy.vcache_policy import VCachePolicy
 
 __all__ = [
     "VCachePolicy",
-    "StaticGlobalThresholdPolicy",
-    "DynamicLocalThresholdPolicy",
-    "DynamicGlobalThresholdPolicy",
-    "IIDLocalThresholdPolicy",
+    "BenchmarkStaticDecisionPolicy",
+    "VerifiedDecisionPolicy",
+    "BenchmarkVerifiedGlobalDecisionPolicy",
+    "BenchmarkVerifiedIIDDecisionPolicy",
     "NoCachePolicy",
 ]

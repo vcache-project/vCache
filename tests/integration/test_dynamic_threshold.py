@@ -3,13 +3,13 @@ import unittest
 from dotenv import load_dotenv
 
 from vcache import (
-    DynamicLocalThresholdPolicy,
     HNSWLibVectorDB,
     InMemoryEmbeddingMetadataStorage,
     LangChainEmbeddingEngine,
     OpenAIInferenceEngine,
     VCache,
     VCacheConfig,
+    VerifiedDecisionPolicy,
 )
 
 load_dotenv()
@@ -28,7 +28,7 @@ def create_default_config_and_policy():
         embedding_metadata_storage=InMemoryEmbeddingMetadataStorage(),
         system_prompt="Please answer in a single word with the first letter capitalized. Example: London",
     )
-    policy = DynamicLocalThresholdPolicy(delta=0.05)
+    policy = VerifiedDecisionPolicy(delta=0.05)
     return config, policy
 
 
