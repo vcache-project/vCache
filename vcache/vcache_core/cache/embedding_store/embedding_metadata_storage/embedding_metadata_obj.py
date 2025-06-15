@@ -37,8 +37,6 @@ class EmbeddingMetadataObj:
         self.t_hat: float = None
         self.t_prime: float = None
         self.var_t: float = None
-        self.gamma: float = None
-        self.t_hat: float = None
 
         #### Metadata for the eviction policy ################################
         self.last_accessed: datetime = last_accessed

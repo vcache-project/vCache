@@ -35,13 +35,15 @@ class LRUEvictionPolicy(EvictionPolicy):
         Returns:
             A list of embedding_ids for the items to be evicted.
         """
-        sorted_metadata = sorted(
+        sorted_metadata: List[EmbeddingMetadataObj] = sorted(
             all_metadata,
             key=lambda meta: meta.last_accessed
             if meta.last_accessed is not None
             else datetime.min,
         )
 
-        num_to_evict = int(self.max_size * self.eviction_percentage)
-        victims = [meta.embedding_id for meta in sorted_metadata[:num_to_evict]]
+        num_to_evict: int = int(self.max_size * self.eviction_percentage)
+        victims: List[int] = [
+            meta.embedding_id for meta in sorted_metadata[:num_to_evict]
+        ]
         return victims
