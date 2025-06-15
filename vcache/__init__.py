@@ -20,17 +20,17 @@ from vcache.vcache_core.cache.embedding_engine import (
     OpenAIEmbeddingEngine,
 )
 
-# Vector databases
-from vcache.vcache_core.cache.embedding_store.vector_db import (
-    HNSWLibVectorDB,
-    SimilarityMetricType,
-    VectorDB,
-)
-
 # Eviction policies
 from vcache.vcache_core.cache.eviction_policy import (
     EvictionPolicy,
     LRUEvictionPolicy,
+)
+
+# Vector databases
+from vcache.vcache_core.cache.vector_db import (
+    HNSWLibVectorDB,
+    SimilarityMetricType,
+    VectorDB,
 )
 
 # Similarity evaluators

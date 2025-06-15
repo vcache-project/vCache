@@ -1,11 +1,11 @@
 from typing import List
 
 from vcache.vcache_core.cache.embedding_engine.embedding_engine import EmbeddingEngine
-from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage.embedding_metadata_obj import (
+from vcache.vcache_core.cache.eviction_policy.eviction_policy import EvictionPolicy
+from vcache.vcache_core.cache.vector_db.embedding_metadata_obj import (
     EmbeddingMetadataObj,
 )
-from vcache.vcache_core.cache.embedding_store.vector_db.vector_db import VectorDB
-from vcache.vcache_core.cache.eviction_policy.eviction_policy import EvictionPolicy
+from vcache.vcache_core.cache.vector_db.vector_db import VectorDB
 
 
 class Cache:

@@ -4,14 +4,14 @@ from vcache.inference_engine.inference_engine import InferenceEngine
 from vcache.inference_engine.strategies.open_ai import OpenAIInferenceEngine
 from vcache.vcache_core.cache.embedding_engine import OpenAIEmbeddingEngine
 from vcache.vcache_core.cache.embedding_engine.embedding_engine import EmbeddingEngine
-from vcache.vcache_core.cache.embedding_store.vector_db import VectorDB
-from vcache.vcache_core.cache.embedding_store.vector_db.strategies.hnsw_lib import (
-    HNSWLibVectorDB,
-)
 from vcache.vcache_core.cache.eviction_policy.eviction_policy import EvictionPolicy
 from vcache.vcache_core.cache.eviction_policy.strategies.no_eviction import (
     NoEvictionPolicy,
 )
+from vcache.vcache_core.cache.vector_db.strategies.hnsw_lib import (
+    HNSWLibVectorDB,
+)
+from vcache.vcache_core.cache.vector_db.vector_db import VectorDB
 from vcache.vcache_core.similarity_evaluator.similarity_evaluator import (
     SimilarityEvaluator,
 )

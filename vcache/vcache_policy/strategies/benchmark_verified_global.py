@@ -12,7 +12,7 @@ from typing_extensions import override
 from vcache.config import VCacheConfig
 from vcache.inference_engine import InferenceEngine
 from vcache.vcache_core.cache.cache import Cache
-from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage.embedding_metadata_obj import (
+from vcache.vcache_core.cache.vector_db.embedding_metadata_obj import (
     EmbeddingMetadataObj,
 )
 from vcache.vcache_core.similarity_evaluator import SimilarityEvaluator

@@ -23,15 +23,12 @@ from vcache.main import VCache
 from vcache.vcache_core.cache.embedding_engine.strategies.benchmark import (
     BenchmarkEmbeddingEngine,
 )
-from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage import (
-    InMemoryEmbeddingMetadataStorage,
-)
-from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage.embedding_metadata_obj import (
-    EmbeddingMetadataObj,
-)
-from vcache.vcache_core.cache.embedding_store.vector_db import (
+from vcache.vcache_core.cache.vector_db import (
     HNSWLibVectorDB,
     SimilarityMetricType,
+)
+from vcache.vcache_core.cache.vector_db.embedding_metadata_obj import (
+    EmbeddingMetadataObj,
 )
 from vcache.vcache_core.similarity_evaluator import SimilarityEvaluator
 from vcache.vcache_core.similarity_evaluator.strategies.llm_comparison import (
@@ -396,7 +393,7 @@ class Benchmark(unittest.TestCase):
         var_ts_dict = {}
 
         metadata_objects: List[EmbeddingMetadataObj] = (
-            self.vcache.vcache_config.embedding_metadata_storage.get_all_embedding_metadata_objects()
+            self.vcache.vcache_config.vector_db.get_all_embedding_metadata_objects()
         )
 
         for metadata_object in metadata_objects:
@@ -486,7 +483,6 @@ def __run_baseline(
             similarity_metric_type=SimilarityMetricType.COSINE,
             max_capacity=MAX_VECTOR_DB_CAPACITY,
         ),
-        embedding_metadata_storage=InMemoryEmbeddingMetadataStorage(),
         similarity_evaluator=similarity_evaluator,
     )
     vcache: VCache = VCache(vcache_config, vcache_policy)

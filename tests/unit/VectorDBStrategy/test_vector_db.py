@@ -2,10 +2,8 @@ import unittest
 
 import pytest
 
-from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage.embedding_metadata_obj import (
+from vcache.vcache_core.cache.vector_db import (
     EmbeddingMetadataObj,
-)
-from vcache.vcache_core.cache.embedding_store.vector_db import (
     HNSWLibVectorDB,
     SimilarityMetricType,
 )
