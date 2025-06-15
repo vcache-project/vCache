@@ -1,3 +1,4 @@
+import threading
 from typing import Any, Dict, List, Optional
 
 from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage.embedding_metadata_obj import (
@@ -18,6 +19,7 @@ class InMemoryEmbeddingMetadataStorage(EmbeddingMetadataStorage):
         Initialize in-memory embedding metadata storage.
         """
         self.metadata_storage: Dict[int, "EmbeddingMetadataObj"] = {}
+        self.lock = threading.Lock()
 
     def add_metadata(
         self, embedding_id: int, metadata: Optional[Dict[str, Any]] = None
@@ -32,8 +34,9 @@ class InMemoryEmbeddingMetadataStorage(EmbeddingMetadataStorage):
         Returns:
             The embedding ID.
         """
-        self.metadata_storage[embedding_id] = metadata
-        return embedding_id
+        with self.lock:
+            self.metadata_storage[embedding_id] = metadata
+            return embedding_id
 
     def get_metadata(self, embedding_id: int) -> Optional[Dict[str, Any]]:
         """
@@ -48,12 +51,13 @@ class InMemoryEmbeddingMetadataStorage(EmbeddingMetadataStorage):
         Raises:
             ValueError: If embedding metadata is not found.
         """
-        if embedding_id not in self.metadata_storage:
-            raise ValueError(
-                f"Embedding metadata for embedding id {embedding_id} not found"
-            )
-        else:
-            return self.metadata_storage[embedding_id]
+        with self.lock:
+            if embedding_id not in self.metadata_storage:
+                raise ValueError(
+                    f"Embedding metadata for embedding id {embedding_id} not found"
+                )
+            else:
+                return self.metadata_storage[embedding_id]
 
     def update_metadata(
         self, embedding_id: int, metadata: Optional[Dict[str, Any]] = None
@@ -71,13 +75,14 @@ class InMemoryEmbeddingMetadataStorage(EmbeddingMetadataStorage):
         Raises:
             ValueError: If embedding metadata is not found.
         """
-        if embedding_id not in self.metadata_storage:
-            raise ValueError(
-                f"Embedding metadata for embedding id {embedding_id} not found"
-            )
-        else:
-            self.metadata_storage[embedding_id] = metadata
-            return metadata
+        with self.lock:
+            if embedding_id not in self.metadata_storage:
+                raise ValueError(
+                    f"Embedding metadata for embedding id {embedding_id} not found"
+                )
+            else:
+                self.metadata_storage[embedding_id] = metadata
+                return metadata
 
     def remove_metadata(self, embedding_id: int) -> bool:
         """
@@ -89,16 +94,18 @@ class InMemoryEmbeddingMetadataStorage(EmbeddingMetadataStorage):
         Returns:
             True if metadata was removed, False if not found.
         """
-        if embedding_id in self.metadata_storage:
-            del self.metadata_storage[embedding_id]
-            return True
-        return False
+        with self.lock:
+            if embedding_id in self.metadata_storage:
+                del self.metadata_storage[embedding_id]
+                return True
+            return False
 
     def flush(self) -> None:
         """
         Flush all metadata from storage.
         """
-        self.metadata_storage = {}
+        with self.lock:
+            self.metadata_storage = {}
 
     def get_all_embedding_metadata_objects(self) -> List[EmbeddingMetadataObj]:
         """
@@ -107,4 +114,5 @@ class InMemoryEmbeddingMetadataStorage(EmbeddingMetadataStorage):
         Returns:
             A list of all embedding metadata objects.
         """
-        return list(self.metadata_storage.values())
+        with self.lock:
+            return list(self.metadata_storage.values())
