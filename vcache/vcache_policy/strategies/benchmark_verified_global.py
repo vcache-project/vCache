@@ -15,7 +15,6 @@ from vcache.vcache_core.cache.cache import Cache
 from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage.embedding_metadata_obj import (
     EmbeddingMetadataObj,
 )
-from vcache.vcache_core.cache.embedding_store.embedding_store import EmbeddingStore
 from vcache.vcache_core.similarity_evaluator import SimilarityEvaluator
 from vcache.vcache_policy.vcache_policy import VCachePolicy
 
@@ -54,10 +53,7 @@ class BenchmarkVerifiedGlobalDecisionPolicy(VCachePolicy):
         self.inference_engine = config.inference_engine
         self.cache = Cache(
             embedding_engine=config.embedding_engine,
-            embedding_store=EmbeddingStore(
-                embedding_metadata_storage=config.embedding_metadata_storage,
-                vector_db=config.vector_db,
-            ),
+            vector_db=config.vector_db,
             eviction_policy=config.eviction_policy,
         )
 

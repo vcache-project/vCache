@@ -2,6 +2,10 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from typing import List
 
+from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage.embedding_metadata_obj import (
+    EmbeddingMetadataObj,
+)
+
 
 class SimilarityMetricType(Enum):
     """
@@ -14,7 +18,7 @@ class SimilarityMetricType(Enum):
 
 class VectorDB(ABC):
     """
-    Abstract base class for vector databases.
+    Abstract base class for vector databases that store both embeddings and metadata.
     """
 
     def transform_similarity_score(
@@ -39,12 +43,13 @@ class VectorDB(ABC):
                 raise ValueError(f"Invalid similarity metric type: {metric_type}")
 
     @abstractmethod
-    def add(self, embedding: List[float]) -> int:
+    def add(self, embedding: List[float], metadata: EmbeddingMetadataObj) -> int:
         """
-        Add an embedding to the vector database.
+        Add an embedding and its metadata to the vector database.
 
         Args:
             embedding: The embedding to add to the vector db.
+            metadata: The metadata object associated with the embedding.
 
         Returns:
             The id of the embedding.
@@ -54,7 +59,7 @@ class VectorDB(ABC):
     @abstractmethod
     def remove(self, embedding_id: int) -> int:
         """
-        Remove an embedding from the vector database.
+        Remove an embedding and its metadata from the vector database.
 
         Args:
             embedding_id: The id of the embedding to remove.
@@ -75,6 +80,45 @@ class VectorDB(ABC):
 
         Returns:
             A list of tuples, each containing a similarity score and an embedding id.
+        """
+        pass
+
+    @abstractmethod
+    def get_metadata(self, embedding_id: int) -> EmbeddingMetadataObj:
+        """
+        Get metadata for a specific embedding.
+
+        Args:
+            embedding_id: The id of the embedding to get the metadata for.
+
+        Returns:
+            The metadata of the embedding.
+        """
+        pass
+
+    @abstractmethod
+    def update_metadata(
+        self, embedding_id: int, metadata: EmbeddingMetadataObj
+    ) -> EmbeddingMetadataObj:
+        """
+        Update metadata for a specific embedding.
+
+        Args:
+            embedding_id: The id of the embedding to update the metadata for.
+            metadata: The metadata to update the embedding with.
+
+        Returns:
+            The updated metadata of the embedding.
+        """
+        pass
+
+    @abstractmethod
+    def get_all_embedding_metadata_objects(self) -> List[EmbeddingMetadataObj]:
+        """
+        Get all embedding metadata objects in the database.
+
+        Returns:
+            A list of all the embedding metadata objects in the database.
         """
         pass
 

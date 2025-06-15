@@ -1,7 +1,10 @@
-from typing import List
+from typing import Dict, List
 
 import hnswlib
 
+from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage.embedding_metadata_obj import (
+    EmbeddingMetadataObj,
+)
 from vcache.vcache_core.cache.embedding_store.vector_db.vector_db import (
     SimilarityMetricType,
     VectorDB,
@@ -14,7 +17,7 @@ Run 'sudo apt-get install build-essential' on Linux Debian/Ubuntu to install the
 
 class HNSWLibVectorDB(VectorDB):
     """
-    HNSWLib-based vector database implementation for efficient similarity search.
+    HNSWLib-based vector database implementation that stores both embeddings and metadata.
     """
 
     def __init__(
@@ -39,27 +42,36 @@ class HNSWLibVectorDB(VectorDB):
         self.M = None
         self.ef = None
         self.index = None
+        self.metadata_storage: Dict[int, EmbeddingMetadataObj] = {}
 
-    def add(self, embedding: List[float]) -> int:
+    def add(self, embedding: List[float], metadata: EmbeddingMetadataObj) -> int:
         """
-        Add an embedding vector to the database.
+        Add an embedding vector and its metadata to the database.
 
         Args:
             embedding: The embedding vector to add.
+            metadata: The metadata object associated with the embedding.
 
         Returns:
             The unique ID assigned to the added embedding.
         """
         if self.index is None:
             self._init_vector_store(len(embedding))
-        self.index.add_items(embedding, self.__next_embedding_id)
+
+        embedding_id = self.__next_embedding_id
+        self.index.add_items(embedding, embedding_id)
+
+        # Automatically set the embedding_id in the metadata
+        metadata.embedding_id = embedding_id
+        self.metadata_storage[embedding_id] = metadata
+
         self.embedding_count += 1
         self.__next_embedding_id += 1
-        return self.__next_embedding_id - 1
+        return embedding_id
 
     def remove(self, embedding_id: int) -> int:
         """
-        Remove an embedding from the database.
+        Remove an embedding and its metadata from the database.
 
         Args:
             embedding_id: The ID of the embedding to remove.
@@ -68,11 +80,15 @@ class HNSWLibVectorDB(VectorDB):
             The ID of the removed embedding.
 
         Raises:
-            ValueError: If the index is not initialized.
+            ValueError: If the index is not initialized or embedding not found.
         """
         if self.index is None:
             raise ValueError("Index is not initialized")
+        if embedding_id not in self.metadata_storage:
+            raise ValueError(f"Embedding with ID {embedding_id} not found")
+
         self.index.mark_deleted(embedding_id)
+        del self.metadata_storage[embedding_id]
         self.embedding_count -= 1
         return embedding_id
 
@@ -98,7 +114,57 @@ class HNSWLibVectorDB(VectorDB):
             self.transform_similarity_score(sim, metric_type) for sim in similarities[0]
         ]
         id_list = [int(id) for id in ids[0]]
-        return list(zip(similarity_scores, id_list))
+
+        # Filter out deleted embeddings (those not in metadata_storage)
+        results = []
+        for score, embedding_id in zip(similarity_scores, id_list):
+            if embedding_id in self.metadata_storage:
+                results.append((score, embedding_id))
+
+        return results
+
+    def get_metadata(self, embedding_id: int) -> EmbeddingMetadataObj:
+        """
+        Get metadata for a specific embedding.
+
+        Args:
+            embedding_id: The ID of the embedding to get metadata for.
+
+        Returns:
+            The metadata object for the embedding.
+        """
+        if embedding_id not in self.metadata_storage:
+            raise ValueError(f"Metadata for embedding ID {embedding_id} not found")
+        return self.metadata_storage[embedding_id]
+
+    def update_metadata(
+        self, embedding_id: int, metadata: EmbeddingMetadataObj
+    ) -> EmbeddingMetadataObj:
+        """
+        Update metadata for a specific embedding.
+
+        Args:
+            embedding_id: The ID of the embedding to update metadata for.
+            metadata: The new metadata object.
+
+        Returns:
+            The updated metadata object.
+        """
+        if embedding_id not in self.metadata_storage:
+            raise ValueError(f"Metadata for embedding ID {embedding_id} not found")
+
+        self.metadata_storage[embedding_id] = metadata
+        self.metadata_storage[embedding_id].embedding_id = embedding_id
+        return metadata
+
+    def get_all_embedding_metadata_objects(self) -> List[EmbeddingMetadataObj]:
+        """
+        Get all embedding metadata objects in the database.
+
+        Returns:
+            A list of all embedding metadata objects.
+        """
+        return list(self.metadata_storage.values())
 
     def reset(self) -> None:
         """
@@ -109,6 +175,7 @@ class HNSWLibVectorDB(VectorDB):
         self._init_vector_store(self.dim)
         self.embedding_count = 0
         self.__next_embedding_id = 0
+        self.metadata_storage.clear()
 
     def _init_vector_store(self, embedding_dim: int):
         """

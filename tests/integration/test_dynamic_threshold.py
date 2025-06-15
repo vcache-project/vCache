@@ -4,7 +4,6 @@ from dotenv import load_dotenv
 
 from vcache import (
     HNSWLibVectorDB,
-    InMemoryEmbeddingMetadataStorage,
     LangChainEmbeddingEngine,
     OpenAIInferenceEngine,
     VCache,
@@ -25,7 +24,6 @@ def create_default_config_and_policy():
             model_name="sentence-transformers/all-mpnet-base-v2"
         ),
         vector_db=HNSWLibVectorDB(),
-        embedding_metadata_storage=InMemoryEmbeddingMetadataStorage(),
         system_prompt="Please answer in a single word with the first letter capitalized. Example: London",
     )
     policy = VerifiedDecisionPolicy(delta=0.05)

@@ -4,7 +4,7 @@ from vcache.vcache_core.cache.embedding_engine.embedding_engine import Embedding
 from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage.embedding_metadata_obj import (
     EmbeddingMetadataObj,
 )
-from vcache.vcache_core.cache.embedding_store.embedding_store import EmbeddingStore
+from vcache.vcache_core.cache.embedding_store.vector_db.vector_db import VectorDB
 from vcache.vcache_core.cache.eviction_policy.eviction_policy import EvictionPolicy
 
 
@@ -15,29 +15,25 @@ class Cache:
 
     def __init__(
         self,
-        embedding_store: EmbeddingStore,
+        vector_db: VectorDB,
         embedding_engine: EmbeddingEngine,
         eviction_policy: EvictionPolicy,
     ):
         """
-        Initialize cache with embedding store, engine, and eviction policy.
+        Initialize cache with vector database, engine, and eviction policy.
 
         Args:
-            embedding_store: Store for managing embeddings and metadata.
+            vector_db: Vector database for managing embeddings and metadata.
             embedding_engine: Engine for generating embeddings from text.
             eviction_policy: Policy for removing items when cache is full.
         """
-        self.embedding_store = embedding_store
+        self.vector_db = vector_db
         self.embedding_engine = embedding_engine
         self.eviction_policy = eviction_policy
 
     def add(self, prompt: str, response: str) -> int:
         """
-        Compute the embedding for the prompt, add an embedding to the vector database and a new metadata object.
-
-        IMPORTANT: The embedding is computed first and then added to the vector database.
-        The metadata object is added last.
-        Consider this when implementing asynchronous logic to prevent race conditions.
+        Compute the embedding for the prompt, add an embedding to the vector database with metadata.
 
         Args:
             prompt: The prompt to add to the cache.
@@ -47,7 +43,9 @@ class Cache:
             The id of the embedding.
         """
         embedding = self.embedding_engine.get_embedding(prompt)
-        return self.embedding_store.add_embedding(embedding, response)
+        metadata = EmbeddingMetadataObj(response=response)
+        embedding_id = self.vector_db.add(embedding, metadata)
+        return embedding_id
 
     def remove(self, embedding_id: int) -> int:
         """
@@ -59,7 +57,7 @@ class Cache:
         Returns:
             The id of the embedding.
         """
-        return self.embedding_store.remove(embedding_id)
+        return self.vector_db.remove(embedding_id)
 
     def get_knn(self, prompt: str, k: int) -> List[tuple[float, int]]:
         """
@@ -73,13 +71,13 @@ class Cache:
             A list of tuples, each containing a similarity score and an embedding id.
         """
         embedding = self.embedding_engine.get_embedding(prompt)
-        return self.embedding_store.get_knn(embedding, k)
+        return self.vector_db.get_knn(embedding, k)
 
     def flush(self) -> None:
         """
         Flush all data from the cache.
         """
-        self.embedding_store.reset()
+        self.vector_db.reset()
 
     def get_metadata(self, embedding_id: int) -> EmbeddingMetadataObj:
         """
@@ -91,7 +89,7 @@ class Cache:
         Returns:
             The metadata of the embedding.
         """
-        return self.embedding_store.get_metadata(embedding_id)
+        return self.vector_db.get_metadata(embedding_id)
 
     def update_metadata(
         self, embedding_id: int, embedding_metadata: EmbeddingMetadataObj
@@ -106,7 +104,7 @@ class Cache:
         Returns:
             The updated metadata of the embedding.
         """
-        return self.embedding_store.update_metadata(embedding_id, embedding_metadata)
+        return self.vector_db.update_metadata(embedding_id, embedding_metadata)
 
     def get_current_capacity(self) -> int:
         """
@@ -125,7 +123,7 @@ class Cache:
         Returns:
             True if the cache is empty, False otherwise.
         """
-        return self.embedding_store.is_empty()
+        return self.vector_db.is_empty()
 
     def get_all_embedding_metadata_objects(self) -> List[EmbeddingMetadataObj]:
         """
@@ -134,4 +132,4 @@ class Cache:
         Returns:
             A list of all the embedding metadata objects in the cache.
         """
-        return self.embedding_store.embedding_metadata_storage.get_all_embedding_metadata_objects()
+        return self.vector_db.get_all_embedding_metadata_objects()
