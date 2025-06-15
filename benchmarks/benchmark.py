@@ -34,7 +34,7 @@ from vcache.vcache_core.cache.embedding_store.vector_db import (
     SimilarityMetricType,
 )
 from vcache.vcache_core.cache.eviction_policy.eviction_policy import EvictionPolicy
-from vcache.vcache_core.cache.eviction_policy.strategies.lru import LRUEvictionPolicy
+from vcache.vcache_core.cache.eviction_policy.strategies.scu import SCUEvictionPolicy
 from vcache.vcache_core.similarity_evaluator import SimilarityEvaluator
 from vcache.vcache_core.similarity_evaluator.strategies.string_comparison import (
     StringComparisonSimilarityEvaluator,
@@ -125,7 +125,7 @@ RUN_COMBINATIONS: List[
         Dataset.SEM_BENCHMARK_CLASSIFICATION,
         GeneratePlotsOnly.NO,
         StringComparisonSimilarityEvaluator(),
-        LRUEvictionPolicy(max_size=200, watermark=0.99, eviction_percentage=0.2),
+        SCUEvictionPolicy(max_size=500, watermark=0.99, eviction_percentage=0.1),
     )
 ]
 
@@ -182,6 +182,7 @@ class Benchmark(unittest.TestCase):
         self.threshold: float = None
         self.delta: float = None
         self.is_static_threshold: bool = None
+        self.eviction_policy: EvictionPolicy = None
 
     def stats_set_up(self):
         self.cache_hit_list: List[int] = []
@@ -428,6 +429,8 @@ class Benchmark(unittest.TestCase):
             "config": {
                 "filepath": self.filepath,
                 "embedding_model": self.embedding_model,
+                "llm_model": self.llm_model,
+                "eviction_policy": str(self.eviction_policy),
                 "is_static_threshold": self.is_static_threshold,
                 "threshold": self.threshold,
                 "delta": self.delta,
@@ -497,6 +500,7 @@ def __run_baseline(
     benchmark.delta = delta if delta != -1 else None
     benchmark.is_static_threshold = threshold != -1
     benchmark.output_folder_path = path
+    benchmark.eviction_policy = eviction_policy
 
     benchmark.stats_set_up()
     try:

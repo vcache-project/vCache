@@ -48,3 +48,16 @@ class MRUEvictionPolicy(EvictionPolicy):
             meta.embedding_id for meta in sorted_metadata[:num_to_evict]
         ]
         return victims
+
+    def __str__(self) -> str:
+        """
+        Returns a string representation of the MRUEvictionPolicy instance.
+
+        Returns:
+            A string representation of the MRUEvictionPolicy instance.
+        """
+        return (
+            f"MRUEvictionPolicy(max_size={self.max_size}, "
+            f"watermark={self.watermark}, "
+            f"eviction_percentage={self.eviction_percentage})"
+        )

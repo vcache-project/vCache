@@ -1,3 +1,4 @@
+import logging
 import os
 import queue
 import random
@@ -100,6 +101,7 @@ class VerifiedDecisionPolicy(VCachePolicy):
         self.similarity_evaluator: Optional[SimilarityEvaluator] = None
         self.inference_engine: Optional[InferenceEngine] = None
         self.cache: Optional[Cache] = None
+        self.logger: logging.Logger = logging.getLogger(__name__)
 
         self.executor: Optional[ThreadPoolExecutor] = None
         self.callback_queue: Optional[CallbackQueue] = None
@@ -340,26 +342,39 @@ class VerifiedDecisionPolicy(VCachePolicy):
         try:
             latest_metdata_object = self.cache.get_metadata(embedding_id=embedding_id)
         except (ValueError, KeyError):
-            # The item was evicted between the time the request was made and
-            # the time the update was processed. We can safely ignore this update.
+            logging.warning(
+                f"Embedding {embedding_id} was evicted between the time the request was made and the time the update was processed. We can safely ignore this update."
+            )
             return
 
         item_was_evicted = latest_metdata_object is None
         if item_was_evicted:
             return
 
-        self.bayesian.update_metadata(
-            similarity_score=similarity_score,
-            is_correct=should_have_exploited,
-            metadata=latest_metdata_object,
-        )
+        try:
+            self.bayesian.update_metadata(
+                similarity_score=similarity_score,
+                is_correct=should_have_exploited,
+                metadata=latest_metdata_object,
+            )
+        except (ValueError, KeyError):
+            self.logger.warning(
+                f"Embedding {embedding_id} was evicted between the time the request was made and the time the update was processed. We can safely ignore this update."
+            )
+            return
 
         if not should_have_exploited:
             self.cache.add(prompt=prompt, response=new_response)
 
-        self.cache.update_metadata(
-            embedding_id=embedding_id, embedding_metadata=latest_metdata_object
-        )
+        try:
+            self.cache.update_metadata(
+                embedding_id=embedding_id, embedding_metadata=latest_metdata_object
+            )
+        except (ValueError, KeyError):
+            self.logger.warning(
+                f"Embedding {embedding_id} was evicted between the time the request was made and the time the update was processed. We can safely ignore this update."
+            )
+            return
 
 
 class _Action(Enum):
@@ -441,6 +456,7 @@ class _Algorithm:
     ) -> None:
         """
         Update the metadata with the new observation
+
         Args
             similarity_score: float - The similarity score between the query and the embedding
             is_correct: bool - Whether the query was correct
@@ -456,6 +472,7 @@ class _Algorithm:
     ) -> _Action:
         """
         Select the action to take based on the similarity score, observations, and accuracy target
+
         Args
             similarity_score: float - The similarity score between the query and the embedding
             metadata: EmbeddingMetadataObj - The metadata of the embedding
@@ -494,10 +511,12 @@ class _Algorithm:
     ) -> Tuple[float, float, float]:
         """
         Optimize parameters with logistic regression
+
         Args
             similarities: np.ndarray - The similarities of the embeddings
             labels: np.ndarray - The labels of the embeddings
             metadata: EmbeddingMetadataObj - The metadata of the embedding
+
         Returns
             t_hat: float - The estimated threshold
             gamma: float - The estimated gamma
@@ -546,14 +565,17 @@ class _Algorithm:
     ) -> float:
         """
         Compute the variance of t using the delta method
+
         Args
             perfect_seperation: bool - Whether the data is perfectly separable
             n_observations: int - The number of observations
             X: np.ndarray - The design matrix
             gamma: float - The gamma parameter
             intercept: float - The intercept parameter
+
         Returns
             float - The variance of t
+
         Note:
             If the data is perfectly separable, we use the variance map to estimate the variance of t
             Otherwise, we use the delta method to estimate the variance of t
@@ -587,11 +609,13 @@ class _Algorithm:
     ) -> float:
         """
         Find the minimum tau value for the given similarity score
+
         Args
             var_t: float - The variance of t
             s: float - The similarity score between the query and the nearest neighbor
             t_hat: float - The estimated threshold
             metadata: EmbeddingMetadataObj - The metadata of the nearest neighbor
+
         Returns
             float - The minimum tau value
         """
@@ -606,9 +630,11 @@ class _Algorithm:
     def _get_t_primes(self, t_hat: float, var_t: float) -> List[float]:
         """
         Compute all possible t_prime values.
+
         Args
             t_hat: float - The estimated threshold
             var_t: float - The variance of t
+
         Returns
             List[float] - The t_prime values
         """
@@ -628,10 +654,12 @@ class _Algorithm:
         """
         Return the (upper) quantile-threshold t' such that
           P_est( t > t' ) <= 1 - quantile
+
         Args
             t_hat: float - The estimated threshold
             var_t: float - The variance of t
             quantile: float - The quantile
+
         Returns
             float - The t_prime value
         """
@@ -642,10 +670,12 @@ class _Algorithm:
     def _likelihood(self, s: float, t: float, gamma: float) -> float:
         """
         Compute the likelihood of the given similarity score and threshold
+
         Args
             s: float - The similarity score between the query and the nearest neighbor
             t: float - The threshold
             gamma: float - The gamma parameter
+
         Returns
             float - The likelihood of the given similarity score and threshold
         """

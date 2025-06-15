@@ -119,3 +119,16 @@ class SCUEvictionPolicy(EvictionPolicy):
                 distance: float = math.sqrt(meta.t_prime**2 + (n_obs_norm - 1) ** 2)
             utilities.append((meta.embedding_id, distance))
         return utilities
+
+    def __str__(self) -> str:
+        """
+        Returns a string representation of the SCUEvictionPolicy instance.
+
+        Returns:
+            A string representation of the SCUEvictionPolicy instance.
+        """
+        return (
+            f"SCUEvictionPolicy(max_size={self.max_size}, "
+            f"watermark={self.watermark}, "
+            f"eviction_percentage={self.eviction_percentage})"
+        )

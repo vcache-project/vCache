@@ -43,3 +43,16 @@ class FIFOEvictionPolicy(EvictionPolicy):
             meta.embedding_id for meta in sorted_metadata[:num_to_evict]
         ]
         return victims
+
+    def __str__(self) -> str:
+        """
+        Returns a string representation of the FIFOEvictionPolicy instance.
+
+        Returns:
+            A string representation of the FIFOEvictionPolicy instance.
+        """
+        return (
+            f"FIFOEvictionPolicy(max_size={self.max_size}, "
+            f"watermark={self.watermark}, "
+            f"eviction_percentage={self.eviction_percentage})"
+        )

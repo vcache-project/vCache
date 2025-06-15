@@ -42,3 +42,12 @@ class NoEvictionPolicy(EvictionPolicy):
     def evict(self, cache: "Cache", victims: List[int]) -> None:
         """Does nothing, as no eviction is needed for this policy."""
         pass
+
+    def __str__(self) -> str:
+        """
+        Returns a string representation of the NoEvictionPolicy instance.
+
+        Returns:
+            A string representation of the NoEvictionPolicy instance.
+        """
+        return "NoEvictionPolicy()"
