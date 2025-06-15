@@ -6,6 +6,7 @@ from scipy.stats import norm
 from typing_extensions import override
 
 from vcache.config import VCacheConfig
+from vcache.inference_engine import InferenceEngine
 from vcache.vcache_core.cache.cache import Cache
 from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage.embedding_metadata_obj import (
     EmbeddingMetadataObj,
@@ -37,10 +38,10 @@ class BenchmarkVerifiedIIDDecisionPolicy(VCachePolicy):
             similarity_evaluator: The similarity evaluator to use for response comparison.
             delta: The delta value for the algorithm.
         """
-        self.similarity_evaluator = similarity_evaluator
+        self.similarity_evaluator: SimilarityEvaluator = similarity_evaluator
         self.bayesian = _Algorithm(delta=delta)
-        self.inference_engine = None
-        self.cache = None
+        self.inference_engine: Optional[InferenceEngine] = None
+        self.cache: Optional[Cache] = None
 
     @override
     def setup(self, config: VCacheConfig):
@@ -63,7 +64,7 @@ class BenchmarkVerifiedIIDDecisionPolicy(VCachePolicy):
     @override
     def process_request(
         self, prompt: str, system_prompt: Optional[str]
-    ) -> tuple[bool, str, str]:
+    ) -> tuple[bool, str, EmbeddingMetadataObj]:
         """
         Process a request using IID local threshold policy.
 
@@ -72,7 +73,7 @@ class BenchmarkVerifiedIIDDecisionPolicy(VCachePolicy):
             system_prompt: The optional system prompt to use for the response. It will override the system prompt in the VCacheConfig if provided.
 
         Returns:
-            Tuple containing [is_cache_hit, actual_response, nn_response].
+            Tuple containing [is_cache_hit, actual_response, nn_metadata_object].
 
         Raises:
             ValueError: If policy has not been setup.
@@ -86,7 +87,7 @@ class BenchmarkVerifiedIIDDecisionPolicy(VCachePolicy):
                 prompt=prompt, system_prompt=system_prompt
             )
             self.cache.add(prompt=prompt, response=response)
-            return False, response, ""
+            return False, response, EmbeddingMetadataObj(embedding_id=-1, response="")
 
         similarity_score, embedding_id = knn[0]
         metadata = self.cache.get_metadata(embedding_id=embedding_id)
@@ -96,7 +97,7 @@ class BenchmarkVerifiedIIDDecisionPolicy(VCachePolicy):
 
         match action:
             case _Action.EXPLOIT:
-                return True, metadata.response, metadata.response
+                return True, metadata.response, metadata
             case _Action.EXPLORE:
                 response = self.inference_engine.create(
                     prompt=prompt, system_prompt=system_prompt
@@ -114,7 +115,7 @@ class BenchmarkVerifiedIIDDecisionPolicy(VCachePolicy):
                 self.cache.update_metadata(
                     embedding_id=embedding_id, embedding_metadata=metadata
                 )
-                return False, response, metadata.response
+                return False, response, metadata
 
 
 class _Action(Enum):

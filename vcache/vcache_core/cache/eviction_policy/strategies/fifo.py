@@ -1,4 +1,3 @@
-from datetime import datetime
 from typing import List
 
 from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage.embedding_metadata_obj import (
@@ -7,27 +6,26 @@ from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage.embeddi
 from vcache.vcache_core.cache.eviction_policy.eviction_policy import EvictionPolicy
 
 
-class LRUEvictionPolicy(EvictionPolicy):
+class FIFOEvictionPolicy(EvictionPolicy):
     """
-    Implements a Least Recently Used (LRU) eviction policy.
+    Implements a First-In, First-Out (FIFO) eviction policy.
 
-    This policy evicts items that have not been accessed for the longest time.
+    This policy evicts items in the order they were added to the cache.
     """
 
     def update_eviction_metadata(self, metadata: EmbeddingMetadataObj) -> None:
         """
-        Updates the last_accessed timestamp of the metadata object to the current time.
+        This method is not used in the FIFO policy, as eviction is based purely
+        on insertion order.
         """
-        metadata.last_accessed = datetime.now()
+        pass
 
     def select_victims(self, all_metadata: List[EmbeddingMetadataObj]) -> List[int]:
         """
-        Selects victims for eviction based on the least recently used principle.
+        Selects victims for eviction based on the first-in, first-out principle.
 
-        This method sorts the metadata by the last_accessed timestamp in
-        ascending order. Items that have `None` for last_accessed (i.e., they
-        have never been used as a nearest neighbor) are considered the oldest
-        and are prioritized for eviction.
+        This method sorts the metadata by the created_at timestamp in ascending
+        order to find the oldest items.
 
         Args:
             all_metadata: A list of all metadata objects in the cache.
@@ -37,9 +35,7 @@ class LRUEvictionPolicy(EvictionPolicy):
         """
         sorted_metadata: List[EmbeddingMetadataObj] = sorted(
             all_metadata,
-            key=lambda meta: meta.last_accessed
-            if meta.last_accessed is not None
-            else datetime.min,
+            key=lambda meta: meta.created_at,
         )
 
         num_to_evict: int = int(self.max_size * self.eviction_percentage)
@@ -50,13 +46,13 @@ class LRUEvictionPolicy(EvictionPolicy):
 
     def __str__(self) -> str:
         """
-        Returns a string representation of the LRUEvictionPolicy instance.
+        Returns a string representation of the FIFOEvictionPolicy instance.
 
         Returns:
-            A string representation of the LRUEvictionPolicy instance.
+            A string representation of the FIFOEvictionPolicy instance.
         """
         return (
-            f"LRUEvictionPolicy(max_size={self.max_size}, "
+            f"FIFOEvictionPolicy(max_size={self.max_size}, "
             f"watermark={self.watermark}, "
             f"eviction_percentage={self.eviction_percentage})"
         )

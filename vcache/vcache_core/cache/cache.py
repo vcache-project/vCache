@@ -27,9 +27,9 @@ class Cache:
             embedding_engine: Engine for generating embeddings from text.
             eviction_policy: Policy for removing items when cache is full.
         """
-        self.embedding_store = embedding_store
-        self.embedding_engine = embedding_engine
-        self.eviction_policy = eviction_policy
+        self.embedding_store: EmbeddingStore = embedding_store
+        self.embedding_engine: EmbeddingEngine = embedding_engine
+        self.eviction_policy: EvictionPolicy = eviction_policy
 
     def add(self, prompt: str, response: str) -> int:
         """
@@ -51,7 +51,7 @@ class Cache:
 
     def remove(self, embedding_id: int) -> int:
         """
-        Remove an embedding from the cache.
+        Remove an embedding and its metadata from the cache.
 
         Args:
             embedding_id: The id of the embedding to remove.
@@ -126,6 +126,15 @@ class Cache:
             True if the cache is empty, False otherwise.
         """
         return self.embedding_store.is_empty()
+
+    def vector_db_size(self) -> int:
+        """
+        Get the number of embeddings in the vector database.
+
+        Returns:
+            The number of embeddings in the vector database.
+        """
+        return self.embedding_store.vector_db_size()
 
     def get_all_embedding_metadata_objects(self) -> List[EmbeddingMetadataObj]:
         """

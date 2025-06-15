@@ -7,11 +7,12 @@ from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage.embeddi
 from vcache.vcache_core.cache.eviction_policy.eviction_policy import EvictionPolicy
 
 
-class LRUEvictionPolicy(EvictionPolicy):
+class MRUEvictionPolicy(EvictionPolicy):
     """
-    Implements a Least Recently Used (LRU) eviction policy.
+    Implements a Most Recently Used (MRU) eviction policy.
 
-    This policy evicts items that have not been accessed for the longest time.
+    This policy evicts items that have been accessed most recently. This can be
+    useful in scenarios where older items are more likely to be re-accessed.
     """
 
     def update_eviction_metadata(self, metadata: EmbeddingMetadataObj) -> None:
@@ -22,12 +23,11 @@ class LRUEvictionPolicy(EvictionPolicy):
 
     def select_victims(self, all_metadata: List[EmbeddingMetadataObj]) -> List[int]:
         """
-        Selects victims for eviction based on the least recently used principle.
+        Selects victims for eviction based on the most recently used principle.
 
         This method sorts the metadata by the last_accessed timestamp in
-        ascending order. Items that have `None` for last_accessed (i.e., they
-        have never been used as a nearest neighbor) are considered the oldest
-        and are prioritized for eviction.
+        descending order. Items that have `None` for last_accessed are
+        treated as the oldest and are not prioritized for eviction.
 
         Args:
             all_metadata: A list of all metadata objects in the cache.
@@ -40,6 +40,7 @@ class LRUEvictionPolicy(EvictionPolicy):
             key=lambda meta: meta.last_accessed
             if meta.last_accessed is not None
             else datetime.min,
+            reverse=True,  # Sort from most recent to least recent
         )
 
         num_to_evict: int = int(self.max_size * self.eviction_percentage)
@@ -50,13 +51,13 @@ class LRUEvictionPolicy(EvictionPolicy):
 
     def __str__(self) -> str:
         """
-        Returns a string representation of the LRUEvictionPolicy instance.
+        Returns a string representation of the MRUEvictionPolicy instance.
 
         Returns:
-            A string representation of the LRUEvictionPolicy instance.
+            A string representation of the MRUEvictionPolicy instance.
         """
         return (
-            f"LRUEvictionPolicy(max_size={self.max_size}, "
+            f"MRUEvictionPolicy(max_size={self.max_size}, "
             f"watermark={self.watermark}, "
             f"eviction_percentage={self.eviction_percentage})"
         )

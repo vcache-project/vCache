@@ -63,6 +63,7 @@ class TestConcurrency(unittest.TestCase):
                 patch.object(
                     policy.bayesian, "select_action", return_value=_Action.EXPLORE
                 ),
+                patch.object(policy.inference_engine, "create", return_value="Berlin"),
             ):
                 initial_prompt = "What is the capital of Germany?"
                 vcache.infer(prompt=initial_prompt)
@@ -90,7 +91,7 @@ class TestConcurrency(unittest.TestCase):
                 total_prompts = concurrent_prompts_chunk_1 + concurrent_prompts_chunk_2
                 with ThreadPoolExecutor(max_workers=len(total_prompts)) as executor:
                     executor.map(do_inference, concurrent_prompts_chunk_1)
-                    time.sleep(1.5)
+                    time.sleep(5)
                     executor.map(do_inference, concurrent_prompts_chunk_2)
 
         all_metadata_objects = vcache.vcache_config.embedding_metadata_storage.get_all_embedding_metadata_objects()
