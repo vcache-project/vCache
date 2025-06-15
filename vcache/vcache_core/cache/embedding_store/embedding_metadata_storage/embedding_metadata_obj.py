@@ -11,7 +11,7 @@ class EmbeddingMetadataObj:
         self,
         embedding_id: int,
         response: str,
-        last_accessed: datetime = None,
+        last_accessed: datetime = datetime.now(),
     ):
         """
         Initialize embedding metadata object.
@@ -42,6 +42,7 @@ class EmbeddingMetadataObj:
 
         #### Metadata for the eviction policy ################################
         self.last_accessed: datetime = last_accessed
+        self.created_at: datetime = datetime.now()
         self.usage_count: int = 0
 
     def __eq__(self, other):
