@@ -8,24 +8,15 @@
   </picture>
 </p>
 
-
 <h3 align="center">
 Reliable and Efficient Semantic Prompt Caching
 </h3>
 <br>
 
-
-
-
 Semantic caching reduces LLM latency and cost by returning cached model responses for semantically similar prompts (not just exact matches). **vCache** is the first verified semantic cache that **guarantees user-defined error rate bounds**. vCache replaces static thresholds with **online-learned, embedding-specific decision boundaries**—no manual fine-tuning required. This enables reliable cached response reuse across any embedding model or workload.
-
-
 
 > [NOTE]
 > vCache is currently in active development. Features and APIs may change as we continue to improve the system.
-
-
-
 
 ## 🚀 Quick Install
 
@@ -40,6 +31,7 @@ Then, set your OpenAI key:
 ```bash
 export OPENAI_API_KEY="your_api_key_here"
 ```
+
 (Note: vCache uses OpenAI by default for both LLM inference and embedding generation, but you can configure any other backend)
 
 Finally, use vCache in your Python code:
@@ -53,15 +45,13 @@ print(f"Response: {response}")
 ```
 
 By default, vCache uses:
+
 - `OpenAIInferenceEngine`
 - `OpenAIEmbeddingEngine`
 - `HNSWLibVectorDB`
-- `InMemoryEmbeddingMetadataStorage`
 - `NoEvictionPolicy`
 - `StringComparisonSimilarityEvaluator`
 - `VerifiedDecisionPolicy` with a maximum failure rate of 2%
-
-
 
 ## ⚙️ Advanced Configuration
 
@@ -75,12 +65,12 @@ from vcache.main import VCache
 from vcache.config import VCacheConfig
 from vcache.inference_engine.strategies.open_ai import OpenAIInferenceEngine
 from vcache.vcache_core.cache.embedding_engine.strategies.open_ai import OpenAIEmbeddingEngine
-from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage.strategies.in_memory import InMemoryEmbeddingMetadataStorage
 from vcache.vcache_core.similarity_evaluator.strategies.string_comparison import StringComparisonSimilarityEvaluator
 from vcache.vcache_policy.strategies.dynamic_local_threshold import VerifiedDecisionPolicy
 from vcache.vcache_policy.vcache_policy import VCachePolicy
-from vcache.vcache_core.cache.embedding_store.vector_db import HNSWLibVectorDB, SimilarityMetricType
+from vcache.vcache_core.cache.vector_db import HNSWLibVectorDB, SimilarityMetricType
 ```
+
 </details>
 
 ```python
@@ -92,7 +82,6 @@ vcache_config: VCacheConfig = VCacheConfig(
         similarity_metric_type=SimilarityMetricType.COSINE,
         max_capacity=100_000,
     ),
-    embedding_metadata_storage=InMemoryEmbeddingMetadataStorage(),
     similarity_evaluator=StringComparisonSimilarityEvaluator,
 )
 
@@ -117,16 +106,16 @@ Semantic caching reduces LLM latency and cost by returning cached model response
 ### Architecture Overview
 
 1. **Embed & Store**  
-Each prompt is converted to a fixed-length vector (an “embedding”) and stored in a vector database along with its LLM response.
+   Each prompt is converted to a fixed-length vector (an “embedding”) and stored in a vector database along with its LLM response.
 
 2. **Nearest-Neighbor Lookup**  
-When a new prompt arrives, the cache embeds it and finds its most similar stored prompt using a similarity metric (e.g., cosine similarity).
+   When a new prompt arrives, the cache embeds it and finds its most similar stored prompt using a similarity metric (e.g., cosine similarity).
 
 3. **Similarity Score**  
-The system computes a score between 0 and 1 that quantifies how “close” the new prompt is to the retrieved entry.
+   The system computes a score between 0 and 1 that quantifies how “close” the new prompt is to the retrieved entry.
 
-4. **Decision: Exploit vs. Explore**  
-   - **Exploit (cache hit):** If the similarity is above a confidence bound, return the cached response.  
+4. **Decision: Exploit vs. Explore**
+   - **Exploit (cache hit):** If the similarity is above a confidence bound, return the cached response.
    - **Explore (cache miss):** Otherwise, infer the LLM for a response, add its embedding and answer to the cache, and return it.
 
 <p align="left">
@@ -139,6 +128,7 @@ The system computes a score between 0 and 1 that quantifies how “close” the 
 </p>
 
 ### Why Fixed Thresholds Fall Short
+
 Existing semantic caches rely on a **global static threshold** to decide whether to reuse a cached response (exploit) or invoke the LLM (explore). If the similarity score exceeds this threshold, the cache reuses the response; otherwise, it infers the model. This strategy is fundamentally limited.
 
 - **Uniform threshold, diverse prompts:** A fixed threshold assumes all embeddings are equally distributed—ignoring that similarity is context-dependent.
@@ -161,11 +151,11 @@ vCache overcomes these limitations with two ideas:
 ### Benefits
 
 - **Reliability**  
-  Formally bounds the rate of incorrect cache hits to your chosen tolerance.  
+  Formally bounds the rate of incorrect cache hits to your chosen tolerance.
 - **Performance**  
-  Matches or exceeds static-threshold systems in cache hit rate and end-to-end latency.  
+  Matches or exceeds static-threshold systems in cache hit rate and end-to-end latency.
 - **Simplicity**  
-  Plug in any embedding model; vCache learns and adapts automatically at runtime.
+ Plug in any embedding model; vCache learns and adapts automatically at runtime.
 
   <p align="left">
   <picture>
@@ -178,25 +168,24 @@ vCache overcomes these limitations with two ideas:
 
 Please refer to the [vCache paper](https://arxiv.org/abs/2502.03771) for further details.
 
-
 ## 🛠 Developer Guide
 
 For advanced usage and development setup, see the [Developer Guide](ReadMe_Dev.md).
 
-
-
 ## 📊 Benchmarking vCache
 
 vCache includes a benchmarking framework to evaluate:
+
 - **Cache hit rate**
 - **Error rate**
 - **Latency improvement**
 - **...**
 
 We provide three open benchmarks:
-- **SemCacheLmArena** (chat-style prompts) - [Dataset  ↗](https://huggingface.co/datasets/vCache/SemBenchmarkLmArena)
-- **SemCacheClassification** (classification queries) - [Dataset  ↗](https://huggingface.co/datasets/vCache/SemBenchmarkClassification)
-- **SemCacheSearchQueries** (real-world search logs) - [Dataset  ↗](https://huggingface.co/datasets/vCache/SemBenchmarkSearchQueries)
+
+- **SemCacheLmArena** (chat-style prompts) - [Dataset ↗](https://huggingface.co/datasets/vCache/SemBenchmarkLmArena)
+- **SemCacheClassification** (classification queries) - [Dataset ↗](https://huggingface.co/datasets/vCache/SemBenchmarkClassification)
+- **SemCacheSearchQueries** (real-world search logs) - [Dataset ↗](https://huggingface.co/datasets/vCache/SemBenchmarkSearchQueries)
 
 See the [Benchmarking Documentation](benchmarks/ReadMe.md) for instructions.
 

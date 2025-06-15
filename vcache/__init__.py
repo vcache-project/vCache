@@ -20,25 +20,17 @@ from vcache.vcache_core.cache.embedding_engine import (
     OpenAIEmbeddingEngine,
 )
 
-# Embedding metadata storage
-from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage import (
-    EmbeddingMetadataStorage,
-    InMemoryEmbeddingMetadataStorage,
-)
-
-# Vector databases
-from vcache.vcache_core.cache.embedding_store.vector_db import (
-    ChromaVectorDB,
-    FAISSVectorDB,
-    HNSWLibVectorDB,
-    SimilarityMetricType,
-    VectorDB,
-)
-
 # Eviction policies
 from vcache.vcache_core.cache.eviction_policy import (
     EvictionPolicy,
     LRUEvictionPolicy,
+)
+
+# Vector databases
+from vcache.vcache_core.cache.vector_db import (
+    HNSWLibVectorDB,
+    SimilarityMetricType,
+    VectorDB,
 )
 
 # Similarity evaluators
@@ -71,9 +63,7 @@ __all__ = [
     "LangChainEmbeddingEngine",
     # Vector databases
     "VectorDB",
-    "FAISSVectorDB",
     "HNSWLibVectorDB",
-    "ChromaVectorDB",
     "SimilarityMetricType",
     # Similarity evaluators
     "SimilarityEvaluator",
@@ -81,9 +71,6 @@ __all__ = [
     # Eviction policies
     "EvictionPolicy",
     "LRUEvictionPolicy",
-    # Embedding metadata storage
-    "EmbeddingMetadataStorage",
-    "InMemoryEmbeddingMetadataStorage",
     # vCache Policies
     "VCachePolicy",
     "VerifiedDecisionPolicy",

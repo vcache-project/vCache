@@ -3,7 +3,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from unittest.mock import MagicMock, patch
 
 from vcache.config import VCacheConfig
-from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage.embedding_metadata_obj import (
+from vcache.vcache_core.cache.vector_db import (
     EmbeddingMetadataObj,
 )
 from vcache.vcache_policy.strategies.verified import (
@@ -48,11 +48,9 @@ class TestVerifiedDecisionPolicy(unittest.TestCase):
         mock_config = MagicMock(spec=VCacheConfig)
         mock_config.inference_engine = self.mock_inference_engine
         mock_config.similarity_evaluator = self.mock_similarity_evaluator
-        # Add all required attributes for Cache creation
-        mock_config.embedding_engine = MagicMock()
-        mock_config.embedding_metadata_storage = MagicMock()
         mock_config.vector_db = MagicMock()
         mock_config.eviction_policy = MagicMock()
+        mock_config.embedding_engine = MagicMock()
 
         self.policy = VerifiedDecisionPolicy()
         self.policy.setup(mock_config)

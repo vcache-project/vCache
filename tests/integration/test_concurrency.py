@@ -8,7 +8,6 @@ from dotenv import load_dotenv
 
 from vcache import (
     HNSWLibVectorDB,
-    InMemoryEmbeddingMetadataStorage,
     LangChainEmbeddingEngine,
     StringComparisonSimilarityEvaluator,
     VCache,
@@ -46,7 +45,6 @@ class TestConcurrency(unittest.TestCase):
                 model_name="sentence-transformers/all-mpnet-base-v2"
             ),
             vector_db=HNSWLibVectorDB(),
-            embedding_metadata_storage=InMemoryEmbeddingMetadataStorage(),
             similarity_evaluator=similarity_evaluator,
         )
 
@@ -93,7 +91,9 @@ class TestConcurrency(unittest.TestCase):
                     time.sleep(1.5)
                     executor.map(do_inference, concurrent_prompts_chunk_2)
 
-        all_metadata_objects = vcache.vcache_config.embedding_metadata_storage.get_all_embedding_metadata_objects()
+        all_metadata_objects = (
+            vcache.vcache_config.vector_db.get_all_embedding_metadata_objects()
+        )
         final_observation_count = len(all_metadata_objects)
 
         for i, metadata_object in enumerate(all_metadata_objects):

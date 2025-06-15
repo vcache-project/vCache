@@ -11,8 +11,8 @@ class EmbeddingMetadataObj:
 
     def __init__(
         self,
-        embedding_id: int,
         response: str,
+        embedding_id: int = -1,
         prior: np.ndarray = None,
         posterior: np.ndarray = None,
         region_reject: List[str] = None,

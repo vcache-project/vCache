@@ -4,10 +4,7 @@ from vcache.main import VCache
 from vcache.vcache_core.cache.embedding_engine.strategies.open_ai import (
     OpenAIEmbeddingEngine,
 )
-from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage.strategies.in_memory import (
-    InMemoryEmbeddingMetadataStorage,
-)
-from vcache.vcache_core.cache.embedding_store.vector_db import (
+from vcache.vcache_core.cache.vector_db import (
     HNSWLibVectorDB,
     SimilarityMetricType,
 )
@@ -27,7 +24,6 @@ vcache_config: VCacheConfig = VCacheConfig(
         similarity_metric_type=SimilarityMetricType.COSINE,
         max_capacity=100000,
     ),
-    embedding_metadata_storage=InMemoryEmbeddingMetadataStorage(),
     similarity_evaluator=StringComparisonSimilarityEvaluator,
 )
 vcache: VCache = VCache(vcache_config, vcache_policy)

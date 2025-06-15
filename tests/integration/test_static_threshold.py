@@ -5,7 +5,6 @@ from dotenv import load_dotenv
 from vcache import (
     BenchmarkStaticDecisionPolicy,
     HNSWLibVectorDB,
-    InMemoryEmbeddingMetadataStorage,
     LangChainEmbeddingEngine,
     OpenAIInferenceEngine,
     VCache,
@@ -25,7 +24,6 @@ def create_default_config_and_policy():
             model_name="sentence-transformers/all-mpnet-base-v2"
         ),
         vector_db=HNSWLibVectorDB(),
-        embedding_metadata_storage=InMemoryEmbeddingMetadataStorage(),
     )
     policy = BenchmarkStaticDecisionPolicy(threshold=0.8)
     return config, policy
