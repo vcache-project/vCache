@@ -337,8 +337,13 @@ class VerifiedDecisionPolicy(VCachePolicy):
             prompt,
         ) = update_args
 
-        # Fetch the latest metadata within the synchronized queue to avoid race conditions
-        latest_metdata_object = self.cache.get_metadata(embedding_id=embedding_id)
+        try:
+            latest_metdata_object = self.cache.get_metadata(embedding_id=embedding_id)
+        except (ValueError, KeyError):
+            # The item was evicted between the time the request was made and
+            # the time the update was processed. We can safely ignore this update.
+            return
+
         item_was_evicted = latest_metdata_object is None
         if item_was_evicted:
             return
