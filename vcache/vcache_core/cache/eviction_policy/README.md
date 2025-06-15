@@ -49,17 +49,16 @@ Victim selection is based on a utility score derived from an item's normalized d
 #### 1. Normalization
 
 To ensure equal weighting of objectives, the observation count for each item $i$ is normalized:
-$$
-n'_{obs,i} = \frac{n_{obs,i}}{\max(n_{obs})}
-$$
+
+$n'_{obs,i} = \frac{n_{obs,i}}{\max(n_{obs})}$
+
 The generality metric, based on $t'_{prime}$, is already within the $[0, 1]$ range.
 
 #### 2. Utility Score
 
 The utility of an item is inversely proportional to its Euclidean distance from the Ideal Point. We define this distance, $D_i$, as:
-$$
-D_i = \sqrt{(t'_{prime,i})^2 + (n'_{obs,i} - 1)^2}
-$$
+
+$D_i = \sqrt{(t'_{prime,i})^2 + (n'_{obs,i} - 1)^2}$
 
 #### 3. Victim Selection
 
