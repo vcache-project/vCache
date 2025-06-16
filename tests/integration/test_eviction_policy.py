@@ -75,7 +75,7 @@ class TestEvictionPolicy(unittest.TestCase):
             ):
                 self.vcache.infer(prompt=prompt)
 
-            self.assertEqual(self.vcache.vcache_policy.cache.vector_db_size(), i + 1)
+            self.assertEqual(self.vcache.vcache_policy.cache.vector_db_size(), i)
 
         self.assertEqual(
             self.vcache.vcache_policy.cache.vector_db_size(), self.watermark_limit
