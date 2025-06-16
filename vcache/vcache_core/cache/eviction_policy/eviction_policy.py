@@ -44,10 +44,12 @@ class EvictionPolicy(ABC):
             watermark: The percentage of `max_size` that triggers eviction.
             eviction_percentage: The percentage of `max_size` to evict.
         """
-        if not 0 < watermark <= 1.0:
-            raise ValueError("Watermark must be between 0 and 1.")
-        if not 0 < eviction_percentage <= 1.0:
-            raise ValueError("Eviction percentage must be between 0 and 1.")
+        if not (0 < watermark <= 1.0):
+            watermark = 0.95
+            self.logger.warning("Watermark must be in (0,1]. Setting to 0.95.")
+        if not (0 < eviction_percentage <= 1.0):
+            eviction_percentage = 0.1
+            self.logger.warning("Eviction percentage must be in (0,1]. Setting to 0.1.")
 
         self.max_size: int = max_size
         self.watermark: float = watermark
