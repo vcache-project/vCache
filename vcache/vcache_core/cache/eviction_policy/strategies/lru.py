@@ -1,3 +1,4 @@
+import heapq
 from datetime import datetime
 from typing import List
 
@@ -24,10 +25,10 @@ class LRUEvictionPolicy(EvictionPolicy):
         """
         Selects victims for eviction based on the least recently used principle.
 
-        This method sorts the metadata by the last_accessed timestamp in
-        ascending order. Items that have `None` for last_accessed (i.e., they
-        have never been used as a nearest neighbor) are considered the oldest
-        and are prioritized for eviction.
+        This method efficiently finds the items with the smallest `last_accessed`
+        timestamps using a heap. Items that have `None` for `last_accessed`
+        (i.e., they have never been used as a nearest neighbor) are considered
+        the oldest and are prioritized for eviction.
 
         Args:
             all_metadata: A list of all metadata objects in the cache.
@@ -35,17 +36,19 @@ class LRUEvictionPolicy(EvictionPolicy):
         Returns:
             A list of embedding_ids for the items to be evicted.
         """
-        sorted_metadata: List[EmbeddingMetadataObj] = sorted(
+        num_to_evict: int = int(self.max_size * self.eviction_percentage)
+        if num_to_evict == 0:
+            return []
+
+        victims_metadata: List[EmbeddingMetadataObj] = heapq.nsmallest(
+            num_to_evict,
             all_metadata,
             key=lambda meta: meta.last_accessed
             if meta.last_accessed is not None
             else datetime.min,
         )
 
-        num_to_evict: int = int(self.max_size * self.eviction_percentage)
-        victims: List[int] = [
-            meta.embedding_id for meta in sorted_metadata[:num_to_evict]
-        ]
+        victims: List[int] = [meta.embedding_id for meta in victims_metadata]
         return victims
 
     def __str__(self) -> str:

@@ -89,7 +89,7 @@ class EvictionPolicy(ABC):
         number_of_embeddings_in_cache = cache.vector_db_size()
         watermark_threshold = self.max_size * self.watermark
 
-        return number_of_embeddings_in_cache > watermark_threshold
+        return number_of_embeddings_in_cache >= watermark_threshold
 
     @abstractmethod
     def update_eviction_metadata(self, metadata: EmbeddingMetadataObj) -> None:

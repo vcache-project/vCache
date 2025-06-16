@@ -39,7 +39,7 @@ class NoEvictionPolicy(EvictionPolicy):
         """Never selects any victims, always returns an empty list."""
         return []
 
-    def evict(self, cache: "Cache", victims: List[int]) -> None:
+    def evict(self, cache: "Cache") -> None:
         """Does nothing, as no eviction is needed for this policy."""
         pass
 

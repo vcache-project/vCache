@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Optional, Tuple
 
 from vcache.config import VCacheConfig
 from vcache.inference_engine import InferenceEngine
@@ -36,7 +36,7 @@ class VCachePolicy(ABC):
     @abstractmethod
     def process_request(
         self, prompt: str, system_prompt: Optional[str]
-    ) -> tuple[bool, str, EmbeddingMetadataObj]:
+    ) -> Tuple[bool, str, EmbeddingMetadataObj]:
         """
         Process a request and determine cache hit status.
 

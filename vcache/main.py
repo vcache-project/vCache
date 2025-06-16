@@ -1,6 +1,9 @@
 from typing import List, Optional, Tuple
 
 from vcache.config import VCacheConfig
+from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage.embedding_metadata_obj import (
+    EmbeddingMetadataObj,
+)
 from vcache.vcache_policy.strategies.verified import (
     VerifiedDecisionPolicy,
 )
@@ -50,7 +53,7 @@ class VCache:
         self,
         prompt: str,
         system_prompt: Optional[str] = None,
-    ) -> Tuple[bool, str, str]:
+    ) -> Tuple[bool, str, EmbeddingMetadataObj]:
         """
         Infer a response from the cache and return the cache hit status, the response, and the nearest neighbor response.
 
@@ -59,7 +62,7 @@ class VCache:
             system_prompt: The optional system prompt to use for the response. It will override the system prompt in the VCacheConfig if provided.
 
         Returns:
-            Tuple containing [is_cache_hit, response, nn_response] where response is the one supposed to be used by the user, and nn_response is for benchmarking purposes.
+            Tuple containing [is_cache_hit, response, nn_metadata] where response is the one supposed to be used by the user, and nn_metadata is for benchmarking purposes.
         """
         if system_prompt is None:
             system_prompt = self.vcache_config.system_prompt
@@ -72,12 +75,13 @@ class VCache:
             prompt, system_prompt
         )
 
-        self.vcache_config.eviction_policy.update_eviction_metadata(nn_metadata)
+        if nn_metadata is not None:
+            self.vcache_config.eviction_policy.update_eviction_metadata(nn_metadata)
 
         if self.vcache_config.eviction_policy.ready_to_evict(self.vcache_policy.cache):
             self.vcache_config.eviction_policy.evict(self.vcache_policy.cache)
 
-        return is_cache_hit, response, nn_metadata.response
+        return is_cache_hit, response, nn_metadata
 
     def __generate_response(self, prompt: str, system_prompt: str) -> str:
         response = self.vcache_policy.inference_engine.create(prompt, system_prompt)

@@ -369,7 +369,7 @@ class Benchmark(unittest.TestCase):
         prompt = f"{task} {review_text}"
         latency_vcache_logic: float = time.time()
         try:
-            is_cache_hit, cache_response, nn_response = (
+            is_cache_hit, cache_response, nn_metadata = (
                 self.vcache.infer_with_cache_info(
                     prompt=prompt,
                     system_prompt=system_prompt,
@@ -382,7 +382,7 @@ class Benchmark(unittest.TestCase):
             raise e
 
         latency_vcache_logic = time.time() - latency_vcache_logic
-        return is_cache_hit, cache_response, nn_response, latency_vcache_logic
+        return is_cache_hit, cache_response, nn_metadata.response, latency_vcache_logic
 
     def dump_results_to_json(self):
         observations_dict = {}
