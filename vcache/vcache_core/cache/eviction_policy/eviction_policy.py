@@ -140,12 +140,20 @@ class EvictionPolicy(ABC):
             cache: The cache instance to perform eviction on.
         """
         if self.is_evicting_lock.acquire(blocking=False):
-            start_time: float = time.time()
-            all_metadata: List[EmbeddingMetadataObj] = (
-                cache.get_all_embedding_metadata_objects()
-            )
-            victims: List[int] = self.select_victims(all_metadata)
-            self.executor.submit(self._evict_victims, cache, victims, start_time)
+            try:
+                self.logger.info("Eviction lock acquired")
+                start_time: float = time.time()
+                all_metadata: List[EmbeddingMetadataObj] = (
+                    cache.get_all_embedding_metadata_objects()
+                )
+                victims: List[int] = self.select_victims(all_metadata)
+                self.executor.submit(self._evict_victims, cache, victims, start_time)
+            except Exception as e:
+                self.logger.error(
+                    f"Error during victim selection: {e}. Releasing lock."
+                )
+                self.is_evicting_lock.release()
+                raise e
 
     def _evict_victims(
         self, cache: "Cache", victims: List[int], start_time: float
@@ -184,4 +192,5 @@ class EvictionPolicy(ABC):
             )
             return evicted_count, remaining_count
         finally:
+            self.logger.info("Eviction lock released")
             self.is_evicting_lock.release()

@@ -352,7 +352,7 @@ class VerifiedDecisionPolicy(VCachePolicy):
             return
 
         try:
-            self.bayesian.update_metadata(
+            self.bayesian.add_observation_to_metadata(
                 similarity_score=similarity_score,
                 is_correct=should_have_exploited,
                 metadata=latest_metdata_object,
@@ -451,7 +451,7 @@ class _Algorithm:
             48: 0.01531,
         }
 
-    def update_metadata(
+    def add_observation_to_metadata(
         self, similarity_score: float, is_correct: bool, metadata: EmbeddingMetadataObj
     ) -> None:
         """
