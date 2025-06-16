@@ -182,7 +182,8 @@ class EvictionPolicy(ABC):
 
             for victim_id in victims:
                 cache.remove(victim_id)
-                self.logger.info(f"Removed item with embedding_id: {victim_id}")
+
+            self.logger.info(f"Removed victims with embedding_ids: {victims}")
 
             evicted_count: int = len(victims)
             remaining_count: int = cache.vector_db_size()
