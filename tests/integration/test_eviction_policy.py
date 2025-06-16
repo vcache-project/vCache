@@ -189,6 +189,92 @@ class TestEvictionPolicy(unittest.TestCase):
         # so the call count should still be 1.
         self.assertEqual(process_request_spy.call_count, 1)
 
+    def test_invalid_watermark_resets_to_default(self):
+        """
+        Verify that creating a policy with an invalid watermark (e.g., > 1)
+        causes it to reset to a safe default value.
+        """
+        with self.assertLogs(
+            "vcache.vcache_core.cache.eviction_policy.eviction_policy", level="WARNING"
+        ) as cm:
+            policy = LRUEvictionPolicy(max_size=10, watermark=1.5)
+            self.assertEqual(policy.watermark, 0.95)
+            self.assertIn("Watermark must be in (0,1]. Setting to 0.95.", cm.output[0])
+
+    def test_invalid_eviction_percentage_resets_to_default(self):
+        """
+        Verify that creating a policy with an invalid eviction percentage
+        (e.g., < 0) causes it to reset to a safe default value.
+        """
+        with self.assertLogs(
+            "vcache.vcache_core.cache.eviction_policy.eviction_policy", level="WARNING"
+        ) as cm:
+            policy = LRUEvictionPolicy(max_size=10, eviction_percentage=-0.5)
+            self.assertEqual(policy.eviction_percentage, 0.1)
+            self.assertIn(
+                "Eviction percentage must be in (0,1]. Setting to 0.1.", cm.output[0]
+            )
+
+    def test_lock_is_released_on_victim_selection_failure(self):
+        """
+        Ensure that if an exception occurs during victim selection, the
+        eviction lock is released to prevent a deadlock.
+        """
+        policy = self.vcache.vcache_config.eviction_policy
+        with patch.object(
+            policy, "select_victims", side_effect=ValueError("Test Exception")
+        ):
+            with self.assertRaises(ValueError):
+                policy.evict(self.vcache.vcache_policy.cache)
+
+            self.assertFalse(policy.is_evicting())
+
+    def test_cache_miss_when_item_evicted_after_knn(self):
+        """
+        Test the race condition where an item is found by get_knn but is
+        evicted before its metadata can be fetched, ensuring a graceful fallback.
+        """
+        self.patcher.stop()  # Use the real get_knn for this test
+
+        prompt = "test prompt"
+        cached_response = "cached response"
+        new_response = "new response"
+
+        # Add an item to the cache
+        self.vcache.vcache_policy.cache.add(prompt, cached_response)
+        knn_result = self.vcache.vcache_policy.cache.get_knn(prompt, k=1)
+        self.assertIsNotNone(knn_result)
+        embedding_id = knn_result[0][1]
+
+        # Now, evict the item *after* it has been selected by get_knn
+        self.vcache.vcache_policy.cache.remove(embedding_id)
+
+        # The policy should now handle the missing metadata gracefully
+        with patch.object(
+            self.vcache.vcache_policy.inference_engine,
+            "create",
+            return_value=new_response,
+        ) as mock_create:
+            is_hit, response, _ = self.vcache.vcache_policy.process_request(
+                prompt, None
+            )
+
+            self.assertFalse(is_hit)
+            self.assertEqual(response, new_response)
+            mock_create.assert_called_once()
+
+        self.patcher.start()  # Re-enable the patch for other tests
+
+    def test_shutdown_cleans_up_resources(self):
+        """
+        Verify that the shutdown method properly terminates the background
+        worker thread pool.
+        """
+        policy = self.vcache.vcache_config.eviction_policy
+        self.assertFalse(policy.executor._shutdown)
+        policy.shutdown()
+        self.assertTrue(policy.executor._shutdown)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -44,6 +44,8 @@ class EvictionPolicy(ABC):
             watermark: The percentage of `max_size` that triggers eviction.
             eviction_percentage: The percentage of `max_size` to evict.
         """
+        self.logger: logging.Logger = logging.getLogger(__name__)
+
         if not (0 < watermark <= 1.0):
             watermark = 0.95
             self.logger.warning("Watermark must be in (0,1]. Setting to 0.95.")
@@ -56,7 +58,6 @@ class EvictionPolicy(ABC):
         self.eviction_percentage: float = eviction_percentage
         self.is_evicting_lock: threading.Lock = threading.Lock()
         self.executor: ThreadPoolExecutor = ThreadPoolExecutor(max_workers=1)
-        self.logger: logging.Logger = logging.getLogger(__name__)
 
     def shutdown(self):
         """Shuts down the eviction thread pool gracefully."""
