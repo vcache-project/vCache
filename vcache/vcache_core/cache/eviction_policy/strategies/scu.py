@@ -115,7 +115,9 @@ class SCUEvictionPolicy(EvictionPolicy):
             if meta.t_prime is None:
                 distance: float = float("inf")
             else:
-                n_obs_norm: float = len(meta.observations) / max_n_obs
+                n_obs_norm: float = (
+                    len(meta.observations) / max_n_obs if max_n_obs > 0 else 0.0
+                )
                 distance: float = math.sqrt(meta.t_prime**2 + (n_obs_norm - 1) ** 2)
             utilities.append((meta.embedding_id, distance))
         return utilities

@@ -40,7 +40,7 @@ class MRUEvictionPolicy(EvictionPolicy):
         if num_to_evict == 0:
             return []
 
-        min_datetime = datetime.min.replace(tzinfo=timezone.utc)
+        min_datetime: datetime = datetime.min.replace(tzinfo=timezone.utc)
 
         victims_metadata: List[EmbeddingMetadataObj] = heapq.nlargest(
             num_to_evict,

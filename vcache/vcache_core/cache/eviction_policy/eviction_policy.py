@@ -49,12 +49,12 @@ class EvictionPolicy(ABC):
         if not 0 < eviction_percentage <= 1.0:
             raise ValueError("Eviction percentage must be between 0 and 1.")
 
-        self.max_size = max_size
-        self.watermark = watermark
-        self.eviction_percentage = eviction_percentage
-        self.is_evicting_lock = threading.Lock()
-        self.executor = ThreadPoolExecutor(max_workers=1)
-        self.logger = logging.getLogger(__name__)
+        self.max_size: int = max_size
+        self.watermark: float = watermark
+        self.eviction_percentage: float = eviction_percentage
+        self.is_evicting_lock: threading.Lock = threading.Lock()
+        self.executor: ThreadPoolExecutor = ThreadPoolExecutor(max_workers=1)
+        self.logger: logging.Logger = logging.getLogger(__name__)
 
     def shutdown(self):
         """Shuts down the eviction thread pool gracefully."""
@@ -86,8 +86,8 @@ class EvictionPolicy(ABC):
         if self.is_evicting():
             return False
 
-        number_of_embeddings_in_cache = cache.vector_db_size()
-        watermark_threshold = self.max_size * self.watermark
+        number_of_embeddings_in_cache: int = cache.vector_db_size()
+        watermark_threshold: int = int(self.max_size * self.watermark)
 
         return number_of_embeddings_in_cache >= watermark_threshold
 
@@ -139,8 +139,10 @@ class EvictionPolicy(ABC):
         """
         if self.is_evicting_lock.acquire(blocking=False):
             start_time: float = time.time()
-            all_metadata = cache.get_all_embedding_metadata_objects()
-            victims = self.select_victims(all_metadata)
+            all_metadata: List[EmbeddingMetadataObj] = (
+                cache.get_all_embedding_metadata_objects()
+            )
+            victims: List[int] = self.select_victims(all_metadata)
             self.executor.submit(self._evict_victims, cache, victims, start_time)
 
     def _evict_victims(
@@ -171,8 +173,8 @@ class EvictionPolicy(ABC):
                 cache.remove(victim_id)
                 self.logger.info(f"Removed item with embedding_id: {victim_id}")
 
-            evicted_count = len(victims)
-            remaining_count = cache.vector_db_size()
+            evicted_count: int = len(victims)
+            remaining_count: int = cache.vector_db_size()
 
             stop_time: float = time.time()
             self.logger.info(
