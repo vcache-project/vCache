@@ -1,3 +1,4 @@
+import heapq
 from typing import List
 
 from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage.embedding_metadata_obj import (
@@ -24,8 +25,8 @@ class FIFOEvictionPolicy(EvictionPolicy):
         """
         Selects victims for eviction based on the first-in, first-out principle.
 
-        This method sorts the metadata by the created_at timestamp in ascending
-        order to find the oldest items.
+        This method efficiently finds the oldest items based on their
+        `created_at` timestamp using a heap.
 
         Args:
             all_metadata: A list of all metadata objects in the cache.
@@ -33,15 +34,17 @@ class FIFOEvictionPolicy(EvictionPolicy):
         Returns:
             A list of embedding_ids for the items to be evicted.
         """
-        sorted_metadata: List[EmbeddingMetadataObj] = sorted(
+        num_to_evict: int = int(self.max_size * self.eviction_percentage)
+        if num_to_evict == 0:
+            return []
+
+        victims_metadata: List[EmbeddingMetadataObj] = heapq.nsmallest(
+            num_to_evict,
             all_metadata,
             key=lambda meta: meta.created_at,
         )
 
-        num_to_evict: int = int(self.max_size * self.eviction_percentage)
-        victims: List[int] = [
-            meta.embedding_id for meta in sorted_metadata[:num_to_evict]
-        ]
+        victims: List[int] = [meta.embedding_id for meta in victims_metadata]
         return victims
 
     def __str__(self) -> str:
