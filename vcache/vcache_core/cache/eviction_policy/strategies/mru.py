@@ -1,5 +1,5 @@
 import heapq
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List
 
 from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage.embedding_metadata_obj import (
@@ -20,7 +20,7 @@ class MRUEvictionPolicy(EvictionPolicy):
         """
         Updates the last_accessed timestamp of the metadata object to the current time.
         """
-        metadata.last_accessed = datetime.now()
+        metadata.last_accessed = datetime.now(timezone.utc)
 
     def select_victims(self, all_metadata: List[EmbeddingMetadataObj]) -> List[int]:
         """
@@ -40,12 +40,14 @@ class MRUEvictionPolicy(EvictionPolicy):
         if num_to_evict == 0:
             return []
 
+        min_datetime = datetime.min.replace(tzinfo=timezone.utc)
+
         victims_metadata: List[EmbeddingMetadataObj] = heapq.nlargest(
             num_to_evict,
             all_metadata,
             key=lambda meta: meta.last_accessed
             if meta.last_accessed is not None
-            else datetime.min,
+            else min_datetime,
         )
 
         victims: List[int] = [meta.embedding_id for meta in victims_metadata]

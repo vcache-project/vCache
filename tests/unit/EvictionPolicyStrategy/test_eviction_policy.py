@@ -1,6 +1,6 @@
 import time
 import unittest
-from datetime import datetime
+from datetime import datetime, timezone
 from unittest.mock import MagicMock
 
 from vcache.vcache_core.cache.eviction_policy.strategies.fifo import (
@@ -31,7 +31,7 @@ class TestEvictionPolicyStrategies(unittest.TestCase):
         for i in range(5):
             mock_meta = MagicMock()
             mock_meta.embedding_id = i
-            mock_meta.created_at = datetime.now()
+            mock_meta.created_at = datetime.now(timezone.utc)
             mock_meta.last_accessed = mock_meta.created_at
             self.metadata.append(mock_meta)
             time.sleep(0.01)  # Ensure timestamps are distinct

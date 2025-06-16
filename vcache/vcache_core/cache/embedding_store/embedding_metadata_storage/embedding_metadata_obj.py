@@ -1,5 +1,5 @@
-from datetime import datetime
-from typing import List, Tuple
+from datetime import datetime, timezone
+from typing import List, Optional, Tuple
 
 
 class EmbeddingMetadataObj:
@@ -11,7 +11,7 @@ class EmbeddingMetadataObj:
         self,
         embedding_id: int,
         response: str,
-        last_accessed: datetime = datetime.now(),
+        last_accessed: Optional[datetime] = None,
     ):
         """
         Initialize embedding metadata object.
@@ -22,7 +22,8 @@ class EmbeddingMetadataObj:
             prior: Prior distribution for Bayesian inference.
             posterior: Posterior distribution for Bayesian inference.
             region_reject: List of rejection regions for heuristic policy.
-            last_accessed: Timestamp of last access to this embedding.
+            last_accessed: Timestamp of last access to this embedding. If not
+                           provided, the current time in UTC is used.
         """
 
         #### Core metadata ###################################################
@@ -39,8 +40,10 @@ class EmbeddingMetadataObj:
         self.var_t: float = None
 
         #### Metadata for the eviction policy ################################
-        self.last_accessed: datetime = last_accessed
-        self.created_at: datetime = datetime.now()
+        self.last_accessed: Optional[datetime] = (
+            last_accessed if last_accessed is not None else datetime.now(timezone.utc)
+        )
+        self.created_at: datetime = datetime.now(timezone.utc)
         self.usage_count: int = 0
 
     def __eq__(self, other):
