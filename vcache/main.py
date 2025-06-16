@@ -1,3 +1,4 @@
+import copy
 from typing import List, Optional, Tuple
 
 from vcache.config import VCacheConfig
@@ -69,7 +70,11 @@ class VCache:
 
         if self.vcache_config.eviction_policy.is_evicting():
             response = self.__generate_response(prompt, system_prompt)
-            return False, response, response
+            return (
+                False,
+                response,
+                EmbeddingMetadataObj(embedding_id=-1, response=response),
+            )
 
         is_cache_hit, response, nn_metadata = self.vcache_policy.process_request(
             prompt, system_prompt
@@ -78,10 +83,14 @@ class VCache:
         if nn_metadata is not None:
             self.vcache_config.eviction_policy.update_eviction_metadata(nn_metadata)
 
+        nn_metadata_copy: Optional[EmbeddingMetadataObj] = (
+            copy.deepcopy(nn_metadata) if nn_metadata is not None else None
+        )
+
         if self.vcache_config.eviction_policy.ready_to_evict(self.vcache_policy.cache):
             self.vcache_config.eviction_policy.evict(self.vcache_policy.cache)
 
-        return is_cache_hit, response, nn_metadata
+        return is_cache_hit, response, nn_metadata_copy
 
     def __generate_response(self, prompt: str, system_prompt: str) -> str:
         response = self.vcache_policy.inference_engine.create(prompt, system_prompt)
