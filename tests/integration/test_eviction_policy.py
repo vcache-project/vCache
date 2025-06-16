@@ -66,7 +66,8 @@ class TestEvictionPolicy(unittest.TestCase):
         Verify that items are added to the cache and eviction is NOT
         triggered before the watermark is reached.
         """
-        for i in range(self.watermark_limit):
+        # Fill the cache to just below the watermark limit
+        for i in range(self.watermark_limit - 1):
             prompt = f"prompt {i}"
             with patch.object(
                 self.vcache.vcache_policy.inference_engine,
@@ -75,18 +76,22 @@ class TestEvictionPolicy(unittest.TestCase):
             ):
                 self.vcache.infer(prompt=prompt)
 
-            self.assertEqual(self.vcache.vcache_policy.cache.vector_db_size(), i)
+            self.assertEqual(self.vcache.vcache_policy.cache.vector_db_size(), i + 1)
 
+        # At this point, the cache size should be one less than the watermark limit
+        # and no eviction should have occurred.
         self.assertEqual(
-            self.vcache.vcache_policy.cache.vector_db_size(), self.watermark_limit
+            self.vcache.vcache_policy.cache.vector_db_size(),
+            self.watermark_limit - 1,
         )
 
-    def test_eviction_triggers_after_watermark(self):
+    def test_eviction_triggers_at_watermark(self):
         """
         Confirm that the eviction process runs automatically when the
-        cache size exceeds the watermark.
+        cache size hits the watermark.
         """
-        for i in range(self.watermark_limit):
+        # Fill the cache to just below the watermark
+        for i in range(self.watermark_limit - 1):
             prompt = f"prompt {i}"
             with patch.object(
                 self.vcache.vcache_policy.inference_engine,
@@ -95,6 +100,7 @@ class TestEvictionPolicy(unittest.TestCase):
             ):
                 self.vcache.infer(prompt=prompt)
 
+        # This call should push the cache size to the watermark and trigger eviction
         trigger_prompt = "prompt trigger"
         with patch.object(
             self.vcache.vcache_policy.inference_engine,
@@ -103,9 +109,10 @@ class TestEvictionPolicy(unittest.TestCase):
         ):
             self.vcache.infer(prompt=trigger_prompt)
 
-        time.sleep(1)
+        time.sleep(1)  # Allow time for background eviction to complete
 
-        expected_size = self.watermark_limit + 1 - self.num_to_evict
+        # The size should be the watermark limit minus the number of evicted items
+        expected_size = self.watermark_limit - self.num_to_evict
         self.assertEqual(
             self.vcache.vcache_policy.cache.vector_db_size(), expected_size
         )
@@ -163,8 +170,8 @@ class TestEvictionPolicy(unittest.TestCase):
             "_evict_victims",
             side_effect=slow_evict_victims,
         ):
-            # Fill the cache up to the watermark limit
-            for i in range(self.watermark_limit):
+            # Fill the cache up to just before the watermark limit
+            for i in range(self.watermark_limit - 1):
                 self.vcache.infer(prompt=f"prompt {i}")
 
             # Reset the spy to ignore the calls from filling the cache
@@ -172,12 +179,14 @@ class TestEvictionPolicy(unittest.TestCase):
 
             # This call will trigger the slow eviction in the background
             self.vcache.infer(prompt="prompt trigger")
+            # The spy should be called for the trigger
+            self.assertEqual(process_request_spy.call_count, 1)
 
             # This call should happen during the eviction
             self.vcache.infer(prompt="prompt during eviction")
 
         # The request during eviction should bypass the core logic,
-        # so process_request should only have been called for the trigger.
+        # so the call count should still be 1.
         self.assertEqual(process_request_spy.call_count, 1)
 
 
