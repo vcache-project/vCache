@@ -16,6 +16,8 @@ class MRUEvictionPolicy(EvictionPolicy):
     useful in scenarios where older items are more likely to be re-accessed.
     """
 
+    _MIN_DATETIME: datetime = datetime.min.replace(tzinfo=timezone.utc)
+
     def update_eviction_metadata(self, metadata: EmbeddingMetadataObj) -> None:
         """
         Updates the last_accessed timestamp of the metadata object to the current time.
@@ -40,14 +42,12 @@ class MRUEvictionPolicy(EvictionPolicy):
         if num_to_evict == 0:
             return []
 
-        min_datetime: datetime = datetime.min.replace(tzinfo=timezone.utc)
-
         victims_metadata: List[EmbeddingMetadataObj] = heapq.nlargest(
             num_to_evict,
             all_metadata,
             key=lambda meta: meta.last_accessed
             if meta.last_accessed is not None
-            else min_datetime,
+            else self._MIN_DATETIME,
         )
 
         victims: List[int] = [meta.embedding_id for meta in victims_metadata]

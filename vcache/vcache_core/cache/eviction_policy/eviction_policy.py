@@ -63,7 +63,19 @@ class EvictionPolicy(ABC):
         atexit.register(self.shutdown)
 
     def shutdown(self):
-        """Shuts down the eviction thread pool gracefully."""
+        """Shuts down the eviction thread pool gracefully.
+
+        This method ensures that the thread pool executor used for eviction
+        operations is properly shut down, releasing any resources and waiting
+        for all running tasks to complete. It is safe to call this method
+        multiple times; shutdown will only occur once.
+
+        This method is automatically registered to run at program exit,
+        but can also be called manually if needed.
+
+        Returns:
+            None
+        """
         if not self._is_shutdown:
             self.logger.info("Shutting down eviction thread pool.")
             self.executor.shutdown(wait=True)
