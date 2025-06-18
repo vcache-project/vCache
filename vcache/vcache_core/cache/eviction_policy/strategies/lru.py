@@ -18,14 +18,15 @@ class LRUEvictionPolicy(EvictionPolicy):
     _MIN_DATETIME: datetime = datetime.min.replace(tzinfo=timezone.utc)
 
     def update_eviction_metadata(self, metadata: EmbeddingMetadataObj) -> None:
-        """
-        Updates the last_accessed timestamp of the metadata object to the current time.
+        """Updates the metadata object's last-accessed timestamp.
+
+        Args:
+            metadata (EmbeddingMetadataObj): The metadata object to update.
         """
         metadata.last_accessed: datetime = datetime.now(timezone.utc)
 
     def select_victims(self, all_metadata: List[EmbeddingMetadataObj]) -> List[int]:
-        """
-        Selects victims for eviction based on the least recently used principle.
+        """Selects victims for eviction based on the LRU principle.
 
         This method efficiently finds the items with the smallest `last_accessed`
         timestamps using a heap. Items that have `None` for `last_accessed`
@@ -33,10 +34,11 @@ class LRUEvictionPolicy(EvictionPolicy):
         the oldest and are prioritized for eviction.
 
         Args:
-            all_metadata: A list of all metadata objects in the cache.
+            all_metadata (List[EmbeddingMetadataObj]): A list of all metadata
+                objects in the cache.
 
         Returns:
-            A list of embedding_ids for the items to be evicted.
+            List[int]: A list of embedding IDs for the items to be evicted.
         """
         num_to_evict: int = int(self.max_size * self.eviction_percentage)
         if num_to_evict == 0:
@@ -54,11 +56,10 @@ class LRUEvictionPolicy(EvictionPolicy):
         return victims
 
     def __str__(self) -> str:
-        """
-        Returns a string representation of the LRUEvictionPolicy instance.
+        """Returns a string representation of the LRUEvictionPolicy.
 
         Returns:
-            A string representation of the LRUEvictionPolicy instance.
+            str: A string representation of the instance.
         """
         return (
             f"LRUEvictionPolicy(max_size={self.max_size}, "

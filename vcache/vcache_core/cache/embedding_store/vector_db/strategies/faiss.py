@@ -17,11 +17,11 @@ class FAISSVectorDB(VectorDB):
     def __init__(
         self, similarity_metric_type: SimilarityMetricType = SimilarityMetricType.COSINE
     ):
-        """
-        Initialize FAISS vector database.
+        """Initializes the FAISS vector database.
 
         Args:
-            similarity_metric_type: The similarity metric to use for comparisons.
+            similarity_metric_type (SimilarityMetricType): The similarity metric
+                to use for comparisons.
         """
         self.similarity_metric_type = similarity_metric_type
         self.__next_embedding_id = 0
@@ -30,15 +30,14 @@ class FAISSVectorDB(VectorDB):
     def transform_similarity_score(
         self, similarity_score: float, metric_type: str
     ) -> float:
-        """
-        Transform similarity score based on the metric type.
+        """Transforms a raw similarity score based on the metric type.
 
         Args:
-            similarity_score: The raw similarity score.
-            metric_type: The type of similarity metric used.
+            similarity_score (float): The raw similarity score.
+            metric_type (str): The similarity metric used (e.g., 'cosine').
 
         Returns:
-            The transformed similarity score.
+            float: The transformed similarity score.
 
         Raises:
             ValueError: If the similarity metric type is invalid.
@@ -52,14 +51,13 @@ class FAISSVectorDB(VectorDB):
                 raise ValueError(f"Invalid similarity metric type: {metric_type}")
 
     def add(self, embedding: List[float]) -> int:
-        """
-        Add an embedding vector to the database.
+        """Adds an embedding vector to the database.
 
         Args:
-            embedding: The embedding vector to add.
+            embedding (List[float]): The embedding vector to add.
 
         Returns:
-            The unique ID assigned to the added embedding.
+            int: The unique ID assigned to the added embedding.
         """
         if self.index is None:
             self._init_vector_store(len(embedding))
@@ -75,17 +73,16 @@ class FAISSVectorDB(VectorDB):
         return id
 
     def remove(self, embedding_id: int) -> int:
-        """
-        Remove an embedding from the database.
+        """Removes an embedding from the database.
 
         Args:
-            embedding_id: The ID of the embedding to remove.
+            embedding_id (int): The ID of the embedding to remove.
 
         Returns:
-            The ID of the removed embedding.
+            int: The ID of the removed embedding.
 
         Raises:
-            ValueError: If the index is not initialized.
+            ValueError: If the index has not been initialized.
         """
         if self.index is None:
             raise ValueError("Index is not initialized")
@@ -96,18 +93,18 @@ class FAISSVectorDB(VectorDB):
         return embedding_id
 
     def get_knn(self, embedding: List[float], k: int) -> List[tuple[float, int]]:
-        """
-        Get k-nearest neighbors for the given embedding.
+        """Gets k-nearest neighbors for a given embedding.
 
         Args:
-            embedding: The query embedding vector.
-            k: The number of nearest neighbors to return.
+            embedding (List[float]): The query embedding vector.
+            k (int): The number of nearest neighbors to return.
 
         Returns:
-            List of tuples containing similarity scores and embedding IDs.
+            List[tuple[float, int]]: A list of tuples containing similarity
+            scores and embedding IDs.
 
         Raises:
-            ValueError: If the index is not initialized.
+            ValueError: If the index has not been initialized.
         """
         if self.index is None:
             raise ValueError("Index is not initialized")
@@ -132,20 +129,17 @@ class FAISSVectorDB(VectorDB):
         ]
 
     def reset(self) -> None:
-        """
-        Reset the vector database to empty state.
-        """
+        """Resets the vector database to an empty state."""
         if self.index is not None:
             dim = self.index.d
             self._init_vector_store(dim)
         self.__next_embedding_id = 0
 
     def _init_vector_store(self, embedding_dim: int):
-        """
-        Initialize the FAISS index with the given embedding dimension.
+        """Initializes the FAISS index.
 
         Args:
-            embedding_dim: The dimension of the embedding vectors.
+            embedding_dim (int): The dimension of the embedding vectors.
 
         Raises:
             ValueError: If the similarity metric type is invalid.
@@ -161,19 +155,17 @@ class FAISSVectorDB(VectorDB):
         self.index = faiss.index_factory(embedding_dim, "IDMap,Flat", faiss_metric)
 
     def is_empty(self) -> bool:
-        """
-        Check if the vector database is empty.
+        """Checks if the vector database is empty.
 
         Returns:
-            True if the database contains no embeddings, False otherwise.
+            bool: True if the database contains no embeddings, False otherwise.
         """
         return self.index.ntotal == 0
 
     def size(self) -> int:
-        """
-        Get the number of embeddings in the vector database.
+        """Gets the number of embeddings in the vector database.
 
         Returns:
-            The number of embeddings in the vector database.
+            int: The number of embeddings in the vector database.
         """
         return self.index.ntotal

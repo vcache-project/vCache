@@ -19,24 +19,26 @@ class MRUEvictionPolicy(EvictionPolicy):
     _MIN_DATETIME: datetime = datetime.min.replace(tzinfo=timezone.utc)
 
     def update_eviction_metadata(self, metadata: EmbeddingMetadataObj) -> None:
-        """
-        Updates the last_accessed timestamp of the metadata object to the current time.
+        """Updates the metadata object's last-accessed timestamp.
+
+        Args:
+            metadata (EmbeddingMetadataObj): The metadata object to update.
         """
         metadata.last_accessed = datetime.now(timezone.utc)
 
     def select_victims(self, all_metadata: List[EmbeddingMetadataObj]) -> List[int]:
-        """
-        Selects victims for eviction based on the most recently used principle.
+        """Selects victims for eviction based on the MRU principle.
 
         This method efficiently finds the items with the largest `last_accessed`
         timestamps using a heap. Items that have `None` for `last_accessed`
         are treated as the oldest and are not prioritized for eviction.
 
         Args:
-            all_metadata: A list of all metadata objects in the cache.
+            all_metadata (List[EmbeddingMetadataObj]): A list of all metadata
+                objects in the cache.
 
         Returns:
-            A list of embedding_ids for the items to be evicted.
+            List[int]: A list of embedding IDs for the items to be evicted.
         """
         num_to_evict: int = int(self.max_size * self.eviction_percentage)
         if num_to_evict == 0:
@@ -54,11 +56,10 @@ class MRUEvictionPolicy(EvictionPolicy):
         return victims
 
     def __str__(self) -> str:
-        """
-        Returns a string representation of the MRUEvictionPolicy instance.
+        """Returns a string representation of the MRUEvictionPolicy.
 
         Returns:
-            A string representation of the MRUEvictionPolicy instance.
+            str: A string representation of the instance.
         """
         return (
             f"MRUEvictionPolicy(max_size={self.max_size}, "

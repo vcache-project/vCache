@@ -15,24 +15,21 @@ class FIFOEvictionPolicy(EvictionPolicy):
     """
 
     def update_eviction_metadata(self, metadata: EmbeddingMetadataObj) -> None:
-        """
-        This method is not used in the FIFO policy, as eviction is based purely
-        on insertion order.
-        """
+        """This method is not used in the FIFO policy."""
         pass
 
     def select_victims(self, all_metadata: List[EmbeddingMetadataObj]) -> List[int]:
-        """
-        Selects victims for eviction based on the first-in, first-out principle.
+        """Selects victims for eviction based on the FIFO principle.
 
         This method efficiently finds the oldest items based on their
         `created_at` timestamp using a heap.
 
         Args:
-            all_metadata: A list of all metadata objects in the cache.
+            all_metadata (List[EmbeddingMetadataObj]): A list of all metadata
+                objects in the cache.
 
         Returns:
-            A list of embedding_ids for the items to be evicted.
+            List[int]: A list of embedding IDs for the items to be evicted.
         """
         num_to_evict: int = int(self.max_size * self.eviction_percentage)
         if num_to_evict == 0:
@@ -48,11 +45,10 @@ class FIFOEvictionPolicy(EvictionPolicy):
         return victims
 
     def __str__(self) -> str:
-        """
-        Returns a string representation of the FIFOEvictionPolicy instance.
+        """Returns a string representation of the FIFOEvictionPolicy.
 
         Returns:
-            A string representation of the FIFOEvictionPolicy instance.
+            str: A string representation of the instance.
         """
         return (
             f"FIFOEvictionPolicy(max_size={self.max_size}, "

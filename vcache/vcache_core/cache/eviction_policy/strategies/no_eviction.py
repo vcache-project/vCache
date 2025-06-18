@@ -27,7 +27,7 @@ class NoEvictionPolicy(EvictionPolicy):
         """This policy is never evicting."""
         return False
 
-    def ready_to_evict(self, cache) -> bool:
+    def ready_to_evict(self, cache: "Cache") -> bool:
         """This policy is never ready to evict."""
         return False
 
@@ -44,10 +44,9 @@ class NoEvictionPolicy(EvictionPolicy):
         pass
 
     def __str__(self) -> str:
-        """
-        Returns a string representation of the NoEvictionPolicy instance.
+        """Returns a string representation of the NoEvictionPolicy.
 
         Returns:
-            A string representation of the NoEvictionPolicy instance.
+            str: A string representation of the instance.
         """
         return "NoEvictionPolicy()"

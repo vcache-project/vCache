@@ -13,17 +13,14 @@ class EmbeddingMetadataObj:
         response: str,
         last_accessed: Optional[datetime] = None,
     ):
-        """
-        Initialize embedding metadata object.
+        """Initializes the embedding metadata object.
 
         Args:
-            embedding_id: Unique identifier for the embedding.
-            response: The response associated with the embedding.
-            prior: Prior distribution for Bayesian inference.
-            posterior: Posterior distribution for Bayesian inference.
-            region_reject: List of rejection regions for heuristic policy.
-            last_accessed: Timestamp of last access to this embedding. If not
-                           provided, the current time in UTC is used.
+            embedding_id (int): The unique identifier for the embedding.
+            response (str): The response associated with the embedding.
+            last_accessed (Optional[datetime]): The timestamp of the last access
+                to this embedding. If not provided, the current time in UTC is
+                used.
         """
 
         #### Core metadata ###################################################
@@ -46,15 +43,14 @@ class EmbeddingMetadataObj:
         self.created_at: datetime = datetime.now(timezone.utc)
         self.usage_count: int = 0
 
-    def __eq__(self, other):
-        """
-        Check equality with another EmbeddingMetadataObj.
+    def __eq__(self, other: object) -> bool:
+        """Checks for equality with another EmbeddingMetadataObj.
 
         Args:
-            other: The other object to compare with.
+            other (object): The object to compare with.
 
         Returns:
-            True if objects are equal, False otherwise.
+            bool: True if the objects are equal, False otherwise.
         """
         if not isinstance(other, EmbeddingMetadataObj):
             return False
@@ -64,12 +60,11 @@ class EmbeddingMetadataObj:
             and self.last_accessed == other.last_accessed
         )
 
-    def __repr__(self):
-        """
-        Return string representation of the embedding metadata object.
+    def __repr__(self) -> str:
+        """Returns a string representation of the object.
 
         Returns:
-            String representation of the object.
+            str: A string representation of the EmbeddingMetadataObj.
         """
         return f"""
         EmbeddingMetadataObj(
