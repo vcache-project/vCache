@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import atexit
 import logging
 import threading
 import time
@@ -58,10 +59,15 @@ class EvictionPolicy(ABC):
         self.eviction_percentage: float = eviction_percentage
         self.is_evicting_lock: threading.Lock = threading.Lock()
         self.executor: ThreadPoolExecutor = ThreadPoolExecutor(max_workers=1)
+        self._is_shutdown = False
+        atexit.register(self.shutdown)
 
     def shutdown(self):
         """Shuts down the eviction thread pool gracefully."""
-        self.executor.shutdown(wait=True)
+        if not self._is_shutdown:
+            self.logger.info("Shutting down eviction thread pool.")
+            self.executor.shutdown(wait=True)
+            self._is_shutdown = True
 
     def is_evicting(self) -> bool:
         """

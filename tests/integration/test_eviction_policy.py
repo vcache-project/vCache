@@ -265,15 +265,25 @@ class TestEvictionPolicy(unittest.TestCase):
 
         self.patcher.start()  # Re-enable the patch for other tests
 
-    def test_shutdown_cleans_up_resources(self):
+    def test_shutdown_is_idempotent(self):
         """
-        Verify that the shutdown method properly terminates the background
-        worker thread pool.
+        Verify that the shutdown method can be called multiple times without error.
         """
         policy = self.vcache.vcache_config.eviction_policy
-        self.assertFalse(policy.executor._shutdown)
+        self.assertFalse(policy._is_shutdown)
         policy.shutdown()
-        self.assertTrue(policy.executor._shutdown)
+        self.assertTrue(policy._is_shutdown)
+        policy.shutdown()  # Second call should not raise an error
+        self.assertTrue(policy._is_shutdown)
+
+    @patch("atexit.register")
+    def test_shutdown_is_registered_on_init(self, mock_atexit_register):
+        """
+        Verify that the policy's shutdown method is registered with atexit
+        during initialization to ensure cleanup.
+        """
+        policy = LRUEvictionPolicy(max_size=10)
+        mock_atexit_register.assert_called_once_with(policy.shutdown)
 
 
 if __name__ == "__main__":
