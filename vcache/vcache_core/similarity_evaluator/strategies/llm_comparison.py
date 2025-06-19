@@ -1,3 +1,6 @@
+from vcache.vcache_core.cache.embedding_store.embedding_store import (
+    EmbeddingMetadataObj,
+)
 from vcache.vcache_core.similarity_evaluator.similarity_evaluator import (
     SimilarityEvaluator,
 )
@@ -14,13 +17,21 @@ class LLMComparisonSimilarityEvaluator(SimilarityEvaluator):
         """
         super().__init__()
 
-    def answers_similar(self, a: str, b: str) -> bool:
+    def answers_similar(
+        self,
+        a: str,
+        b: str,
+        metadata_a: EmbeddingMetadataObj = None,
+        metadata_b: EmbeddingMetadataObj = None,
+    ) -> bool:
         """
         Check if two answers are similar using LLM-judge comparison.
 
         Args:
             a: The first answer to compare.
             b: The second answer to compare.
+            metadata_a: The metadata of the first answer (used for benchmark evaluation).
+            metadata_b: The metadata of the second answer (used for benchmark evaluation).
 
         Returns:
             True if the answers are similar, False otherwise.

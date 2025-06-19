@@ -37,6 +37,9 @@ from vcache.vcache_core.cache.embedding_store.vector_db import (
 from vcache.vcache_core.cache.eviction_policy.eviction_policy import EvictionPolicy
 from vcache.vcache_core.cache.eviction_policy.strategies.scu import SCUEvictionPolicy
 from vcache.vcache_core.similarity_evaluator import SimilarityEvaluator
+from vcache.vcache_core.similarity_evaluator.strategies.benchmark_comparison import (
+    BenchmarkComparisonSimilarityEvaluator,
+)
 from vcache.vcache_core.similarity_evaluator.strategies.string_comparison import (
     StringComparisonSimilarityEvaluator,
 )
@@ -122,7 +125,7 @@ RUN_COMBINATIONS: List[
         LargeLanguageModel.LLAMA_3_8B,
         Dataset.SEM_BENCHMARK_ARENA,
         GeneratePlotsOnly.NO,
-        StringComparisonSimilarityEvaluator(),
+        BenchmarkComparisonSimilarityEvaluator(),
         SCUEvictionPolicy(max_size=500, watermark=0.99, eviction_percentage=0.1),
     ),
     (
@@ -130,7 +133,7 @@ RUN_COMBINATIONS: List[
         LargeLanguageModel.LLAMA_3_8B,
         Dataset.SEM_BENCHMARK_SEARCH_QUERIES,
         GeneratePlotsOnly.NO,
-        StringComparisonSimilarityEvaluator(),
+        BenchmarkComparisonSimilarityEvaluator(),
         SCUEvictionPolicy(max_size=500, watermark=0.99, eviction_percentage=0.1),
     ),
     (
