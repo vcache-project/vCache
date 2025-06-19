@@ -109,8 +109,8 @@ class GeneratePlotsOnly(Enum):
 ########################################################################################################################
 
 
-MAX_SAMPLES: int = 20000
-CONFIDENCE_INTERVALS_ITERATIONS: int = 5
+MAX_SAMPLES: int = 10000
+CONFIDENCE_INTERVALS_ITERATIONS: int = 1
 DISABLE_PROGRESS_BAR: bool = False
 KEEP_SPLIT: int = 100
 
@@ -120,11 +120,27 @@ RUN_COMBINATIONS: List[
     (
         EmbeddingModel.GTE,
         LargeLanguageModel.LLAMA_3_8B,
+        Dataset.SEM_BENCHMARK_ARENA,
+        GeneratePlotsOnly.NO,
+        StringComparisonSimilarityEvaluator(),
+        SCUEvictionPolicy(max_size=500, watermark=0.99, eviction_percentage=0.1),
+    ),
+    (
+        EmbeddingModel.GTE,
+        LargeLanguageModel.LLAMA_3_8B,
+        Dataset.SEM_BENCHMARK_SEARCH_QUERIES,
+        GeneratePlotsOnly.NO,
+        StringComparisonSimilarityEvaluator(),
+        SCUEvictionPolicy(max_size=500, watermark=0.99, eviction_percentage=0.1),
+    ),
+    (
+        EmbeddingModel.GTE,
+        LargeLanguageModel.LLAMA_3_8B,
         Dataset.SEM_BENCHMARK_CLASSIFICATION,
         GeneratePlotsOnly.NO,
         StringComparisonSimilarityEvaluator(),
         SCUEvictionPolicy(max_size=500, watermark=0.99, eviction_percentage=0.1),
-    )
+    ),
 ]
 
 BASELINES_TO_RUN: List[Baseline] = [
@@ -158,7 +174,7 @@ STATIC_THRESHOLDS: List[float] = [
 ]
 
 DELTAS: List[float] = [
-    0.01
+    0.05
 ]  # , 0.015, 0.02, 0.025, 0.03, 0.035, 0.04, 0.05, 0.06, 0.07]
 
 MAX_VECTOR_DB_CAPACITY: int = 100000
@@ -371,10 +387,19 @@ class Benchmark(unittest.TestCase):
         label_response: str,
         system_prompt: str,
         id_set: int,
-    ) -> Tuple[bool, str, str, float]:
+    ) -> Tuple[bool, str, EmbeddingMetadataObj, EmbeddingMetadataObj, float]:
         """
-        Returns: Tuple[bool, str, str, float] - [is_cache_hit, cache_response, nn_response, latency_vcache_logic]
+        Returns: Tuple[bool, str, EmbeddingMetadataObj, EmbeddingMetadataObj, float] - [is_cache_hit, cache_response, response_metadata, nn_metadata, latency_vcache_logic]
         """
+        if isinstance(candidate_embedding, str):
+            try:
+                candidate_embedding = json.loads(candidate_embedding)
+            except json.JSONDecodeError:
+                print("Error loading embedding from string")
+                import ast
+
+                candidate_embedding = ast.literal_eval(candidate_embedding)
+
         if isinstance(candidate_embedding, torch.Tensor):
             candidate_embedding = candidate_embedding.tolist()
         elif isinstance(candidate_embedding, np.ndarray):
