@@ -272,7 +272,12 @@ class Benchmark(unittest.TestCase):
         try:
             if "/" in self.filepath:
                 logging.info(f"Loading Hugging Face dataset: {self.filepath}")
-                data_iterator = load_dataset(self.filepath, split="train")
+                data_iterator = load_dataset(self.filepath)
+                if isinstance(data_iterator, dict):
+                    if "train" in data_iterator:
+                        data_iterator = data_iterator["train"]
+                    else:
+                        data_iterator = next(iter(data_iterator.values()))
                 self.run_benchmark_loop(data_iterator)
             else:
                 logging.info(f"Loading local dataset: {self.filepath}")
