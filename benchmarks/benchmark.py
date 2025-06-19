@@ -234,15 +234,19 @@ class Benchmark(unittest.TestCase):
 
             label_id_set: int = data_entry.get("id_set", -1)
 
-            is_cache_hit, cache_response, nn_metadata, latency_vcache_logic = (
-                self.get_vcache_answer(
-                    task=task,
-                    review_text=review_text,
-                    candidate_embedding=candidate_embedding,
-                    label_response=label_response,
-                    system_prompt=system_prompt,
-                    id_set=label_id_set,
-                )
+            (
+                is_cache_hit,
+                cache_response,
+                response_metadata,
+                nn_metadata,
+                latency_vcache_logic,
+            ) = self.get_vcache_answer(
+                task=task,
+                review_text=review_text,
+                candidate_embedding=candidate_embedding,
+                label_response=label_response,
+                system_prompt=system_prompt,
+                id_set=label_id_set,
             )
             latency_vcache: float = latency_vcache_logic + emb_generation_latency
             if not is_cache_hit:
@@ -257,6 +261,7 @@ class Benchmark(unittest.TestCase):
                 label_response=label_response,
                 cache_response=cache_response,
                 label_id_set=label_id_set,
+                response_metadata=response_metadata,
                 nn_metadata=nn_metadata,
                 latency_direct=latency_direct,
                 latency_vcache=latency_vcache,
@@ -309,6 +314,7 @@ class Benchmark(unittest.TestCase):
         label_response: str,
         cache_response: str,
         label_id_set: int,
+        response_metadata: EmbeddingMetadataObj,
         nn_metadata: EmbeddingMetadataObj,
         latency_direct: float,
         latency_vcache: float,
@@ -316,9 +322,15 @@ class Benchmark(unittest.TestCase):
         if is_cache_hit:  # If cache hit, the actual response is the nearest neighbor response (cache_response == nn_response)
             self.cache_hit_list.append(1)
             self.cache_miss_list.append(0)
-            cache_response_correct: bool = answers_have_same_meaning_static(
-                label_response, cache_response
-            )
+
+            equality_check_with_id_set: bool = label_id_set != -1
+            if equality_check_with_id_set:
+                cache_response_correct: bool = label_id_set == response_metadata.id_set
+            else:
+                cache_response_correct: bool = answers_have_same_meaning_static(
+                    label_response, cache_response
+                )
+
             if cache_response_correct:
                 self.tp_list.append(1)
                 self.fp_list.append(0)
@@ -382,7 +394,7 @@ class Benchmark(unittest.TestCase):
         prompt = f"{task} {review_text}"
         latency_vcache_logic: float = time.time()
         try:
-            is_cache_hit, cache_response, nn_metadata = (
+            is_cache_hit, cache_response, response_metadata, nn_metadata = (
                 self.vcache.infer_with_cache_info(
                     prompt=prompt,
                     system_prompt=system_prompt,
@@ -396,7 +408,13 @@ class Benchmark(unittest.TestCase):
             raise e
 
         latency_vcache_logic = time.time() - latency_vcache_logic
-        return is_cache_hit, cache_response, nn_metadata, latency_vcache_logic
+        return (
+            is_cache_hit,
+            cache_response,
+            response_metadata,
+            nn_metadata,
+            latency_vcache_logic,
+        )
 
     def dump_results_to_json(self):
         observations_dict = {}

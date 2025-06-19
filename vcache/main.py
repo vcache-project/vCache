@@ -47,7 +47,7 @@ class VCache:
         Returns:
             str: The response to be used by the user.
         """
-        _, response, _ = self.infer_with_cache_info(prompt, system_prompt)
+        _, response, _, _ = self.infer_with_cache_info(prompt, system_prompt)
         return response
 
     def infer_with_cache_info(
@@ -68,8 +68,8 @@ class VCache:
                 (if the cached response is correct or incorrect).
 
         Returns:
-            Tuple[bool, str, EmbeddingMetadataObj]: A tuple containing the cache
-                hit status, the response, and the nearest neighbor metadata.
+            Tuple[bool, str, EmbeddingMetadataObj, EmbeddingMetadataObj]: A tuple containing the cache
+                hit status, the response, the metadata of the response and nearest neighbor metadata.
         """
         if system_prompt is None:
             system_prompt = self.vcache_config.system_prompt
@@ -79,7 +79,8 @@ class VCache:
             return (
                 False,
                 response,
-                EmbeddingMetadataObj(embedding_id=-1, response=response),
+                EmbeddingMetadataObj(embedding_id=-1, response=response, id_set=id_set),
+                EmbeddingMetadataObj(embedding_id=-1, response=response, id_set=id_set),
             )
 
         is_cache_hit, response, nn_metadata = self.vcache_policy.process_request(
@@ -96,7 +97,15 @@ class VCache:
         if self.vcache_config.eviction_policy.ready_to_evict(self.vcache_policy.cache):
             self.vcache_config.eviction_policy.evict(self.vcache_policy.cache)
 
-        return is_cache_hit, response, nn_metadata_copy
+        if is_cache_hit:
+            return is_cache_hit, response, nn_metadata_copy, nn_metadata_copy
+        else:
+            return (
+                is_cache_hit,
+                response,
+                EmbeddingMetadataObj(embedding_id=-1, response=response, id_set=id_set),
+                nn_metadata_copy,
+            )
 
     def __generate_response(self, prompt: str, system_prompt: str) -> str:
         """Generates a new response using the inference engine.
