@@ -184,7 +184,7 @@ Please refer to the [vCache paper](https://arxiv.org/abs/2502.03771) for further
 
 ## 🛠 Developer Guide
 
-For advanced usage and development setup, see the [Developer Guide](ReadMe_Dev.md).
+For development setup and contribution guidelines, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 
 
