@@ -8,11 +8,12 @@ from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage.embeddi
 from vcache.vcache_core.cache.eviction_policy.eviction_policy import EvictionPolicy
 
 
-class LRUEvictionPolicy(EvictionPolicy):
+class MRUEvictionPolicy(EvictionPolicy):
     """
-    Implements a Least Recently Used (LRU) eviction policy.
+    Implements a Most Recently Used (MRU) eviction policy.
 
-    This policy evicts items that have not been accessed for the longest time.
+    This policy evicts items that have been accessed most recently. This can be
+    useful in scenarios where older items are more likely to be re-accessed.
     """
 
     _MIN_DATETIME: datetime = datetime.min.replace(tzinfo=timezone.utc)
@@ -23,15 +24,14 @@ class LRUEvictionPolicy(EvictionPolicy):
         Args:
             metadata (EmbeddingMetadataObj): The metadata object to update.
         """
-        metadata.last_accessed: datetime = datetime.now(timezone.utc)
+        metadata.last_accessed = datetime.now(timezone.utc)
 
     def select_victims(self, all_metadata: List[EmbeddingMetadataObj]) -> List[int]:
-        """Selects victims for eviction based on the LRU principle.
+        """Selects victims for eviction based on the MRU principle.
 
-        This method efficiently finds the items with the smallest `last_accessed`
+        This method efficiently finds the items with the largest `last_accessed`
         timestamps using a heap. Items that have `None` for `last_accessed`
-        (i.e., they have never been used as a nearest neighbor) are considered
-        the oldest and are prioritized for eviction.
+        are treated as the oldest and are not prioritized for eviction.
 
         Args:
             all_metadata (List[EmbeddingMetadataObj]): A list of all metadata
@@ -44,7 +44,7 @@ class LRUEvictionPolicy(EvictionPolicy):
         if num_to_evict == 0:
             return []
 
-        victims_metadata: List[EmbeddingMetadataObj] = heapq.nsmallest(
+        victims_metadata: List[EmbeddingMetadataObj] = heapq.nlargest(
             num_to_evict,
             all_metadata,
             key=lambda meta: meta.last_accessed
@@ -56,13 +56,13 @@ class LRUEvictionPolicy(EvictionPolicy):
         return victims
 
     def __str__(self) -> str:
-        """Returns a string representation of the LRUEvictionPolicy.
+        """Returns a string representation of the MRUEvictionPolicy.
 
         Returns:
             str: A string representation of the instance.
         """
         return (
-            f"LRUEvictionPolicy(max_size={self.max_size}, "
+            f"MRUEvictionPolicy(max_size={self.max_size}, "
             f"watermark={self.watermark}, "
             f"eviction_percentage={self.eviction_percentage})"
         )

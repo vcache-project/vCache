@@ -101,6 +101,9 @@ vcache = VCache(vcache_config, vcache_policy)
 
 You can swap out any component—such as the eviction policy or vector database—for your specific use case.
 
+### Eviction Policy
+vCache supports FIFO, LRU, MRU, and a custom SCU eviction policy. See the [Eviction Policy Documentation](vcache/vcache_core/cache/eviction_policy/README.md) for further details.
+
 ## 🧠 What Is Semantic Caching?
 
 Semantic caching reduces LLM latency and cost by returning cached model responses for **semantically similar** prompts (not just exact matches)—so you don’t pay for inference cost and latency on repeated questions that have the same answer.
@@ -207,7 +210,7 @@ If you use vCache for your research, please cite our [paper](https://arxiv.org/a
 ```bibtex
 @article{schroeder2025adaptive,
   title={vCache: Verified Semantic Prompt Caching},
-  author={Schroeder, Luis Gaspar and Liu, Shu and Cuadron, Alejandro and Zhao, Mark and Krusche, Stephan and Kemper, Alfons and Zaharia, Matei and Gonzalez, Joseph E},
+  author={Schroeder, Luis Gaspar and Desai, Aditya and Cuadron, Alejandro and Chu, Kyle and Liu, Shu and Zhao, Mark and Krusche, Stephan and Kemper, Alfons and Zaharia, Matei and Gonzalez, Joseph E},
   journal={arXiv preprint arXiv:2502.03771},
   year={2025}
 }

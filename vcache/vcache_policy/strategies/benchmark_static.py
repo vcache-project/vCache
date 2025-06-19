@@ -1,9 +1,13 @@
-from typing import Optional
+from typing import List, Optional, Tuple
 
 from typing_extensions import override
 
 from vcache.config import VCacheConfig
+from vcache.inference_engine import InferenceEngine
 from vcache.vcache_core.cache.cache import Cache
+from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage.embedding_metadata_obj import (
+    EmbeddingMetadataObj,
+)
 from vcache.vcache_core.cache.embedding_store.embedding_store import EmbeddingStore
 from vcache.vcache_policy.vcache_policy import VCachePolicy
 
@@ -25,9 +29,9 @@ class BenchmarkStaticDecisionPolicy(VCachePolicy):
         Args:
             threshold: The similarity threshold to use for cache hits.
         """
-        self.threshold = threshold
-        self.inference_engine = None
-        self.cache = None
+        self.threshold: float = threshold
+        self.inference_engine: Optional[InferenceEngine] = None
+        self.cache: Optional[Cache] = None
 
     @override
     def setup(self, config: VCacheConfig):
@@ -50,7 +54,7 @@ class BenchmarkStaticDecisionPolicy(VCachePolicy):
     @override
     def process_request(
         self, prompt: str, system_prompt: Optional[str]
-    ) -> tuple[bool, str, str]:
+    ) -> Tuple[bool, str, EmbeddingMetadataObj]:
         """
         Process a request using static global threshold policy.
 
@@ -59,7 +63,7 @@ class BenchmarkStaticDecisionPolicy(VCachePolicy):
             system_prompt: The optional system prompt to use for the response. It will override the system prompt in the VCacheConfig if provided.
 
         Returns:
-            Tuple containing [is_cache_hit, actual_response, nn_response].
+            Tuple containing [is_cache_hit, actual_response, nn_metadata_object].
 
         Raises:
             ValueError: If policy has not been setup.
@@ -67,23 +71,25 @@ class BenchmarkStaticDecisionPolicy(VCachePolicy):
         if self.inference_engine is None or self.cache is None:
             raise ValueError("Policy has not been setup")
 
-        knn = self.cache.get_knn(prompt=prompt, k=1)
+        knn: List[Tuple[float, int]] = self.cache.get_knn(prompt=prompt, k=1)
 
         if not knn:
-            response = self.inference_engine.create(
+            response: str = self.inference_engine.create(
                 prompt=prompt, system_prompt=system_prompt
             )
             self.cache.add(prompt=prompt, response=response)
-            return False, response, ""
+            return False, response, EmbeddingMetadataObj(embedding_id=-1, response="")
 
         similarity_score, embedding_id = knn[0]
-        metadata = self.cache.get_metadata(embedding_id=embedding_id)
-        is_cache_hit = similarity_score >= self.threshold
+        metadata: EmbeddingMetadataObj = self.cache.get_metadata(
+            embedding_id=embedding_id
+        )
+        is_cache_hit: bool = similarity_score >= self.threshold
         if is_cache_hit:
-            return True, metadata.response, metadata.response
+            return True, metadata.response, metadata
         else:
-            response = self.inference_engine.create(
+            response: str = self.inference_engine.create(
                 prompt=prompt, system_prompt=system_prompt
             )
             self.cache.add(prompt=prompt, response=response)
-            return False, response, metadata.response
+            return False, response, metadata

@@ -1,5 +1,4 @@
 import heapq
-from datetime import datetime, timezone
 from typing import List
 
 from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage.embedding_metadata_obj import (
@@ -8,30 +7,22 @@ from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage.embeddi
 from vcache.vcache_core.cache.eviction_policy.eviction_policy import EvictionPolicy
 
 
-class LRUEvictionPolicy(EvictionPolicy):
+class FIFOEvictionPolicy(EvictionPolicy):
     """
-    Implements a Least Recently Used (LRU) eviction policy.
+    Implements a First-In, First-Out (FIFO) eviction policy.
 
-    This policy evicts items that have not been accessed for the longest time.
+    This policy evicts items in the order they were added to the cache.
     """
-
-    _MIN_DATETIME: datetime = datetime.min.replace(tzinfo=timezone.utc)
 
     def update_eviction_metadata(self, metadata: EmbeddingMetadataObj) -> None:
-        """Updates the metadata object's last-accessed timestamp.
-
-        Args:
-            metadata (EmbeddingMetadataObj): The metadata object to update.
-        """
-        metadata.last_accessed: datetime = datetime.now(timezone.utc)
+        """This method is not used in the FIFO policy."""
+        pass
 
     def select_victims(self, all_metadata: List[EmbeddingMetadataObj]) -> List[int]:
-        """Selects victims for eviction based on the LRU principle.
+        """Selects victims for eviction based on the FIFO principle.
 
-        This method efficiently finds the items with the smallest `last_accessed`
-        timestamps using a heap. Items that have `None` for `last_accessed`
-        (i.e., they have never been used as a nearest neighbor) are considered
-        the oldest and are prioritized for eviction.
+        This method efficiently finds the oldest items based on their
+        `created_at` timestamp using a heap.
 
         Args:
             all_metadata (List[EmbeddingMetadataObj]): A list of all metadata
@@ -47,22 +38,20 @@ class LRUEvictionPolicy(EvictionPolicy):
         victims_metadata: List[EmbeddingMetadataObj] = heapq.nsmallest(
             num_to_evict,
             all_metadata,
-            key=lambda meta: meta.last_accessed
-            if meta.last_accessed is not None
-            else self._MIN_DATETIME,
+            key=lambda meta: meta.created_at,
         )
 
         victims: List[int] = [meta.embedding_id for meta in victims_metadata]
         return victims
 
     def __str__(self) -> str:
-        """Returns a string representation of the LRUEvictionPolicy.
+        """Returns a string representation of the FIFOEvictionPolicy.
 
         Returns:
             str: A string representation of the instance.
         """
         return (
-            f"LRUEvictionPolicy(max_size={self.max_size}, "
+            f"FIFOEvictionPolicy(max_size={self.max_size}, "
             f"watermark={self.watermark}, "
             f"eviction_percentage={self.eviction_percentage})"
         )

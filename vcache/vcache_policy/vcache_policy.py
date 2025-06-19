@@ -1,13 +1,27 @@
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Optional, Tuple
 
 from vcache.config import VCacheConfig
+from vcache.inference_engine import InferenceEngine
+from vcache.vcache_core.cache.cache import Cache
+from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage.embedding_metadata_obj import (
+    EmbeddingMetadataObj,
+)
+from vcache.vcache_core.cache.eviction_policy.eviction_policy import EvictionPolicy
 
 
 class VCachePolicy(ABC):
     """
     Abstract base class for VCache policies.
     """
+
+    def __init__(self):
+        """
+        Initialize the VCache policy.
+        """
+        self.inference_engine: Optional[InferenceEngine] = None
+        self.cache: Optional[Cache] = None
+        self.eviction_policy: Optional[EvictionPolicy] = None
 
     @abstractmethod
     def setup(self, config: VCacheConfig):
@@ -22,7 +36,7 @@ class VCachePolicy(ABC):
     @abstractmethod
     def process_request(
         self, prompt: str, system_prompt: Optional[str]
-    ) -> tuple[bool, str, str]:
+    ) -> Tuple[bool, str, EmbeddingMetadataObj]:
         """
         Process a request and determine cache hit status.
 
@@ -31,6 +45,6 @@ class VCachePolicy(ABC):
             system_prompt: The optional system prompt to use for the response. It will override the system prompt in the VCacheConfig if provided.
 
         Returns:
-            Tuple containing [is_cache_hit, actual_response, nn_response].
+            Tuple containing [is_cache_hit, actual_response, nn_metadata_object].
         """
         pass

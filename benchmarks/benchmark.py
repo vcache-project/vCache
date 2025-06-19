@@ -33,10 +33,9 @@ from vcache.vcache_core.cache.embedding_store.vector_db import (
     HNSWLibVectorDB,
     SimilarityMetricType,
 )
+from vcache.vcache_core.cache.eviction_policy.eviction_policy import EvictionPolicy
+from vcache.vcache_core.cache.eviction_policy.strategies.scu import SCUEvictionPolicy
 from vcache.vcache_core.similarity_evaluator import SimilarityEvaluator
-from vcache.vcache_core.similarity_evaluator.strategies.llm_comparison import (
-    LLMComparisonSimilarityEvaluator,
-)
 from vcache.vcache_core.similarity_evaluator.strategies.string_comparison import (
     StringComparisonSimilarityEvaluator,
 )
@@ -112,8 +111,8 @@ class GeneratePlotsOnly(Enum):
 ########################################################################################################################
 
 
-MAX_SAMPLES: int = 60000
-CONFIDENCE_INTERVALS_ITERATIONS: int = 2
+MAX_SAMPLES: int = 20000
+CONFIDENCE_INTERVALS_ITERATIONS: int = 5
 DISABLE_PROGRESS_BAR: bool = False
 KEEP_SPLIT: int = 100
 
@@ -126,14 +125,8 @@ RUN_COMBINATIONS: List[
         Dataset.SEM_BENCHMARK_CLASSIFICATION,
         GeneratePlotsOnly.NO,
         StringComparisonSimilarityEvaluator(),
-    ),
-    (
-        EmbeddingModel.GTE,
-        LargeLanguageModel.GPT_4O_MINI,
-        Dataset.SEM_BENCHMARK_ARENA,
-        GeneratePlotsOnly.NO,
-        LLMComparisonSimilarityEvaluator(),
-    ),
+        SCUEvictionPolicy(max_size=500, watermark=0.99, eviction_percentage=0.1),
+    )
 ]
 
 BASELINES_TO_RUN: List[Baseline] = [
@@ -166,7 +159,9 @@ STATIC_THRESHOLDS: List[float] = [
     0.98,
 ]
 
-DELTAS: List[float] = [0.01, 0.015, 0.02, 0.025, 0.03, 0.035, 0.04, 0.05, 0.06, 0.07]
+DELTAS: List[float] = [
+    0.01
+]  # , 0.015, 0.02, 0.025, 0.03, 0.035, 0.04, 0.05, 0.06, 0.07]
 
 MAX_VECTOR_DB_CAPACITY: int = 100000
 PLOT_FONT_SIZE: int = 50
@@ -187,6 +182,7 @@ class Benchmark(unittest.TestCase):
         self.threshold: float = None
         self.delta: float = None
         self.is_static_threshold: bool = None
+        self.eviction_policy: EvictionPolicy = None
 
     def stats_set_up(self):
         self.cache_hit_list: List[int] = []
@@ -373,7 +369,7 @@ class Benchmark(unittest.TestCase):
         prompt = f"{task} {review_text}"
         latency_vcache_logic: float = time.time()
         try:
-            is_cache_hit, cache_response, nn_response = (
+            is_cache_hit, cache_response, nn_metadata = (
                 self.vcache.infer_with_cache_info(
                     prompt=prompt,
                     system_prompt=system_prompt,
@@ -386,7 +382,7 @@ class Benchmark(unittest.TestCase):
             raise e
 
         latency_vcache_logic = time.time() - latency_vcache_logic
-        return is_cache_hit, cache_response, nn_response, latency_vcache_logic
+        return is_cache_hit, cache_response, nn_metadata.response, latency_vcache_logic
 
     def dump_results_to_json(self):
         observations_dict = {}
@@ -433,6 +429,8 @@ class Benchmark(unittest.TestCase):
             "config": {
                 "filepath": self.filepath,
                 "embedding_model": self.embedding_model,
+                "llm_model": self.llm_model,
+                "eviction_policy": str(self.eviction_policy),
                 "is_static_threshold": self.is_static_threshold,
                 "threshold": self.threshold,
                 "delta": self.delta,
@@ -478,6 +476,7 @@ def __run_baseline(
     delta: float,
     threshold: float,
     similarity_evaluator: SimilarityEvaluator,
+    eviction_policy: EvictionPolicy,
 ):
     vcache_config: VCacheConfig = VCacheConfig(
         inference_engine=BenchmarkInferenceEngine(),
@@ -488,6 +487,7 @@ def __run_baseline(
         ),
         embedding_metadata_storage=InMemoryEmbeddingMetadataStorage(),
         similarity_evaluator=similarity_evaluator,
+        eviction_policy=eviction_policy,
     )
     vcache: VCache = VCache(vcache_config, vcache_policy)
 
@@ -500,6 +500,7 @@ def __run_baseline(
     benchmark.delta = delta if delta != -1 else None
     benchmark.is_static_threshold = threshold != -1
     benchmark.output_folder_path = path
+    benchmark.eviction_policy = eviction_policy
 
     benchmark.stats_set_up()
     try:
@@ -528,6 +529,7 @@ def main():
         dataset,
         generate_plots_only,
         similarity_evaluator,
+        eviction_policy,
     ) in RUN_COMBINATIONS:
         try:
             print(f"DatasetPath: {datasets_dir}, Dataset: {dataset.value}")
@@ -569,6 +571,7 @@ def main():
                             delta=delta,
                             threshold=-1,
                             similarity_evaluator=similarity_evaluator,
+                            eviction_policy=eviction_policy,
                         )
 
             #####################################################
@@ -604,6 +607,7 @@ def main():
                         delta=delta,
                         threshold=-1,
                         similarity_evaluator=similarity_evaluator,
+                        eviction_policy=eviction_policy,
                     )
 
             #####################################################
@@ -653,6 +657,7 @@ def main():
                         delta=-1,
                         threshold=threshold,
                         similarity_evaluator=similarity_evaluator,
+                        eviction_policy=eviction_policy,
                     )
 
             #####################################################
@@ -703,6 +708,7 @@ def main():
                             delta=delta,
                             threshold=-1,
                             similarity_evaluator=similarity_evaluator,
+                            eviction_policy=eviction_policy,
                         )
 
             #####################################################
@@ -736,6 +742,7 @@ def main():
                             delta=delta,
                             threshold=-1,
                             similarity_evaluator=similarity_evaluator,
+                            eviction_policy=eviction_policy,
                         )
 
             #####################################################
@@ -766,6 +773,7 @@ def main():
                         delta=-1,
                         threshold=threshold,
                         similarity_evaluator=similarity_evaluator,
+                        eviction_policy=eviction_policy,
                     )
 
             #####################################################

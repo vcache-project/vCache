@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import MagicMock
 
 from dotenv import load_dotenv
 
@@ -27,6 +28,12 @@ class TestvcacheNoCache(unittest.TestCase):
     def test_basic_functionality(self):
         """Test that when cache is disabled, all requests are misses."""
         config, policy = create_default_config_and_policy()
+
+        # Mock the cache attribute that main.py expects on the policy
+        mock_cache = MagicMock()
+        mock_cache.vector_db_size.return_value = 0
+        policy.cache = mock_cache
+
         vcache = VCache(config, policy)
 
         # First request should be a miss

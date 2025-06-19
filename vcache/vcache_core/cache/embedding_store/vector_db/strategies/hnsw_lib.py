@@ -22,12 +22,12 @@ class HNSWLibVectorDB(VectorDB):
         similarity_metric_type: SimilarityMetricType = SimilarityMetricType.COSINE,
         max_capacity: int = 100000,
     ):
-        """
-        Initialize HNSWLib vector database.
+        """Initializes the HNSWLib vector database.
 
         Args:
-            similarity_metric_type: The similarity metric to use for comparisons.
-            max_capacity: Maximum number of vectors the database can store.
+            similarity_metric_type (SimilarityMetricType): The similarity metric
+                to use for comparisons.
+            max_capacity (int): The maximum number of vectors the database can store.
         """
         self.embedding_count = 0
         self.__next_embedding_id = 0
@@ -41,14 +41,13 @@ class HNSWLibVectorDB(VectorDB):
         self.index = None
 
     def add(self, embedding: List[float]) -> int:
-        """
-        Add an embedding vector to the database.
+        """Adds an embedding vector to the database.
 
         Args:
-            embedding: The embedding vector to add.
+            embedding (List[float]): The embedding vector to add.
 
         Returns:
-            The unique ID assigned to the added embedding.
+            int: The unique ID assigned to the added embedding.
         """
         if self.index is None:
             self._init_vector_store(len(embedding))
@@ -58,17 +57,19 @@ class HNSWLibVectorDB(VectorDB):
         return self.__next_embedding_id - 1
 
     def remove(self, embedding_id: int) -> int:
-        """
-        Remove an embedding from the database.
+        """Marks an embedding for deletion in the database.
+
+        Note:
+            HNSWLib does not physically remove data, but marks it as deleted.
 
         Args:
-            embedding_id: The ID of the embedding to remove.
+            embedding_id (int): The ID of the embedding to remove.
 
         Returns:
-            The ID of the removed embedding.
+            int: The ID of the removed embedding.
 
         Raises:
-            ValueError: If the index is not initialized.
+            ValueError: If the index has not been initialized.
         """
         if self.index is None:
             raise ValueError("Index is not initialized")
@@ -77,15 +78,15 @@ class HNSWLibVectorDB(VectorDB):
         return embedding_id
 
     def get_knn(self, embedding: List[float], k: int) -> List[tuple[float, int]]:
-        """
-        Get k-nearest neighbors for the given embedding.
+        """Gets k-nearest neighbors for a given embedding.
 
         Args:
-            embedding: The query embedding vector.
-            k: The number of nearest neighbors to return.
+            embedding (List[float]): The query embedding vector.
+            k (int): The number of nearest neighbors to return.
 
         Returns:
-            List of tuples containing similarity scores and embedding IDs.
+            List[tuple[float, int]]: A list of tuples containing similarity
+            scores and embedding IDs.
         """
         if self.index is None:
             return []
@@ -101,9 +102,7 @@ class HNSWLibVectorDB(VectorDB):
         return list(zip(similarity_scores, id_list))
 
     def reset(self) -> None:
-        """
-        Reset the vector database to empty state.
-        """
+        """Resets the vector database to an empty state."""
         if self.dim is None:
             return
         self._init_vector_store(self.dim)
@@ -111,11 +110,10 @@ class HNSWLibVectorDB(VectorDB):
         self.__next_embedding_id = 0
 
     def _init_vector_store(self, embedding_dim: int):
-        """
-        Initialize the HNSWLib index with the given embedding dimension.
+        """Initializes the HNSWLib index.
 
         Args:
-            embedding_dim: The dimension of the embedding vectors.
+            embedding_dim (int): The dimension of the embedding vectors.
 
         Raises:
             ValueError: If the similarity metric type is invalid.
@@ -141,10 +139,17 @@ class HNSWLibVectorDB(VectorDB):
         self.index.set_ef(self.ef)
 
     def is_empty(self) -> bool:
-        """
-        Check if the vector database is empty.
+        """Checks if the vector database is empty.
 
         Returns:
-            True if the database contains no embeddings, False otherwise.
+            bool: True if the database contains no embeddings, False otherwise.
         """
         return self.embedding_count == 0
+
+    def size(self) -> int:
+        """Gets the number of embeddings in the vector database.
+
+        Returns:
+            int: The number of embeddings in the vector database.
+        """
+        return self.embedding_count

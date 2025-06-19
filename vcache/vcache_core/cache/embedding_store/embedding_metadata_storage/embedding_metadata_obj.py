@@ -1,7 +1,5 @@
-from datetime import datetime
-from typing import List, Tuple
-
-import numpy as np
+from datetime import datetime, timezone
+from typing import List, Optional, Tuple
 
 
 class EmbeddingMetadataObj:
@@ -13,27 +11,23 @@ class EmbeddingMetadataObj:
         self,
         embedding_id: int,
         response: str,
-        prior: np.ndarray = None,
-        posterior: np.ndarray = None,
-        region_reject: List[str] = None,
-        last_accessed: datetime = None,
+        last_accessed: Optional[datetime] = None,
     ):
-        """
-        Initialize embedding metadata object.
+        """Initializes the embedding metadata object.
 
         Args:
-            embedding_id: Unique identifier for the embedding.
-            response: The response associated with the embedding.
-            prior: Prior distribution for Bayesian inference.
-            posterior: Posterior distribution for Bayesian inference.
-            region_reject: List of rejection regions for heuristic policy.
-            last_accessed: Timestamp of last access to this embedding.
+            embedding_id (int): The unique identifier for the embedding.
+            response (str): The response associated with the embedding.
+            last_accessed (Optional[datetime]): The timestamp of the last access
+                to this embedding. If not provided, the current time in UTC is
+                used.
         """
+
+        #### Core metadata ###################################################
         self.embedding_id: int = embedding_id
         self.response: str = response
-        self.last_accessed: datetime = last_accessed
 
-        # vCache Bayesian Policy ########################
+        #### vCache Bayesian Policy ##########################################
         self.observations: List[Tuple[float, int]] = []  # (similarity, label)
         self.observations.append((0.0, 0))
         self.observations.append((1.0, 1))
@@ -41,46 +35,36 @@ class EmbeddingMetadataObj:
         self.t_hat: float = None
         self.t_prime: float = None
         self.var_t: float = None
-        self.gamma: float = None
-        self.t_hat: float = None
-        ##################################################
 
-        # vCache Heuristic Policy #######################
-        self.prior: np.ndarray = prior
-        self.posterior: np.ndarray = posterior
-        self.region_reject: List[float] = region_reject
-        self.correct_similarities: List[float] = []
-        self.incorrect_similarities: List[float] = []
-        self.posteriors: List[float] = []
-        ##################################################
+        #### Metadata for the eviction policy ################################
+        self.last_accessed: Optional[datetime] = (
+            last_accessed if last_accessed is not None else datetime.now(timezone.utc)
+        )
+        self.created_at: datetime = datetime.now(timezone.utc)
+        self.usage_count: int = 0
 
-    def __eq__(self, other):
-        """
-        Check equality with another EmbeddingMetadataObj.
+    def __eq__(self, other: object) -> bool:
+        """Checks for equality with another EmbeddingMetadataObj.
 
         Args:
-            other: The other object to compare with.
+            other (object): The object to compare with.
 
         Returns:
-            True if objects are equal, False otherwise.
+            bool: True if the objects are equal, False otherwise.
         """
         if not isinstance(other, EmbeddingMetadataObj):
             return False
         return (
             self.embedding_id == other.embedding_id
             and self.response == other.response
-            and np.array_equal(self.prior, other.prior)
-            and np.array_equal(self.posterior, other.posterior)
-            and self.region_reject == other.region_reject
             and self.last_accessed == other.last_accessed
         )
 
-    def __repr__(self):
-        """
-        Return string representation of the embedding metadata object.
+    def __repr__(self) -> str:
+        """Returns a string representation of the object.
 
         Returns:
-            String representation of the object.
+            str: A string representation of the EmbeddingMetadataObj.
         """
         return f"""
         EmbeddingMetadataObj(
@@ -92,21 +76,3 @@ class EmbeddingMetadataObj:
             gamma={self.gamma},
         )
         """
-
-    def add_correct_similarity(self, similarity: float):
-        """
-        Add a correct similarity score to the metadata.
-
-        Args:
-            similarity: The similarity score to add.
-        """
-        self.correct_similarities.append(similarity)
-
-    def add_incorrect_similarity(self, similarity: float):
-        """
-        Add an incorrect similarity score to the metadata.
-
-        Args:
-            similarity: The similarity score to add.
-        """
-        self.incorrect_similarities.append(similarity)
