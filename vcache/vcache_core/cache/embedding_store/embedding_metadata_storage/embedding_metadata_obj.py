@@ -12,6 +12,7 @@ class EmbeddingMetadataObj:
         embedding_id: int,
         response: str,
         last_accessed: Optional[datetime] = None,
+        id_set: int = -1,
     ):
         """Initializes the embedding metadata object.
 
@@ -21,11 +22,17 @@ class EmbeddingMetadataObj:
             last_accessed (Optional[datetime]): The timestamp of the last access
                 to this embedding. If not provided, the current time in UTC is
                 used.
+            id_set (int): The set identifier for the embedding. This is used in the
+                benchmark to identify if the nearest neighbor is from the same set
+                (if the cached response is correct or incorrect).
         """
 
         #### Core metadata ###################################################
         self.embedding_id: int = embedding_id
         self.response: str = response
+
+        #### Benchmark metadata ##############################################
+        self.id_set: int = id_set
 
         #### vCache Bayesian Policy ##########################################
         self.observations: List[Tuple[float, int]] = []  # (similarity, label)

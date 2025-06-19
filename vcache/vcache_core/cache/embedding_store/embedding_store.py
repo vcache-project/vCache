@@ -32,7 +32,7 @@ class EmbeddingStore:
         self._add_lock = threading.Lock()
         self._remove_lock = threading.Lock()
 
-    def add_embedding(self, embedding: List[float], response: str) -> int:
+    def add_embedding(self, embedding: List[float], response: str, id_set: int) -> int:
         """Adds an embedding and its metadata to the store.
 
         This operation is thread-safe.
@@ -40,6 +40,9 @@ class EmbeddingStore:
         Args:
             embedding (List[float]): The embedding vector to add.
             response (str): The response associated with the embedding.
+            id_set (int): The set identifier for the embedding. This is used in the
+                benchmark to identify if the nearest neighbor is from the same set
+                (if the cached response is correct or incorrect).
 
         Returns:
             int: The ID of the added embedding.
@@ -49,6 +52,7 @@ class EmbeddingStore:
             metadata = EmbeddingMetadataObj(
                 embedding_id=embedding_id,
                 response=response,
+                id_set=id_set,
             )
             self.embedding_metadata_storage.add_metadata(
                 embedding_id=embedding_id, metadata=metadata

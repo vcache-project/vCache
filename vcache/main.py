@@ -54,6 +54,7 @@ class VCache:
         self,
         prompt: str,
         system_prompt: Optional[str] = None,
+        id_set: int = -1,
     ) -> Tuple[bool, str, EmbeddingMetadataObj]:
         """Infers a response and returns the cache hit status and metadata.
 
@@ -62,6 +63,9 @@ class VCache:
             system_prompt (Optional[str]): The optional system prompt to use
                 for the response. Overrides the system prompt in the
                 VCacheConfig if provided.
+            id_set (int): The set identifier for the embedding. This is used in the
+                benchmark to identify if the nearest neighbor is from the same set
+                (if the cached response is correct or incorrect).
 
         Returns:
             Tuple[bool, str, EmbeddingMetadataObj]: A tuple containing the cache
@@ -79,7 +83,7 @@ class VCache:
             )
 
         is_cache_hit, response, nn_metadata = self.vcache_policy.process_request(
-            prompt, system_prompt
+            prompt, system_prompt, id_set
         )
 
         if nn_metadata is not None:

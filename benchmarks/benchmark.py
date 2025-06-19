@@ -232,6 +232,8 @@ class Benchmark(unittest.TestCase):
             # 2.2) vCache Inference (With Cache)
             candidate_embedding: List[float] = data_entry[self.embedding_model[0]]
 
+            id_set: int = data_entry.get("id_set", -1)
+
             is_cache_hit, cache_response, nn_response, latency_vcache_logic = (
                 self.get_vcache_answer(
                     task=task,
@@ -239,6 +241,7 @@ class Benchmark(unittest.TestCase):
                     candidate_embedding=candidate_embedding,
                     label_response=label_response,
                     system_prompt=system_prompt,
+                    id_set=id_set,
                 )
             )
             latency_vcache: float = latency_vcache_logic + emb_generation_latency
@@ -347,6 +350,7 @@ class Benchmark(unittest.TestCase):
         candidate_embedding: List[float],
         label_response: str,
         system_prompt: str,
+        id_set: int,
     ) -> Tuple[bool, str, str, float]:
         """
         Returns: Tuple[bool, str, str, float] - [is_cache_hit, cache_response, nn_response, latency_vcache_logic]
@@ -374,6 +378,7 @@ class Benchmark(unittest.TestCase):
                 self.vcache.infer_with_cache_info(
                     prompt=prompt,
                     system_prompt=system_prompt,
+                    id_set=id_set,
                 )
             )
         except Exception as e:

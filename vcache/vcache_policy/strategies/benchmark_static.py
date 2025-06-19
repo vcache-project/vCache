@@ -53,7 +53,7 @@ class BenchmarkStaticDecisionPolicy(VCachePolicy):
 
     @override
     def process_request(
-        self, prompt: str, system_prompt: Optional[str]
+        self, prompt: str, system_prompt: Optional[str], id_set: int
     ) -> Tuple[bool, str, EmbeddingMetadataObj]:
         """
         Process a request using static global threshold policy.
@@ -61,6 +61,9 @@ class BenchmarkStaticDecisionPolicy(VCachePolicy):
         Args:
             prompt: The prompt to check for cache hit.
             system_prompt: The optional system prompt to use for the response. It will override the system prompt in the VCacheConfig if provided.
+            id_set: The set identifier for the embedding. This is used in the
+                benchmark to identify if the nearest neighbor is from the same set
+                (if the cached response is correct or incorrect).
 
         Returns:
             Tuple containing [is_cache_hit, actual_response, nn_metadata_object].
@@ -77,7 +80,7 @@ class BenchmarkStaticDecisionPolicy(VCachePolicy):
             response: str = self.inference_engine.create(
                 prompt=prompt, system_prompt=system_prompt
             )
-            self.cache.add(prompt=prompt, response=response)
+            self.cache.add(prompt=prompt, response=response, id_set=id_set)
             return False, response, EmbeddingMetadataObj(embedding_id=-1, response="")
 
         similarity_score, embedding_id = knn[0]
@@ -91,5 +94,5 @@ class BenchmarkStaticDecisionPolicy(VCachePolicy):
             response: str = self.inference_engine.create(
                 prompt=prompt, system_prompt=system_prompt
             )
-            self.cache.add(prompt=prompt, response=response)
+            self.cache.add(prompt=prompt, response=response, id_set=id_set)
             return False, response, metadata
