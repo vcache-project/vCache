@@ -323,7 +323,6 @@ class VerifiedDecisionPolicy(VCachePolicy):
                 embedding_id,
                 prompt,
                 label_id_set,
-                nn_id_set,
             )
         )
 
