@@ -207,7 +207,7 @@ class VerifiedDecisionPolicy(VCachePolicy):
         similarity_score, embedding_id = knn[0]
 
         try:
-            metadata = self.cache.get_metadata(embedding_id=embedding_id)
+            nn_metadata = self.cache.get_metadata(embedding_id=embedding_id)
         except Exception:
             # Cache eviction fallback
             new_response = self.inference_engine.create(
@@ -221,12 +221,12 @@ class VerifiedDecisionPolicy(VCachePolicy):
             )
 
         action = self.bayesian.select_action(
-            similarity_score=similarity_score, metadata=metadata
+            similarity_score=similarity_score, metadata=nn_metadata
         )
 
         match action:
             case _Action.EXPLOIT:
-                return True, metadata.response, metadata
+                return True, nn_metadata.response, nn_metadata
             case _Action.EXPLORE:
                 response = self.inference_engine.create(
                     prompt=prompt, system_prompt=system_prompt
@@ -234,23 +234,23 @@ class VerifiedDecisionPolicy(VCachePolicy):
 
                 self.__update_cache(
                     response=response,
-                    metadata=metadata,
+                    nn_metadata=nn_metadata,
                     similarity_score=similarity_score,
                     embedding_id=embedding_id,
                     prompt=prompt,
-                    id_set=id_set,
+                    label_id_set=id_set,
                 )
 
-                return False, response, metadata
+                return False, response, nn_metadata
 
     def __update_cache(
         self,
         response: str,
-        metadata: EmbeddingMetadataObj,
+        nn_metadata: EmbeddingMetadataObj,
         similarity_score: float,
         embedding_id: int,
         prompt: str,
-        id_set: int,
+        label_id_set: int,
     ) -> None:
         """
         Asynchronously validates the correctness of the cached response and updates the cache.
@@ -264,11 +264,11 @@ class VerifiedDecisionPolicy(VCachePolicy):
 
         Args:
             response: The response to check for correctness.
-            metadata: The metadata of the embedding.
+            nn_metadata: The metadata of the nearest neighbor embedding.
             similarity_score: The similarity score between the query and the embedding.
             embedding_id: The id of the embedding.
             prompt: The prompt that was used to generate the response.
-            id_set: The set identifier for the embedding. This is used in the
+            label_id_set: The set identifier for the embedding. This is used in the
                 benchmark to identify if the nearest neighbor is from the same set
                 (if the cached response is correct or incorrect).
         """
@@ -281,8 +281,9 @@ class VerifiedDecisionPolicy(VCachePolicy):
             similarity_score,
             embedding_id,
             prompt,
-            metadata.response,
-            id_set,
+            nn_metadata.response,
+            label_id_set,
+            nn_metadata.id_set,
         )
 
     def __submit_for_background_update(
@@ -292,7 +293,8 @@ class VerifiedDecisionPolicy(VCachePolicy):
         embedding_id: int,
         prompt: str,
         cached_response: str,
-        id_set: int,
+        label_id_set: int,
+        nn_id_set: int,
     ):
         """
         Submits a task to check answer similarity and queue a cache update.
@@ -307,9 +309,11 @@ class VerifiedDecisionPolicy(VCachePolicy):
             embedding_id: The ID of the nearest neighbor embedding.
             prompt: The original user prompt.
             cached_response: The response from the cached nearest neighbor.
+            label_id_set: The id_set of the label.
+            nn_id_set: The id_set of the nearest neighbor.
         """
         should_have_exploited = self.similarity_evaluator.answers_similar(
-            a=new_response, b=cached_response
+            a=new_response, b=cached_response, id_set_a=label_id_set, id_set_b=nn_id_set
         )
         self.callback_queue.put(
             (
@@ -318,7 +322,8 @@ class VerifiedDecisionPolicy(VCachePolicy):
                 similarity_score,
                 embedding_id,
                 prompt,
-                id_set,
+                label_id_set,
+                nn_id_set,
             )
         )
 

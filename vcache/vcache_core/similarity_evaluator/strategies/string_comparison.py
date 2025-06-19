@@ -1,6 +1,3 @@
-from vcache.vcache_core.cache.embedding_store.embedding_store import (
-    EmbeddingMetadataObj,
-)
 from vcache.vcache_core.similarity_evaluator.similarity_evaluator import (
     SimilarityEvaluator,
 )
@@ -21,8 +18,8 @@ class StringComparisonSimilarityEvaluator(SimilarityEvaluator):
         self,
         a: str,
         b: str,
-        metadata_a: EmbeddingMetadataObj = None,
-        metadata_b: EmbeddingMetadataObj = None,
+        id_set_a: int = None,
+        id_set_b: int = None,
     ) -> bool:
         """
         Determine if two answers are similar using string comparison.
@@ -30,8 +27,8 @@ class StringComparisonSimilarityEvaluator(SimilarityEvaluator):
         Args:
             a: The first answer.
             b: The second answer.
-            metadata_a: The metadata of the first answer (used for benchmark evaluation).
-            metadata_b: The metadata of the second answer (used for benchmark evaluation).
+            id_set_a: The id_set of the first answer.
+            id_set_b: The id_set of the second answer.
 
         Returns:
             True if the normalized strings are equal, False otherwise.

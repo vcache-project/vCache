@@ -1,6 +1,3 @@
-from vcache.vcache_core.cache.embedding_store.embedding_store import (
-    EmbeddingMetadataObj,
-)
 from vcache.vcache_core.similarity_evaluator.similarity_evaluator import (
     SimilarityEvaluator,
 )
@@ -8,7 +5,7 @@ from vcache.vcache_core.similarity_evaluator.similarity_evaluator import (
 
 class BenchmarkComparisonSimilarityEvaluator(SimilarityEvaluator):
     """
-    Benchmark-based similarity evaluator that compares answers based on their id_set metadata.
+    Benchmark-based similarity evaluator that compares answers based on their id_set.
 
     This evaluator is specifically designed for benchmark evaluation scenarios where
     answers are considered similar if they belong to the same id_set. This allows
@@ -26,8 +23,8 @@ class BenchmarkComparisonSimilarityEvaluator(SimilarityEvaluator):
         self,
         a: str,
         b: str,
-        metadata_a: EmbeddingMetadataObj = None,
-        metadata_b: EmbeddingMetadataObj = None,
+        id_set_a: int,
+        id_set_b: int,
     ) -> bool:
         """
         Check if two answers are similar by comparing their id_set metadata.
@@ -39,10 +36,10 @@ class BenchmarkComparisonSimilarityEvaluator(SimilarityEvaluator):
         Args:
             a: The first answer to compare (not used in this implementation).
             b: The second answer to compare (not used in this implementation).
-            metadata_a: The metadata of the first answer containing the id_set.
-            metadata_b: The metadata of the second answer containing the id_set.
+            id_set_a: The id_set of the first answer.
+            id_set_b: The id_set of the second answer.
 
         Returns:
             True if both answers belong to the same id_set, False otherwise.
         """
-        return metadata_a.id_set == metadata_b.id_set
+        return id_set_a == id_set_b
