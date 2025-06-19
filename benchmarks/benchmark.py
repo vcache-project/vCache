@@ -232,16 +232,16 @@ class Benchmark(unittest.TestCase):
             # 2.2) vCache Inference (With Cache)
             candidate_embedding: List[float] = data_entry[self.embedding_model[0]]
 
-            id_set: int = data_entry.get("id_set", -1)
+            label_id_set: int = data_entry.get("id_set", -1)
 
-            is_cache_hit, cache_response, nn_response, latency_vcache_logic = (
+            is_cache_hit, cache_response, nn_metadata, latency_vcache_logic = (
                 self.get_vcache_answer(
                     task=task,
                     review_text=review_text,
                     candidate_embedding=candidate_embedding,
                     label_response=label_response,
                     system_prompt=system_prompt,
-                    id_set=id_set,
+                    id_set=label_id_set,
                 )
             )
             latency_vcache: float = latency_vcache_logic + emb_generation_latency
@@ -256,7 +256,8 @@ class Benchmark(unittest.TestCase):
                 is_cache_hit=is_cache_hit,
                 label_response=label_response,
                 cache_response=cache_response,
-                nn_response=nn_response,
+                label_id_set=label_id_set,
+                nn_metadata=nn_metadata,
                 latency_direct=latency_direct,
                 latency_vcache=latency_vcache,
             )
@@ -307,7 +308,8 @@ class Benchmark(unittest.TestCase):
         is_cache_hit: bool,
         label_response: str,
         cache_response: str,
-        nn_response: str,
+        label_id_set: int,
+        nn_metadata: EmbeddingMetadataObj,
         latency_direct: float,
         latency_vcache: float,
     ):
@@ -328,9 +330,15 @@ class Benchmark(unittest.TestCase):
         else:  # If cache miss, the actual response is the label response
             self.cache_miss_list.append(1)
             self.cache_hit_list.append(0)
-            nn_response_correct: bool = answers_have_same_meaning_static(
-                label_response, nn_response
-            )
+
+            equality_check_with_id_set: bool = label_id_set != -1
+            if equality_check_with_id_set:
+                nn_response_correct: bool = label_id_set == nn_metadata.id_set
+            else:
+                nn_response_correct: bool = answers_have_same_meaning_static(
+                    label_response, nn_metadata.response
+                )
+
             if nn_response_correct:
                 self.fn_list.append(1)
                 self.tn_list.append(0)
@@ -388,7 +396,7 @@ class Benchmark(unittest.TestCase):
             raise e
 
         latency_vcache_logic = time.time() - latency_vcache_logic
-        return is_cache_hit, cache_response, nn_metadata.response, latency_vcache_logic
+        return is_cache_hit, cache_response, nn_metadata, latency_vcache_logic
 
     def dump_results_to_json(self):
         observations_dict = {}
