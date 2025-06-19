@@ -201,11 +201,13 @@ class Benchmark(unittest.TestCase):
             os.makedirs(self.output_folder_path)
 
     def run_benchmark_loop(self, data_entries):
+        logging.info("Running benchmark loop")
         pbar = tqdm(
             total=MAX_SAMPLES,
             desc="Processing entries",
             disable=DISABLE_PROGRESS_BAR,
         )
+        logging.info(f"data_entries: {data_entries}")
         for idx, data_entry in enumerate(data_entries):
             if idx >= MAX_SAMPLES:
                 break
@@ -215,13 +217,9 @@ class Benchmark(unittest.TestCase):
             system_prompt = data_entry.get("output_format", "")
             review_text = data_entry.get("text", "")
 
-            # TODO Hacked: Needs to be fixed in benchmark arena json file
-            if self.embedding_model[0] == "emb_e5_large_v2_ft":
-                emb_generation_latency: float = float(data_entry["emb_e5_large_v2_lat"])
-            else:
-                emb_generation_latency: float = float(
-                    data_entry[self.embedding_model[0] + "_lat"]
-                )
+            emb_generation_latency: float = float(
+                data_entry[self.embedding_model[0] + "_lat"]
+            )
 
             llm_generation_latency: float = float(
                 data_entry[self.llm_model[0] + "_lat"]
@@ -233,6 +231,7 @@ class Benchmark(unittest.TestCase):
 
             # 2.2) vCache Inference (With Cache)
             candidate_embedding: List[float] = data_entry[self.embedding_model[0]]
+
             is_cache_hit, cache_response, nn_response, latency_vcache_logic = (
                 self.get_vcache_answer(
                     task=task,
@@ -272,12 +271,9 @@ class Benchmark(unittest.TestCase):
         try:
             if "/" in self.filepath:
                 logging.info(f"Loading Hugging Face dataset: {self.filepath}")
-                data_iterator = load_dataset(self.filepath)
-                if isinstance(data_iterator, dict):
-                    if "train" in data_iterator:
-                        data_iterator = data_iterator["train"]
-                    else:
-                        data_iterator = next(iter(data_iterator.values()))
+                data_iterator = load_dataset(
+                    self.filepath, split=f"train[:{MAX_SAMPLES}]"
+                )
                 self.run_benchmark_loop(data_iterator)
             else:
                 logging.info(f"Loading local dataset: {self.filepath}")
@@ -416,9 +412,7 @@ class Benchmark(unittest.TestCase):
         self.var_ts_dict = var_ts_dict
 
         try:
-            global_observations_dict = (
-                self.vcache.vcache_policy.bayesian.global_observations
-            )
+            global_observations_dict = self.vcache.vcache_policy.global_observations
             global_gamma = self.vcache.vcache_policy.bayesian.global_gamma
             global_t_hat = self.vcache.vcache_policy.bayesian.global_t_hat
             global_t_prime = self.vcache.vcache_policy.bayesian.global_t_prime
