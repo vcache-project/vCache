@@ -4,10 +4,12 @@ from vcache.vcache_core.cache.eviction_policy.strategies.mru import MRUEvictionP
 from vcache.vcache_core.cache.eviction_policy.strategies.no_eviction import (
     NoEvictionPolicy,
 )
+from vcache.vcache_core.cache.eviction_policy.strategies.scu import SCUEvictionPolicy
 
 __all__ = [
     "LRUEvictionPolicy",
     "MRUEvictionPolicy",
     "FIFOEvictionPolicy",
     "NoEvictionPolicy",
+    "SCUEvictionPolicy",
 ]
