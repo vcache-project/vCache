@@ -111,11 +111,56 @@ class GeneratePlotsOnly(Enum):
 ### Benchmark Config ###################################################################################################
 ########################################################################################################################
 
+"""
+    This script is designed to benchmark the performance of vCache against several baselines. 
+    It evaluates cache hit rates, accuracy, latency, and other metrics across different configurations.
 
-MAX_SAMPLES: int = 10000
+    The primary configuration is done by modifying the global variables in the Benchmark Config section:
+
+    1.  `RUN_COMBINATIONS`: This is the most important setting. It's a list of tuples, where each tuple 
+        defines a complete benchmark scenario to run. Each tuple contains:
+        - `EmbeddingModel`: The embedding model to use (e.g., `EmbeddingModel.GTE`).
+        - `LargeLanguageModel`: The large language model to use (e.g., `LargeLanguageModel.GPT_4O_MINI`).
+        - `Dataset`: The dataset for the benchmark. The string values correspond to Hugging Face dataset 
+           repository IDs (e.g., 'vCache/SemBenchmarkSearchQueries'). These datasets will be automatically 
+           downloaded and cached by the `datasets` library on the first run.
+        - `GeneratePlotsOnly`: Set to `GeneratePlotsOnly.YES` to skip the benchmark and only regenerate 
+           plots from existing results.
+        - `SimilarityEvaluator`: The strategy for comparing semantic similarity (e.g., `StringComparisonSimilarityEvaluator`, 
+          `BenchmarkComparisonSimilarityEvaluator`).
+        - `EvictionPolicy`: The cache eviction policy to use (e.g., `SCUEvictionPolicy`).
+
+    2.  `BASELINES_TO_RUN`: A list to specify which caching strategies to evaluate. Every baseline is run 
+        for every run combination. Comment out or remove baselines you don't want to run. Available baselines 
+        include `VCacheLocal`, `GPTCache`, `BerkeleyEmbedding`, etc.
+
+    3.  `STATIC_THRESHOLDS`: A list of floating-point values for the similarity thresholds used by static policies 
+        like GPTCache and BerkeleyEmbedding. The benchmark will run once for each threshold in this list.
+
+    4.  `DELTAS`: A list of floating-point values for the `delta` parameter used by dynamic policies 
+        like vCache. The benchmark will run once for each delta in this list.
+
+    Additional configuration variables:
+
+    5.  `CONFIDENCE_INTERVALS_ITERATIONS`: Number of iterations to run each configuration for calculating 
+        confidence intervals in statistical analysis.
+
+    6.  `DISABLE_PROGRESS_BAR`: Set to `True` to disable the progress bar during benchmark execution. 
+
+    7.  `KEEP_SPLIT`: Determines how many samples to keep from the dataset for evaluation. This controls 
+        the size of the test set used in the benchmark.
+
+    8.  `MAX_VECTOR_DB_CAPACITY`: Maximum capacity for the vector database.
+
+    9.  `PLOT_FONT_SIZE`: Font size used in generated plots and visualizations.
+
+"""
+
 CONFIDENCE_INTERVALS_ITERATIONS: int = 1
 DISABLE_PROGRESS_BAR: bool = False
 KEEP_SPLIT: int = 100
+MAX_VECTOR_DB_CAPACITY: int = 150000
+PLOT_FONT_SIZE: int = 50
 
 RUN_COMBINATIONS: List[
     Tuple[EmbeddingModel, LargeLanguageModel, Dataset, GeneratePlotsOnly]
@@ -126,15 +171,17 @@ RUN_COMBINATIONS: List[
         Dataset.SEM_BENCHMARK_ARENA,
         GeneratePlotsOnly.NO,
         BenchmarkComparisonSimilarityEvaluator(),
-        SCUEvictionPolicy(max_size=2000, watermark=0.99, eviction_percentage=0.1),
+        SCUEvictionPolicy(max_size=6000, watermark=0.99, eviction_percentage=0.1),
+        60000,
     ),
     (
-        EmbeddingModel.GTE,
-        LargeLanguageModel.LLAMA_3_8B,
+        EmbeddingModel.E5_LARGE_V2,
+        LargeLanguageModel.GPT_4O_MINI,
         Dataset.SEM_BENCHMARK_SEARCH_QUERIES,
         GeneratePlotsOnly.NO,
         BenchmarkComparisonSimilarityEvaluator(),
-        SCUEvictionPolicy(max_size=2000, watermark=0.99, eviction_percentage=0.1),
+        SCUEvictionPolicy(max_size=15000, watermark=0.99, eviction_percentage=0.1),
+        150000,
     ),
     (
         EmbeddingModel.GTE,
@@ -142,46 +189,47 @@ RUN_COMBINATIONS: List[
         Dataset.SEM_BENCHMARK_CLASSIFICATION,
         GeneratePlotsOnly.NO,
         StringComparisonSimilarityEvaluator(),
-        SCUEvictionPolicy(max_size=750, watermark=0.99, eviction_percentage=0.1),
+        SCUEvictionPolicy(max_size=4500, watermark=0.99, eviction_percentage=0.1),
+        45000,
     ),
 ]
 
 BASELINES_TO_RUN: List[Baseline] = [
-    # Baseline.IID,
-    # Baseline.GPTCache,
     Baseline.VCacheLocal,
-    # Baseline.BerkeleyEmbedding,
-    # Baseline.VCacheBerkeleyEmbedding,
+    Baseline.IID,
+    Baseline.GPTCache,
+    Baseline.BerkeleyEmbedding,
+    Baseline.VCacheBerkeleyEmbedding,
 ]
 
-STATIC_THRESHOLDS: List[float] = [
-    0.80,
-    0.81,
-    0.82,
-    0.83,
-    0.84,
-    0.85,
-    0.86,
-    0.87,
-    0.88,
-    0.89,
-    0.90,
-    0.91,
-    0.92,
-    0.93,
-    0.94,
-    0.95,
-    0.96,
-    0.97,
-    0.98,
-]
+STATIC_THRESHOLDS: List[float] = [0.98]
+# STATIC_THRESHOLDS: List[float] = [
+#     0.80,
+#     0.81,
+#     0.82,
+#     0.83,
+#     0.84,
+#     0.85,
+#     0.86,
+#     0.87,
+#     0.88,
+#     0.89,
+#     0.90,
+#     0.91,
+#     0.92,
+#     0.93,
+#     0.94,
+#     0.95,
+#     0.96,
+#     0.97,
+#     0.98,
+#     0.99
+# ]
 
-DELTAS: List[float] = [
-    0.05
-]  # , 0.015, 0.02, 0.025, 0.03, 0.035, 0.04, 0.05, 0.06, 0.07]
-
-MAX_VECTOR_DB_CAPACITY: int = 100000
-PLOT_FONT_SIZE: int = 50
+DELTAS: List[float] = [0.05]
+# DELTAS: List[float] = [
+#     0.01, 0.015, 0.02, 0.025, 0.03, 0.035, 0.04, 0.05, 0.06, 0.07
+# ]
 
 
 ########################################################################################################################
@@ -219,16 +267,17 @@ class Benchmark(unittest.TestCase):
         if self.output_folder_path and not os.path.exists(self.output_folder_path):
             os.makedirs(self.output_folder_path)
 
-    def run_benchmark_loop(self, data_entries):
+    def run_benchmark_loop(self, data_entries, max_samples):
         logging.info("Running benchmark loop")
         pbar = tqdm(
-            total=MAX_SAMPLES,
+            total=min(max_samples, len(data_entries)),
             desc="Processing entries",
             disable=DISABLE_PROGRESS_BAR,
         )
         logging.info(f"data_entries: {data_entries}")
+
         for idx, data_entry in enumerate(data_entries):
-            if idx >= MAX_SAMPLES:
+            if idx >= max_samples:
                 break
 
             # 1) Get Data
@@ -252,6 +301,8 @@ class Benchmark(unittest.TestCase):
             candidate_embedding: List[float] = data_entry[self.embedding_model[0]]
 
             label_id_set: int = data_entry.get("id_set", -1)
+            if label_id_set == -1:
+                label_id_set: int = data_entry.get("ID_Set", -1)
 
             (
                 is_cache_hit,
@@ -290,7 +341,7 @@ class Benchmark(unittest.TestCase):
 
         pbar.close()
 
-    def test_run_benchmark(self):
+    def test_run_benchmark(self, max_samples):
         if not self.filepath or not self.embedding_model or not self.llm_model:
             raise ValueError(
                 f"Required parameters not set: filepath: {self.filepath}, embedding_model: {self.embedding_model}, or llm_model: {self.llm_model}"
@@ -300,14 +351,14 @@ class Benchmark(unittest.TestCase):
             if "/" in self.filepath:
                 logging.info(f"Loading Hugging Face dataset: {self.filepath}")
                 data_iterator = load_dataset(
-                    self.filepath, split=f"train[:{MAX_SAMPLES}]"
+                    self.filepath, split=f"train[:{max_samples}]"
                 )
-                self.run_benchmark_loop(data_iterator)
+                self.run_benchmark_loop(data_iterator, max_samples)
             else:
                 logging.info(f"Loading local dataset: {self.filepath}")
                 with open(self.filepath, "rb") as file:
                     data_entries = ijson.items(file, "item")
-                    self.run_benchmark_loop(data_entries)
+                    self.run_benchmark_loop(data_entries, max_samples)
 
         except FileNotFoundError as e:
             logging.error(f"Benchmark dataset file not found: {e}")
@@ -535,6 +586,7 @@ def __run_baseline(
     threshold: float,
     similarity_evaluator: SimilarityEvaluator,
     eviction_policy: EvictionPolicy,
+    max_samples: int,
 ):
     vcache_config: VCacheConfig = VCacheConfig(
         inference_engine=BenchmarkInferenceEngine(),
@@ -562,7 +614,7 @@ def __run_baseline(
 
     benchmark.stats_set_up()
     try:
-        benchmark.test_run_benchmark()
+        benchmark.test_run_benchmark(max_samples)
     except Exception as e:
         logging.error(f"Error running benchmark: {e}")
 
@@ -588,6 +640,7 @@ def main():
         generate_plots_only,
         similarity_evaluator,
         eviction_policy,
+        max_samples,
     ) in RUN_COMBINATIONS:
         try:
             dataset_name = dataset.value
@@ -600,7 +653,7 @@ def main():
                 logging.info(f"Using local dataset: {dataset_path}")
 
             logging.info(
-                f"Running benchmark for dataset: {dataset_name}, embedding model: {embedding_model.value[1]}, LLM model: {llm_model.value[1]}\n"
+                f"\nRunning benchmark for dataset: {dataset_name}, embedding model: {embedding_model.value[1]}, LLM model: {llm_model.value[1]}\n"
             )
             start_time_llm_model = time.time()
 
@@ -637,6 +690,7 @@ def main():
                             threshold=-1,
                             similarity_evaluator=similarity_evaluator,
                             eviction_policy=eviction_policy,
+                            max_samples=max_samples,
                         )
 
             #####################################################
@@ -673,6 +727,7 @@ def main():
                         threshold=-1,
                         similarity_evaluator=similarity_evaluator,
                         eviction_policy=eviction_policy,
+                        max_samples=max_samples,
                     )
 
             #####################################################
@@ -723,6 +778,7 @@ def main():
                         threshold=threshold,
                         similarity_evaluator=similarity_evaluator,
                         eviction_policy=eviction_policy,
+                        max_samples=max_samples,
                     )
 
             #####################################################
@@ -774,6 +830,7 @@ def main():
                             threshold=-1,
                             similarity_evaluator=similarity_evaluator,
                             eviction_policy=eviction_policy,
+                            max_samples=max_samples,
                         )
 
             #####################################################
@@ -808,6 +865,7 @@ def main():
                             threshold=-1,
                             similarity_evaluator=similarity_evaluator,
                             eviction_policy=eviction_policy,
+                            max_samples=max_samples,
                         )
 
             #####################################################
@@ -839,6 +897,7 @@ def main():
                         threshold=threshold,
                         similarity_evaluator=similarity_evaluator,
                         eviction_policy=eviction_policy,
+                        max_samples=max_samples,
                     )
 
             #####################################################

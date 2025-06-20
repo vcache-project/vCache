@@ -1,3 +1,5 @@
+import logging
+
 from vcache.vcache_core.similarity_evaluator.similarity_evaluator import (
     SimilarityEvaluator,
 )
@@ -42,4 +44,10 @@ class BenchmarkComparisonSimilarityEvaluator(SimilarityEvaluator):
         Returns:
             True if both answers belong to the same id_set, False otherwise.
         """
+        if id_set_a == -1 or id_set_b == -1:
+            logging.warning(
+                f"BenchmarkComparisonSimilarityEvaluator - Verify your Configuration - id_set_a: {id_set_a}, id_set_b: {id_set_b}"
+            )
+            return False
+
         return id_set_a == id_set_b

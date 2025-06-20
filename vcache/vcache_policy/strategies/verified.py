@@ -207,10 +207,12 @@ class VerifiedDecisionPolicy(VCachePolicy):
         similarity_score, embedding_id = knn[0]
 
         try:
-            nn_metadata = self.cache.get_metadata(embedding_id=embedding_id)
+            nn_metadata: EmbeddingMetadataObj = self.cache.get_metadata(
+                embedding_id=embedding_id
+            )
         except Exception:
             # Cache eviction fallback
-            new_response = self.inference_engine.create(
+            new_response: str = self.inference_engine.create(
                 prompt=prompt, system_prompt=system_prompt
             )
             self.cache.add(prompt=prompt, response=new_response, id_set=id_set)
