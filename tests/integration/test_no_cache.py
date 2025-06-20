@@ -37,14 +37,14 @@ class TestvcacheNoCache(unittest.TestCase):
         vcache = VCache(config, policy)
 
         # First request should be a miss
-        cache_hit, response, _ = vcache.infer_with_cache_info(
+        cache_hit, response, _, _ = vcache.infer_with_cache_info(
             prompt="What is the capital of France?"
         )
         self.assertFalse(cache_hit, "Request should be a miss with cache disabled")
         self.assertTrue(len(response) > 0, "Response should not be empty")
 
         # Same request should still be a miss with cache disabled
-        cache_hit, response, _ = vcache.infer_with_cache_info(
+        cache_hit, response, _, _ = vcache.infer_with_cache_info(
             prompt="What is the capital of France?"
         )
         self.assertFalse(

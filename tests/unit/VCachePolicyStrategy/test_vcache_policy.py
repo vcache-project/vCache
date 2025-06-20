@@ -23,12 +23,13 @@ class TestVerifiedDecisionPolicy(unittest.TestCase):
         self.mock_metadata_store = {}
         self.next_embedding_id = 0
 
-        def add_to_cache(prompt, response):
+        def add_to_cache(prompt, response, id_set=None):
             self.next_embedding_id += 1
             # Simulate adding metadata
             mock_meta = MagicMock(spec=EmbeddingMetadataObj)
             mock_meta.response = response
             mock_meta.observations = []
+            mock_meta.id_set = id_set
             self.mock_metadata_store[self.next_embedding_id] = mock_meta
             return self.next_embedding_id
 
@@ -69,12 +70,12 @@ class TestVerifiedDecisionPolicy(unittest.TestCase):
         self.mock_cache.get_knn.return_value = []
         self.mock_inference_engine.create.return_value = "new response"
 
-        is_hit, response, _ = self.policy.process_request("prompt", None)
+        is_hit, response, _ = self.policy.process_request("prompt", None, id_set=1)
 
         self.assertFalse(is_hit)
         self.assertEqual(response, "new response")
         self.mock_cache.add.assert_called_once_with(
-            prompt="prompt", response="new response"
+            prompt="prompt", response="new response", id_set=1
         )
 
     @patch("vcache.vcache_policy.strategies.verified._Algorithm.select_action")
@@ -86,9 +87,10 @@ class TestVerifiedDecisionPolicy(unittest.TestCase):
         mock_meta = MagicMock(spec=EmbeddingMetadataObj)
         mock_meta.response = "cached response"
         mock_meta.observations = []
+        mock_meta.id_set = 1
         self.mock_metadata_store[1] = mock_meta
 
-        is_hit, response, _ = self.policy.process_request("prompt", None)
+        is_hit, response, _ = self.policy.process_request("prompt", None, id_set=1)
 
         self.assertTrue(is_hit)
         self.assertEqual(response, "cached response")
@@ -103,12 +105,13 @@ class TestVerifiedDecisionPolicy(unittest.TestCase):
         mock_meta = MagicMock(spec=EmbeddingMetadataObj)
         mock_meta.response = "cached response"
         mock_meta.observations = []
+        mock_meta.id_set = 1
         self.mock_metadata_store[1] = mock_meta
 
         self.mock_inference_engine.create.return_value = "new response"
         self.mock_similarity_evaluator.answers_similar.return_value = True
 
-        is_hit, response, _ = self.policy.process_request("prompt", None)
+        is_hit, response, _ = self.policy.process_request("prompt", None, id_set=1)
         self.policy.shutdown()  # Wait for background tasks to finish
 
         self.assertFalse(is_hit)
@@ -131,13 +134,13 @@ class TestVerifiedDecisionPolicy(unittest.TestCase):
                 prompt = f"writer-{i}-prompt-{j}"
                 self.mock_cache.get_knn.return_value = []  # Force miss
                 self.mock_inference_engine.create.return_value = "new response"
-                self.policy.process_request(prompt, None)
+                self.policy.process_request(prompt, None, id_set=1)
             return True
 
         def reader_task(i):
             for _ in range(ops_per_thread):
                 self.mock_cache.get_knn.return_value = [(0.9, 1)]  # Force hit
-                self.policy.process_request("reader-prompt", None)
+                self.policy.process_request("reader-prompt", None, id_set=1)
             return True
 
         with ThreadPoolExecutor(max_workers=num_threads) as executor:
@@ -163,6 +166,7 @@ class TestVerifiedDecisionPolicy(unittest.TestCase):
         mock_meta = MagicMock(spec=EmbeddingMetadataObj)
         mock_meta.response = "cached"
         mock_meta.observations = []
+        mock_meta.id_set = 1
         self.mock_metadata_store[1] = mock_meta
 
         with patch.object(
@@ -173,7 +177,7 @@ class TestVerifiedDecisionPolicy(unittest.TestCase):
                 self.mock_cache.get_knn.return_value = [(0.8, 1)]
                 self.mock_inference_engine.create.return_value = "new response"
                 self.mock_similarity_evaluator.answers_similar.return_value = True
-                self.policy.process_request("similar_prompt", None)
+                self.policy.process_request("similar_prompt", None, id_set=1)
                 return True
 
             with ThreadPoolExecutor(max_workers=num_threads) as executor:
@@ -198,13 +202,13 @@ class TestVerifiedDecisionPolicy(unittest.TestCase):
         self.mock_cache.get_metadata.side_effect = KeyError("Metadata not found")
         self.mock_inference_engine.create.return_value = "fallback response"
 
-        is_hit, response, _ = self.policy.process_request("prompt", None)
+        is_hit, response, _ = self.policy.process_request("prompt", None, id_set=1)
 
         self.assertFalse(is_hit)
         self.assertEqual(response, "fallback response")
         # It should have been treated as a cache miss, so add is called
         self.mock_cache.add.assert_called_once_with(
-            prompt="prompt", response="fallback response"
+            prompt="prompt", response="fallback response", id_set=1
         )
 
     def test_race_condition_update_vs_eviction(self):
@@ -216,6 +220,7 @@ class TestVerifiedDecisionPolicy(unittest.TestCase):
             mock_meta = MagicMock(spec=EmbeddingMetadataObj)
             mock_meta.response = "cached"
             mock_meta.observations = []
+            mock_meta.id_set = 1
             self.mock_metadata_store[1] = mock_meta
             self.mock_inference_engine.create.return_value = "new response"
 
@@ -232,7 +237,7 @@ class TestVerifiedDecisionPolicy(unittest.TestCase):
             self.mock_cache.get_metadata.side_effect = get_metadata_for_update
 
             # This call will queue the background update
-            self.policy.process_request("prompt", None)
+            self.policy.process_request("prompt", None, id_set=1)
 
             # Allow background tasks to run and complete
             self.policy.shutdown()

@@ -38,21 +38,21 @@ class TestvcacheStaticThreshold(unittest.TestCase):
         vcache = VCache(config, policy)
 
         # First request should be a miss
-        cache_hit, response, _ = vcache.infer_with_cache_info(
+        cache_hit, response, _, _ = vcache.infer_with_cache_info(
             prompt="What is the capital of France?"
         )
         self.assertFalse(cache_hit, "First request should be a cache miss")
         self.assertTrue(len(response) > 0, "Response should not be empty")
 
         # Same request should be a hit
-        cache_hit, response, _ = vcache.infer_with_cache_info(
+        cache_hit, response, _, _ = vcache.infer_with_cache_info(
             prompt="What is the capital of France?"
         )
         self.assertTrue(cache_hit, "Identical request should be a cache hit")
         self.assertTrue(len(response) > 0, "Response should not be empty")
 
         # Similar but different request, should be a hit
-        cache_hit, response, _ = vcache.infer_with_cache_info(
+        cache_hit, response, _, _ = vcache.infer_with_cache_info(
             prompt="What's France's capital city?"
         )
         self.assertTrue(
@@ -61,7 +61,7 @@ class TestvcacheStaticThreshold(unittest.TestCase):
         self.assertTrue(len(response) > 0, "Response should not be empty")
 
         # Different request should be a miss
-        cache_hit, response, _ = vcache.infer_with_cache_info(
+        cache_hit, response, _, _ = vcache.infer_with_cache_info(
             prompt="What is the capital of Germany?"
         )
         self.assertFalse(cache_hit, "Different request should be a cache miss")
@@ -74,13 +74,13 @@ class TestvcacheStaticThreshold(unittest.TestCase):
         vcache = VCache(config, policy)
 
         # First request should be a miss
-        cache_hit, _, _ = vcache.infer_with_cache_info(
+        cache_hit, _, _, _ = vcache.infer_with_cache_info(
             prompt="What is the capital of France?"
         )
         self.assertFalse(cache_hit, "First request should be a cache miss")
 
         # Similar request with low threshold should be a hit
-        cache_hit, _, _ = vcache.infer_with_cache_info(
+        cache_hit, _, _, _ = vcache.infer_with_cache_info(
             prompt="What's France's capital city?"
         )
         self.assertTrue(
@@ -94,13 +94,13 @@ class TestvcacheStaticThreshold(unittest.TestCase):
         vcache = VCache(config, policy)
 
         # First request should be a miss
-        cache_hit, _, _ = vcache.infer_with_cache_info(
+        cache_hit, _, _, _ = vcache.infer_with_cache_info(
             prompt="What is the capital of France?"
         )
         self.assertFalse(cache_hit, "First request should be a cache miss")
 
         # Similar request with high threshold should be a miss
-        cache_hit, _, _ = vcache.infer_with_cache_info(
+        cache_hit, _, _, _ = vcache.infer_with_cache_info(
             prompt="What's France's capital city?"
         )
         self.assertFalse(

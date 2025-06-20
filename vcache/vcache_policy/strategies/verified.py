@@ -171,7 +171,7 @@ class VerifiedDecisionPolicy(VCachePolicy):
 
     @override
     def process_request(
-        self, prompt: str, system_prompt: Optional[str]
+        self, prompt: str, system_prompt: Optional[str], id_set: int
     ) -> tuple[bool, str, EmbeddingMetadataObj]:
         """
         Process a request using dynamic local threshold policy.
@@ -186,6 +186,9 @@ class VerifiedDecisionPolicy(VCachePolicy):
         Args:
             prompt: The prompt to check for cache hit.
             system_prompt: The optional system prompt to use for the response. It will override the system prompt in the VCacheConfig if provided.
+            id_set: The set identifier for the embedding. This is used in the
+                benchmark to identify if the nearest neighbor is from the same set
+                (if the cached response is correct or incorrect).
 
         Returns:
             Tuple containing [is_cache_hit, actual_response, nn_metadata_object].
@@ -198,19 +201,21 @@ class VerifiedDecisionPolicy(VCachePolicy):
             response = self.inference_engine.create(
                 prompt=prompt, system_prompt=system_prompt
             )
-            self.cache.add(prompt=prompt, response=response)
+            self.cache.add(prompt=prompt, response=response, id_set=id_set)
             return False, response, EmbeddingMetadataObj(embedding_id=-1, response="")
 
         similarity_score, embedding_id = knn[0]
 
         try:
-            metadata = self.cache.get_metadata(embedding_id=embedding_id)
+            nn_metadata: EmbeddingMetadataObj = self.cache.get_metadata(
+                embedding_id=embedding_id
+            )
         except Exception:
             # Cache eviction fallback
-            new_response = self.inference_engine.create(
+            new_response: str = self.inference_engine.create(
                 prompt=prompt, system_prompt=system_prompt
             )
-            self.cache.add(prompt=prompt, response=new_response)
+            self.cache.add(prompt=prompt, response=new_response, id_set=id_set)
             return (
                 False,
                 new_response,
@@ -218,12 +223,12 @@ class VerifiedDecisionPolicy(VCachePolicy):
             )
 
         action = self.bayesian.select_action(
-            similarity_score=similarity_score, metadata=metadata
+            similarity_score=similarity_score, metadata=nn_metadata
         )
 
         match action:
             case _Action.EXPLOIT:
-                return True, metadata.response, metadata
+                return True, nn_metadata.response, nn_metadata
             case _Action.EXPLORE:
                 response = self.inference_engine.create(
                     prompt=prompt, system_prompt=system_prompt
@@ -231,21 +236,23 @@ class VerifiedDecisionPolicy(VCachePolicy):
 
                 self.__update_cache(
                     response=response,
-                    metadata=metadata,
+                    nn_metadata=nn_metadata,
                     similarity_score=similarity_score,
                     embedding_id=embedding_id,
                     prompt=prompt,
+                    label_id_set=id_set,
                 )
 
-                return False, response, metadata
+                return False, response, nn_metadata
 
     def __update_cache(
         self,
         response: str,
-        metadata: EmbeddingMetadataObj,
+        nn_metadata: EmbeddingMetadataObj,
         similarity_score: float,
         embedding_id: int,
         prompt: str,
+        label_id_set: int,
     ) -> None:
         """
         Asynchronously validates the correctness of the cached response and updates the cache.
@@ -259,10 +266,13 @@ class VerifiedDecisionPolicy(VCachePolicy):
 
         Args:
             response: The response to check for correctness.
-            metadata: The metadata of the embedding.
+            nn_metadata: The metadata of the nearest neighbor embedding.
             similarity_score: The similarity score between the query and the embedding.
             embedding_id: The id of the embedding.
             prompt: The prompt that was used to generate the response.
+            label_id_set: The set identifier for the embedding. This is used in the
+                benchmark to identify if the nearest neighbor is from the same set
+                (if the cached response is correct or incorrect).
         """
         if self.executor is None:
             raise ValueError("Executor not initialized. Call setup() first.")
@@ -273,7 +283,9 @@ class VerifiedDecisionPolicy(VCachePolicy):
             similarity_score,
             embedding_id,
             prompt,
-            metadata.response,
+            nn_metadata.response,
+            label_id_set,
+            nn_metadata.id_set,
         )
 
     def __submit_for_background_update(
@@ -283,6 +295,8 @@ class VerifiedDecisionPolicy(VCachePolicy):
         embedding_id: int,
         prompt: str,
         cached_response: str,
+        label_id_set: int,
+        nn_id_set: int,
     ):
         """
         Submits a task to check answer similarity and queue a cache update.
@@ -297,9 +311,11 @@ class VerifiedDecisionPolicy(VCachePolicy):
             embedding_id: The ID of the nearest neighbor embedding.
             prompt: The original user prompt.
             cached_response: The response from the cached nearest neighbor.
+            label_id_set: The id_set of the label.
+            nn_id_set: The id_set of the nearest neighbor.
         """
         should_have_exploited = self.similarity_evaluator.answers_similar(
-            a=new_response, b=cached_response
+            a=new_response, b=cached_response, id_set_a=label_id_set, id_set_b=nn_id_set
         )
         self.callback_queue.put(
             (
@@ -308,6 +324,7 @@ class VerifiedDecisionPolicy(VCachePolicy):
                 similarity_score,
                 embedding_id,
                 prompt,
+                label_id_set,
             )
         )
 
@@ -330,6 +347,9 @@ class VerifiedDecisionPolicy(VCachePolicy):
                          - similarity_score (float): The similarity score.
                          - embedding_id (int): The ID of the nearest neighbor.
                          - prompt (str): The original user prompt.
+                         - id_set (int): The set identifier for the embedding. This is used in the
+                            benchmark to identify if the nearest neighbor is from the same set
+                            (if the cached response is correct or incorrect).
         """
         (
             should_have_exploited,
@@ -337,6 +357,7 @@ class VerifiedDecisionPolicy(VCachePolicy):
             similarity_score,
             embedding_id,
             prompt,
+            id_set,
         ) = update_args
 
         try:
@@ -364,7 +385,7 @@ class VerifiedDecisionPolicy(VCachePolicy):
             return
 
         if not should_have_exploited:
-            self.cache.add(prompt=prompt, response=new_response)
+            self.cache.add(prompt=prompt, response=new_response, id_set=id_set)
 
         try:
             self.cache.update_metadata(

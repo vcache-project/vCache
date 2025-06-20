@@ -30,7 +30,7 @@ class Cache:
         self.embedding_engine: EmbeddingEngine = embedding_engine
         self.eviction_policy: EvictionPolicy = eviction_policy
 
-    def add(self, prompt: str, response: str) -> int:
+    def add(self, prompt: str, response: str, id_set: int) -> int:
         """Computes and adds an embedding to the vector database and metadata store.
 
         Note:
@@ -41,12 +41,15 @@ class Cache:
         Args:
             prompt (str): The prompt to add to the cache.
             response (str): The response to associate with the prompt.
+            id_set (int): The set identifier for the embedding. This is used in the
+                benchmark to identify if the nearest neighbor is from the same set
+                (if the cached response is correct or incorrect).
 
         Returns:
             int: The ID of the newly added embedding.
         """
         embedding = self.embedding_engine.get_embedding(prompt)
-        return self.embedding_store.add_embedding(embedding, response)
+        return self.embedding_store.add_embedding(embedding, response, id_set)
 
     def remove(self, embedding_id: int) -> int:
         """Removes an embedding and its metadata from the cache.

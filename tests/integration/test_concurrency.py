@@ -26,7 +26,7 @@ class TestConcurrency(unittest.TestCase):
 
         mock_answers_similar = MagicMock()
 
-        def answers_similar(a, b):
+        def answers_similar(a, b, id_set_a=None, id_set_b=None):
             if "Return 'xxxxxxxxx' as the answer" in a:
                 time.sleep(10)
                 print(f"Answers Similar (Execution time: 10s) => a: {a}, b: {b}\n")

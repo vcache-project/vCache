@@ -241,7 +241,7 @@ class TestEvictionPolicy(unittest.TestCase):
         new_response = "new response"
 
         # Add an item to the cache
-        self.vcache.vcache_policy.cache.add(prompt, cached_response)
+        self.vcache.vcache_policy.cache.add(prompt, cached_response, id_set=1)
         knn_result = self.vcache.vcache_policy.cache.get_knn(prompt, k=1)
         self.assertIsNotNone(knn_result)
         embedding_id = knn_result[0][1]
@@ -256,7 +256,7 @@ class TestEvictionPolicy(unittest.TestCase):
             return_value=new_response,
         ) as mock_create:
             is_hit, response, _ = self.vcache.vcache_policy.process_request(
-                prompt, None
+                prompt, None, id_set=1
             )
 
             self.assertFalse(is_hit)

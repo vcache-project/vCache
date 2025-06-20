@@ -10,6 +10,7 @@ from typing import Dict, List, Tuple
 import ijson
 import numpy as np
 import torch
+from datasets import load_dataset
 from tqdm import tqdm
 
 from benchmarks._plotter_combined import generate_combined_plots
@@ -36,6 +37,9 @@ from vcache.vcache_core.cache.embedding_store.vector_db import (
 from vcache.vcache_core.cache.eviction_policy.eviction_policy import EvictionPolicy
 from vcache.vcache_core.cache.eviction_policy.strategies.scu import SCUEvictionPolicy
 from vcache.vcache_core.similarity_evaluator import SimilarityEvaluator
+from vcache.vcache_core.similarity_evaluator.strategies.benchmark_comparison import (
+    BenchmarkComparisonSimilarityEvaluator,
+)
 from vcache.vcache_core.similarity_evaluator.strategies.string_comparison import (
     StringComparisonSimilarityEvaluator,
 )
@@ -93,12 +97,9 @@ class Baseline(Enum):
 
 
 class Dataset(Enum):
-    SEM_BENCHMARK_CLASSIFICATION = "benchmark_classification"
-    SEM_BENCHMARK_ARENA = "benchmark_arena"
-    SEM_BENCHMARK_SEARCH_QUERIES = "sem_benchmark_search_queries_150k"
-    AMAZON_INSTANT_VIDEO = "amazon_instant_video"
-    COMMONSENSE_QA = "commonsense_qa"
-    ECOMMERCE_DATASET = "ecommerce_dataset"
+    SEM_BENCHMARK_CLASSIFICATION = "vCache/SemBenchmarkClassification"
+    SEM_BENCHMARK_ARENA = "vCache/SemBenchmarkLmArena"
+    SEM_BENCHMARK_SEARCH_QUERIES = "vCache/SemBenchmarkSearchQueries"
 
 
 class GeneratePlotsOnly(Enum):
@@ -110,61 +111,125 @@ class GeneratePlotsOnly(Enum):
 ### Benchmark Config ###################################################################################################
 ########################################################################################################################
 
+"""
+    This script is designed to benchmark the performance of vCache against several baselines. 
+    It evaluates cache hit rates, accuracy, latency, and other metrics across different configurations.
 
-MAX_SAMPLES: int = 20000
-CONFIDENCE_INTERVALS_ITERATIONS: int = 5
+    The primary configuration is done by modifying the global variables in the Benchmark Config section:
+
+    1.  `RUN_COMBINATIONS`: This is the most important setting. It's a list of tuples, where each tuple 
+        defines a complete benchmark scenario to run. Each tuple contains:
+        - `EmbeddingModel`: The embedding model to use (e.g., `EmbeddingModel.GTE`).
+        - `LargeLanguageModel`: The large language model to use (e.g., `LargeLanguageModel.GPT_4O_MINI`).
+        - `Dataset`: The dataset for the benchmark. The string values correspond to Hugging Face dataset 
+           repository IDs (e.g., 'vCache/SemBenchmarkSearchQueries'). These datasets will be automatically 
+           downloaded and cached by the `datasets` library on the first run.
+        - `GeneratePlotsOnly`: Set to `GeneratePlotsOnly.YES` to skip the benchmark and only regenerate 
+           plots from existing results.
+        - `SimilarityEvaluator`: The strategy for comparing semantic similarity (e.g., `StringComparisonSimilarityEvaluator`, 
+          `BenchmarkComparisonSimilarityEvaluator`).
+        - `EvictionPolicy`: The cache eviction policy to use (e.g., `SCUEvictionPolicy`).
+
+    2.  `BASELINES_TO_RUN`: A list to specify which caching strategies to evaluate. Every baseline is run 
+        for every run combination. Comment out or remove baselines you don't want to run. Available baselines 
+        include `VCacheLocal`, `GPTCache`, `BerkeleyEmbedding`, etc.
+
+    3.  `STATIC_THRESHOLDS`: A list of floating-point values for the similarity thresholds used by static policies 
+        like GPTCache and BerkeleyEmbedding. The benchmark will run once for each threshold in this list.
+
+    4.  `DELTAS`: A list of floating-point values for the `delta` parameter used by dynamic policies 
+        like vCache. The benchmark will run once for each delta in this list.
+
+    Additional configuration variables:
+
+    5.  `CONFIDENCE_INTERVALS_ITERATIONS`: Number of iterations to run each configuration for calculating 
+        confidence intervals in statistical analysis.
+
+    6.  `DISABLE_PROGRESS_BAR`: Set to `True` to disable the progress bar during benchmark execution. 
+
+    7.  `KEEP_SPLIT`: Determines how many samples to keep from the dataset for evaluation. This controls 
+        the size of the test set used in the benchmark.
+
+    8.  `MAX_VECTOR_DB_CAPACITY`: Maximum capacity for the vector database.
+
+    9.  `PLOT_FONT_SIZE`: Font size used in generated plots and visualizations.
+
+"""
+
+CONFIDENCE_INTERVALS_ITERATIONS: int = 1
 DISABLE_PROGRESS_BAR: bool = False
 KEEP_SPLIT: int = 100
+MAX_VECTOR_DB_CAPACITY: int = 150000
+PLOT_FONT_SIZE: int = 50
 
 RUN_COMBINATIONS: List[
     Tuple[EmbeddingModel, LargeLanguageModel, Dataset, GeneratePlotsOnly]
 ] = [
     (
         EmbeddingModel.GTE,
+        LargeLanguageModel.GPT_4O_MINI,
+        Dataset.SEM_BENCHMARK_ARENA,
+        GeneratePlotsOnly.NO,
+        BenchmarkComparisonSimilarityEvaluator(),
+        SCUEvictionPolicy(max_size=6000, watermark=0.99, eviction_percentage=0.1),
+        60000,
+    ),
+    (
+        EmbeddingModel.E5_LARGE_V2,
+        LargeLanguageModel.GPT_4O_MINI,
+        Dataset.SEM_BENCHMARK_SEARCH_QUERIES,
+        GeneratePlotsOnly.NO,
+        BenchmarkComparisonSimilarityEvaluator(),
+        SCUEvictionPolicy(max_size=15000, watermark=0.99, eviction_percentage=0.1),
+        150000,
+    ),
+    (
+        EmbeddingModel.GTE,
         LargeLanguageModel.LLAMA_3_8B,
         Dataset.SEM_BENCHMARK_CLASSIFICATION,
         GeneratePlotsOnly.NO,
         StringComparisonSimilarityEvaluator(),
-        SCUEvictionPolicy(max_size=500, watermark=0.99, eviction_percentage=0.1),
-    )
+        SCUEvictionPolicy(max_size=4500, watermark=0.99, eviction_percentage=0.1),
+        45000,
+    ),
 ]
 
 BASELINES_TO_RUN: List[Baseline] = [
-    # Baseline.IID,
-    # Baseline.GPTCache,
     Baseline.VCacheLocal,
-    # Baseline.BerkeleyEmbedding,
-    # Baseline.VCacheBerkeleyEmbedding,
+    Baseline.IID,
+    Baseline.GPTCache,
+    Baseline.BerkeleyEmbedding,
+    Baseline.VCacheBerkeleyEmbedding,
 ]
 
-STATIC_THRESHOLDS: List[float] = [
-    0.80,
-    0.81,
-    0.82,
-    0.83,
-    0.84,
-    0.85,
-    0.86,
-    0.87,
-    0.88,
-    0.89,
-    0.90,
-    0.91,
-    0.92,
-    0.93,
-    0.94,
-    0.95,
-    0.96,
-    0.97,
-    0.98,
-]
+STATIC_THRESHOLDS: List[float] = [0.98]
+# STATIC_THRESHOLDS: List[float] = [
+#     0.80,
+#     0.81,
+#     0.82,
+#     0.83,
+#     0.84,
+#     0.85,
+#     0.86,
+#     0.87,
+#     0.88,
+#     0.89,
+#     0.90,
+#     0.91,
+#     0.92,
+#     0.93,
+#     0.94,
+#     0.95,
+#     0.96,
+#     0.97,
+#     0.98,
+#     0.99
+# ]
 
-DELTAS: List[float] = [
-    0.01
-]  # , 0.015, 0.02, 0.025, 0.03, 0.035, 0.04, 0.05, 0.06, 0.07]
-
-MAX_VECTOR_DB_CAPACITY: int = 100000
-PLOT_FONT_SIZE: int = 50
+DELTAS: List[float] = [0.05]
+# DELTAS: List[float] = [
+#     0.01, 0.015, 0.02, 0.025, 0.03, 0.035, 0.04, 0.05, 0.06, 0.07
+# ]
 
 
 ########################################################################################################################
@@ -202,83 +267,98 @@ class Benchmark(unittest.TestCase):
         if self.output_folder_path and not os.path.exists(self.output_folder_path):
             os.makedirs(self.output_folder_path)
 
-    def test_run_benchmark(self):
+    def run_benchmark_loop(self, data_entries, max_samples):
+        logging.info("Running benchmark loop")
+        pbar = tqdm(
+            total=min(max_samples, len(data_entries)),
+            desc="Processing entries",
+            disable=DISABLE_PROGRESS_BAR,
+        )
+        logging.info(f"data_entries: {data_entries}")
+
+        for idx, data_entry in enumerate(data_entries):
+            if idx >= max_samples:
+                break
+
+            # 1) Get Data
+            task = data_entry["task"]
+            system_prompt = data_entry.get("output_format", "")
+            review_text = data_entry.get("text", "")
+
+            emb_generation_latency: float = float(
+                data_entry[self.embedding_model[0] + "_lat"]
+            )
+
+            llm_generation_latency: float = float(
+                data_entry[self.llm_model[0] + "_lat"]
+            )
+
+            # 2.1) Direct Inference (No Cache)
+            label_response: str = data_entry[self.llm_model[0]]
+            latency_direct: float = llm_generation_latency
+
+            # 2.2) vCache Inference (With Cache)
+            candidate_embedding: List[float] = data_entry[self.embedding_model[0]]
+
+            label_id_set: int = data_entry.get("id_set", -1)
+            if label_id_set == -1:
+                label_id_set: int = data_entry.get("ID_Set", -1)
+
+            (
+                is_cache_hit,
+                cache_response,
+                response_metadata,
+                nn_metadata,
+                latency_vcache_logic,
+            ) = self.get_vcache_answer(
+                task=task,
+                review_text=review_text,
+                candidate_embedding=candidate_embedding,
+                label_response=label_response,
+                system_prompt=system_prompt,
+                id_set=label_id_set,
+            )
+            latency_vcache: float = latency_vcache_logic + emb_generation_latency
+            if not is_cache_hit:
+                latency_vcache += llm_generation_latency
+
+            # This is important for the async logic
+            time.sleep(0.002)
+
+            # 3) Update Stats
+            self.update_stats(
+                is_cache_hit=is_cache_hit,
+                label_response=label_response,
+                cache_response=cache_response,
+                label_id_set=label_id_set,
+                response_metadata=response_metadata,
+                nn_metadata=nn_metadata,
+                latency_direct=latency_direct,
+                latency_vcache=latency_vcache,
+            )
+
+            pbar.update(1)
+
+        pbar.close()
+
+    def test_run_benchmark(self, max_samples):
         if not self.filepath or not self.embedding_model or not self.llm_model:
             raise ValueError(
                 f"Required parameters not set: filepath: {self.filepath}, embedding_model: {self.embedding_model}, or llm_model: {self.llm_model}"
             )
 
         try:
-            with open(self.filepath, "rb") as file:
-                data_entries = ijson.items(file, "item")
-
-                pbar = tqdm(
-                    total=MAX_SAMPLES,
-                    desc="Processing entries",
-                    disable=DISABLE_PROGRESS_BAR,
+            if "/" in self.filepath:
+                logging.info(f"Loading Hugging Face dataset: {self.filepath}")
+                data_iterator = load_dataset(
+                    self.filepath, split=f"train[:{max_samples}]"
                 )
-                for idx, data_entry in enumerate(data_entries):
-                    if idx >= MAX_SAMPLES:
-                        break
-
-                    # 1) Get Data
-                    task = data_entry["task"]
-                    system_prompt = data_entry.get("output_format", "")
-                    review_text = data_entry.get("text", "")
-
-                    # TODO Hacked: Needs to be fixed in benchmark arena json file
-                    if self.embedding_model[0] == "emb_e5_large_v2_ft":
-                        emb_generation_latency: float = float(
-                            data_entry["emb_e5_large_v2_lat"]
-                        )
-                    else:
-                        emb_generation_latency: float = float(
-                            data_entry[self.embedding_model[0] + "_lat"]
-                        )
-
-                    llm_generation_latency: float = float(
-                        data_entry[self.llm_model[0] + "_lat"]
-                    )
-
-                    # 2.1) Direct Inference (No Cache)
-                    label_response: str = data_entry[self.llm_model[0]]
-                    latency_direct: float = llm_generation_latency
-
-                    # 2.2) vCache Inference (With Cache)
-                    candidate_embedding: List[float] = data_entry[
-                        self.embedding_model[0]
-                    ]
-                    is_cache_hit, cache_response, nn_response, latency_vcache_logic = (
-                        self.get_vcache_answer(
-                            task=task,
-                            review_text=review_text,
-                            candidate_embedding=candidate_embedding,
-                            label_response=label_response,
-                            system_prompt=system_prompt,
-                        )
-                    )
-                    latency_vcache: float = (
-                        latency_vcache_logic + emb_generation_latency
-                    )
-                    if not is_cache_hit:
-                        latency_vcache += llm_generation_latency
-
-                    # This is important for the async logic
-                    time.sleep(0.002)
-
-                    # 3) Update Stats
-                    self.update_stats(
-                        is_cache_hit=is_cache_hit,
-                        label_response=label_response,
-                        cache_response=cache_response,
-                        nn_response=nn_response,
-                        latency_direct=latency_direct,
-                        latency_vcache=latency_vcache,
-                    )
-
-                    pbar.update(1)
-
-                pbar.close()
+                self.run_benchmark_loop(data_iterator, max_samples)
+            else:
+                logging.info(f"Loading local dataset: {self.filepath}")
+                with open(self.filepath, "rb") as file:
+                    data_entries = ijson.items(file, "item")
+                    self.run_benchmark_loop(data_entries, max_samples)
 
         except FileNotFoundError as e:
             logging.error(f"Benchmark dataset file not found: {e}")
@@ -303,16 +383,24 @@ class Benchmark(unittest.TestCase):
         is_cache_hit: bool,
         label_response: str,
         cache_response: str,
-        nn_response: str,
+        label_id_set: int,
+        response_metadata: EmbeddingMetadataObj,
+        nn_metadata: EmbeddingMetadataObj,
         latency_direct: float,
         latency_vcache: float,
     ):
         if is_cache_hit:  # If cache hit, the actual response is the nearest neighbor response (cache_response == nn_response)
             self.cache_hit_list.append(1)
             self.cache_miss_list.append(0)
-            cache_response_correct: bool = answers_have_same_meaning_static(
-                label_response, cache_response
-            )
+
+            equality_check_with_id_set: bool = label_id_set != -1
+            if equality_check_with_id_set:
+                cache_response_correct: bool = label_id_set == response_metadata.id_set
+            else:
+                cache_response_correct: bool = answers_have_same_meaning_static(
+                    label_response, cache_response
+                )
+
             if cache_response_correct:
                 self.tp_list.append(1)
                 self.fp_list.append(0)
@@ -324,9 +412,15 @@ class Benchmark(unittest.TestCase):
         else:  # If cache miss, the actual response is the label response
             self.cache_miss_list.append(1)
             self.cache_hit_list.append(0)
-            nn_response_correct: bool = answers_have_same_meaning_static(
-                label_response, nn_response
-            )
+
+            equality_check_with_id_set: bool = label_id_set != -1
+            if equality_check_with_id_set:
+                nn_response_correct: bool = label_id_set == nn_metadata.id_set
+            else:
+                nn_response_correct: bool = answers_have_same_meaning_static(
+                    label_response, nn_metadata.response
+                )
+
             if nn_response_correct:
                 self.fn_list.append(1)
                 self.tn_list.append(0)
@@ -346,10 +440,20 @@ class Benchmark(unittest.TestCase):
         candidate_embedding: List[float],
         label_response: str,
         system_prompt: str,
-    ) -> Tuple[bool, str, str, float]:
+        id_set: int,
+    ) -> Tuple[bool, str, EmbeddingMetadataObj, EmbeddingMetadataObj, float]:
         """
-        Returns: Tuple[bool, str, str, float] - [is_cache_hit, cache_response, nn_response, latency_vcache_logic]
+        Returns: Tuple[bool, str, EmbeddingMetadataObj, EmbeddingMetadataObj, float] - [is_cache_hit, cache_response, response_metadata, nn_metadata, latency_vcache_logic]
         """
+        if isinstance(candidate_embedding, str):
+            try:
+                candidate_embedding = json.loads(candidate_embedding)
+            except json.JSONDecodeError:
+                print("Error loading embedding from string")
+                import ast
+
+                candidate_embedding = ast.literal_eval(candidate_embedding)
+
         if isinstance(candidate_embedding, torch.Tensor):
             candidate_embedding = candidate_embedding.tolist()
         elif isinstance(candidate_embedding, np.ndarray):
@@ -369,10 +473,11 @@ class Benchmark(unittest.TestCase):
         prompt = f"{task} {review_text}"
         latency_vcache_logic: float = time.time()
         try:
-            is_cache_hit, cache_response, nn_metadata = (
+            is_cache_hit, cache_response, response_metadata, nn_metadata = (
                 self.vcache.infer_with_cache_info(
                     prompt=prompt,
                     system_prompt=system_prompt,
+                    id_set=id_set,
                 )
             )
         except Exception as e:
@@ -382,7 +487,13 @@ class Benchmark(unittest.TestCase):
             raise e
 
         latency_vcache_logic = time.time() - latency_vcache_logic
-        return is_cache_hit, cache_response, nn_metadata.response, latency_vcache_logic
+        return (
+            is_cache_hit,
+            cache_response,
+            response_metadata,
+            nn_metadata,
+            latency_vcache_logic,
+        )
 
     def dump_results_to_json(self):
         observations_dict = {}
@@ -411,9 +522,7 @@ class Benchmark(unittest.TestCase):
         self.var_ts_dict = var_ts_dict
 
         try:
-            global_observations_dict = (
-                self.vcache.vcache_policy.bayesian.global_observations
-            )
+            global_observations_dict = self.vcache.vcache_policy.global_observations
             global_gamma = self.vcache.vcache_policy.bayesian.global_gamma
             global_t_hat = self.vcache.vcache_policy.bayesian.global_t_hat
             global_t_prime = self.vcache.vcache_policy.bayesian.global_t_prime
@@ -477,6 +586,7 @@ def __run_baseline(
     threshold: float,
     similarity_evaluator: SimilarityEvaluator,
     eviction_policy: EvictionPolicy,
+    max_samples: int,
 ):
     vcache_config: VCacheConfig = VCacheConfig(
         inference_engine=BenchmarkInferenceEngine(),
@@ -504,7 +614,7 @@ def __run_baseline(
 
     benchmark.stats_set_up()
     try:
-        benchmark.test_run_benchmark()
+        benchmark.test_run_benchmark(max_samples)
     except Exception as e:
         logging.error(f"Error running benchmark: {e}")
 
@@ -530,12 +640,20 @@ def main():
         generate_plots_only,
         similarity_evaluator,
         eviction_policy,
+        max_samples,
     ) in RUN_COMBINATIONS:
         try:
-            print(f"DatasetPath: {datasets_dir}, Dataset: {dataset.value}")
-            dataset_file = os.path.join(datasets_dir, f"{dataset.value}.json")
+            dataset_name = dataset.value
+            dataset_path = ""
+            if "/" in dataset_name:
+                dataset_path = dataset_name
+                logging.info(f"Using Hugging Face dataset: {dataset_path}")
+            else:
+                dataset_path = os.path.join(datasets_dir, f"{dataset_name}.json")
+                logging.info(f"Using local dataset: {dataset_path}")
+
             logging.info(
-                f"Running benchmark for dataset: {dataset}, embedding model: {embedding_model.value[1]}, LLM model: {llm_model.value[1]}\n"
+                f"\nRunning benchmark for dataset: {dataset_name}, embedding model: {embedding_model.value[1]}, LLM model: {llm_model.value[1]}\n"
             )
             start_time_llm_model = time.time()
 
@@ -549,7 +667,7 @@ def main():
                     for i in range(0, CONFIDENCE_INTERVALS_ITERATIONS):
                         path = os.path.join(
                             results_dir,
-                            dataset.value,
+                            dataset_name,
                             embedding_model.value[1],
                             llm_model.value[1],
                             f"vcache_local_{delta}_run_{i + 1}",
@@ -564,7 +682,7 @@ def main():
                         __run_baseline(
                             vcache_policy=VerifiedDecisionPolicy(delta=delta),
                             path=path,
-                            dataset_file=dataset_file,
+                            dataset_file=dataset_path,
                             embedding_model=embedding_model.value,
                             llm_model=llm_model.value,
                             timestamp=timestamp,
@@ -572,6 +690,7 @@ def main():
                             threshold=-1,
                             similarity_evaluator=similarity_evaluator,
                             eviction_policy=eviction_policy,
+                            max_samples=max_samples,
                         )
 
             #####################################################
@@ -583,7 +702,7 @@ def main():
                 for delta in DELTAS:
                     path = os.path.join(
                         results_dir,
-                        dataset.value,
+                        dataset_name,
                         embedding_model.value[1],
                         llm_model.value[1],
                         f"vcache_global_{delta}",
@@ -600,7 +719,7 @@ def main():
                             delta=delta
                         ),
                         path=path,
-                        dataset_file=dataset_file,
+                        dataset_file=dataset_path,
                         embedding_model=embedding_model.value,
                         llm_model=llm_model.value,
                         timestamp=timestamp,
@@ -608,6 +727,7 @@ def main():
                         threshold=-1,
                         similarity_evaluator=similarity_evaluator,
                         eviction_policy=eviction_policy,
+                        max_samples=max_samples,
                     )
 
             #####################################################
@@ -635,7 +755,7 @@ def main():
 
                     path = os.path.join(
                         results_dir,
-                        dataset.value,
+                        dataset_name,
                         berkeley_embedding_model.value[1],
                         llm_model.value[1],
                         f"berkeley_embedding_{threshold}",
@@ -650,7 +770,7 @@ def main():
                             threshold=threshold
                         ),
                         path=path,
-                        dataset_file=dataset_file,
+                        dataset_file=dataset_path,
                         embedding_model=berkeley_embedding_model.value,
                         llm_model=llm_model.value,
                         timestamp=timestamp,
@@ -658,6 +778,7 @@ def main():
                         threshold=threshold,
                         similarity_evaluator=similarity_evaluator,
                         eviction_policy=eviction_policy,
+                        max_samples=max_samples,
                     )
 
             #####################################################
@@ -686,7 +807,7 @@ def main():
 
                         path = os.path.join(
                             results_dir,
-                            dataset.value,
+                            dataset_name,
                             berkeley_embedding_model.value[1],
                             llm_model.value[1],
                             f"vcache_berkeley_embedding_{delta}_run_{i + 1}",
@@ -701,7 +822,7 @@ def main():
                         __run_baseline(
                             vcache_policy=VerifiedDecisionPolicy(delta=delta),
                             path=path,
-                            dataset_file=dataset_file,
+                            dataset_file=dataset_path,
                             embedding_model=berkeley_embedding_model.value,
                             llm_model=llm_model.value,
                             timestamp=timestamp,
@@ -709,6 +830,7 @@ def main():
                             threshold=-1,
                             similarity_evaluator=similarity_evaluator,
                             eviction_policy=eviction_policy,
+                            max_samples=max_samples,
                         )
 
             #####################################################
@@ -718,7 +840,7 @@ def main():
                     for i in range(0, CONFIDENCE_INTERVALS_ITERATIONS):
                         path = os.path.join(
                             results_dir,
-                            dataset.value,
+                            dataset_name,
                             embedding_model.value[1],
                             llm_model.value[1],
                             f"iid_local_{delta}_run_{i + 1}",
@@ -735,7 +857,7 @@ def main():
                                 delta=delta
                             ),
                             path=path,
-                            dataset_file=dataset_file,
+                            dataset_file=dataset_path,
                             embedding_model=embedding_model.value,
                             llm_model=llm_model.value,
                             timestamp=timestamp,
@@ -743,6 +865,7 @@ def main():
                             threshold=-1,
                             similarity_evaluator=similarity_evaluator,
                             eviction_policy=eviction_policy,
+                            max_samples=max_samples,
                         )
 
             #####################################################
@@ -751,7 +874,7 @@ def main():
                 for threshold in STATIC_THRESHOLDS:
                     path = os.path.join(
                         results_dir,
-                        dataset.value,
+                        dataset_name,
                         embedding_model.value[1],
                         llm_model.value[1],
                         f"gptcache_{threshold}",
@@ -766,7 +889,7 @@ def main():
                             threshold=threshold
                         ),
                         path=path,
-                        dataset_file=dataset_file,
+                        dataset_file=dataset_path,
                         embedding_model=embedding_model.value,
                         llm_model=llm_model.value,
                         timestamp=timestamp,
@@ -774,11 +897,12 @@ def main():
                         threshold=threshold,
                         similarity_evaluator=similarity_evaluator,
                         eviction_policy=eviction_policy,
+                        max_samples=max_samples,
                     )
 
             #####################################################
             generate_combined_plots(
-                dataset=dataset.value,
+                dataset=dataset_name,
                 embedding_model_name=embedding_model.value[1],
                 llm_model_name=llm_model.value[1],
                 results_dir=results_dir,

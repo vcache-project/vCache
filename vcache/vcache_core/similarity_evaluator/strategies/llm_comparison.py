@@ -14,13 +14,21 @@ class LLMComparisonSimilarityEvaluator(SimilarityEvaluator):
         """
         super().__init__()
 
-    def answers_similar(self, a: str, b: str) -> bool:
+    def answers_similar(
+        self,
+        a: str,
+        b: str,
+        id_set_a: int = None,
+        id_set_b: int = None,
+    ) -> bool:
         """
         Check if two answers are similar using LLM-judge comparison.
 
         Args:
             a: The first answer to compare.
             b: The second answer to compare.
+            id_set_a: The id_set of the first answer.
+            id_set_b: The id_set of the second answer.
 
         Returns:
             True if the answers are similar, False otherwise.
