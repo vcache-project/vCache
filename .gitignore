@@ -11,7 +11,7 @@ benchmarks/data/large_scale/*.json
 benchmarks/results/*
 temp/*
 *.log
-*.parquet
+benchmarks/*.parquet
 bin/*
 .venv/
 .env

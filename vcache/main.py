@@ -55,7 +55,7 @@ class VCache:
         prompt: str,
         system_prompt: Optional[str] = None,
         id_set: int = -1,
-    ) -> Tuple[bool, str, EmbeddingMetadataObj]:
+    ) -> Tuple[bool, str, EmbeddingMetadataObj, EmbeddingMetadataObj]:
         """Infers a response and returns the cache hit status and metadata.
 
         Args:

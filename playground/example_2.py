@@ -1,3 +1,4 @@
+import time
 from pathlib import Path
 
 import pandas as pd
@@ -19,7 +20,7 @@ from vcache import (
     Run 
        export OPENAI_API_KEY="<your-api-key>"
     before running the script with
-       poetry run python example_1.py
+       poetry run python example_2.py
 """
 
 
@@ -56,12 +57,18 @@ def main():
     print(f"Loaded {len(df)} rows of data\n")
     print("Processing data with vCache...")
 
-    for i, row in tqdm(df.iterrows(), total=len(df), desc="Processing rows"):
+    for i, row in tqdm(
+        df.iterrows(), total=len(df), desc="Processing rows", disable=True
+    ):
         prompt = row["text"]
         system_prompt = row["task"]
 
-        response = vcache.infer(prompt, system_prompt)
-        print(f"Response for request {i}: {response}")
+        start_time = time.time()
+        is_hit, response, _, _ = vcache.infer_with_cache_info(prompt, system_prompt)
+        end_time = time.time()
+        print(
+            f"Response for request {i}: {response}. Is hit: {is_hit}. Time taken: {(end_time - start_time):.3f} seconds"
+        )
 
     print("Data processing completed.")
 

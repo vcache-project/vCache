@@ -1,3 +1,4 @@
+from vcache.inference_engine import InferenceEngine
 from vcache.vcache_core.similarity_evaluator.similarity_evaluator import (
     SimilarityEvaluator,
 )
@@ -8,11 +9,12 @@ class LLMComparisonSimilarityEvaluator(SimilarityEvaluator):
     LLM-based similarity evaluator for comparing answer similarity.
     """
 
-    def __init__(self):
+    def __init__(self, inference_engine: InferenceEngine = None):
         """
         Initialize LLM comparison similarity evaluator.
         """
         super().__init__()
+        self.inference_engine = inference_engine
 
     def answers_similar(
         self,
