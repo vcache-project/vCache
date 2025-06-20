@@ -45,11 +45,10 @@ export OPENAI_API_KEY="your_api_key_here"
 Finally, use vCache in your Python code:
 
 ```python
-from vcache.main import VCache
+from vcache import VCache
 
 vcache = VCache()
 response, cache_hit = vcache.create("Is the sky blue?")
-print(f"Response: {response}")
 ```
 
 By default, vCache uses:
@@ -67,39 +66,37 @@ By default, vCache uses:
 
 vCache is modular and highly configurable. Below is an example showing how to customize key components:
 
-<details closed>
-<summary>Imports</summary>
 
 ```python
-from vcache.main import VCache
-from vcache.config import VCacheConfig
-from vcache.inference_engine.strategies.open_ai import OpenAIInferenceEngine
-from vcache.vcache_core.cache.embedding_engine.strategies.open_ai import OpenAIEmbeddingEngine
-from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage.strategies.in_memory import InMemoryEmbeddingMetadataStorage
-from vcache.vcache_core.similarity_evaluator.strategies.string_comparison import StringComparisonSimilarityEvaluator
-from vcache.vcache_policy.strategies.dynamic_local_threshold import VerifiedDecisionPolicy
-from vcache.vcache_policy.vcache_policy import VCachePolicy
-from vcache.vcache_core.cache.embedding_store.vector_db import HNSWLibVectorDB, SimilarityMetricType
-```
-</details>
-
-```python
-vcache_policy: VCachePolicy = VerifiedDecisionPolicy(delta=0.02)
-vcache_config: VCacheConfig = VCacheConfig(
-    inference_engine=OpenAIInferenceEngine(),
-    embedding_engine=OpenAIEmbeddingEngine(),
-    vector_db=HNSWLibVectorDB(
-        similarity_metric_type=SimilarityMetricType.COSINE,
-        max_capacity=100_000,
-    ),
+# 1. Configure the components for vCache
+config: VCacheConfig = VCacheConfig(
+    inference_engine=OpenAIInferenceEngine(model_name="gpt-4.1-2025-04-14"),
+    embedding_engine=OpenAIEmbeddingEngine(model_name="text-embedding-3-small"),
+    vector_db=HNSWLibVectorDB(),
     embedding_metadata_storage=InMemoryEmbeddingMetadataStorage(),
-    similarity_evaluator=StringComparisonSimilarityEvaluator,
+    similarity_evaluator=LLMComparisonSimilarityEvaluator(
+        inference_engine=OpenAIInferenceEngine(model_name="gpt-4.1-nano-2025-04-14")
+    ),
 )
 
-vcache = VCache(vcache_config, vcache_policy)
+# 2. Choose a caching policy
+policy: VCachePolicy = VerifiedDecisionPolicy(delta=0.03)
+
+# 3. Initialize vCache with the configuration and policy
+vcache: VCache = VCache(config, policy)
+
+response: str = vcache.infer("Is the sky blue?")
 ```
 
 You can swap out any component—such as the eviction policy or vector database—for your specific use case.
+
+You can find complete working examples in the [`playground`](playground/) directory:
+
+- [`example_1.py`](playground/example_1.py) - Basic usage with sample data processing
+- [`example_2.py`](playground/example_2.py) - Advanced usage with cache hit tracking and timing
+
+These examples demonstrate how to set up vCache with different configurations and process data efficiently.
+
 
 ### Eviction Policy
 vCache supports FIFO, LRU, MRU, and a custom SCU eviction policy. See the [Eviction Policy Documentation](vcache/vcache_core/cache/eviction_policy/README.md) for further details.
