@@ -78,7 +78,12 @@ class TestLLMComparisonIntegration(unittest.TestCase):
         # Check for required components
         self.assertIn("class LLMComparisonSimilarityEvaluator", content)
         self.assertIn("def __init__(self)", content)
-        self.assertIn("def answers_similar(self, a: str, b: str) -> bool", content)
+        self.assertIn("def answers_similar", content)
+        self.assertIn("a: str", content)
+        self.assertIn("b: str", content)
+        self.assertIn("id_set_a: int = None", content)
+        self.assertIn("id_set_b: int = None", content)
+        self.assertIn("-> bool", content)
         self.assertIn("self.inference_engine", content)
         self.assertIn("system_prompt", content)
         self.assertIn("user_prompt", content)
