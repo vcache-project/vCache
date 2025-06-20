@@ -209,7 +209,7 @@ class TestLLMComparisonSimilarityEvaluator(unittest.TestCase):
         sig = inspect.signature(self.evaluator.answers_similar)
         params = list(sig.parameters.keys())
 
-        self.assertEqual(params, ["a", "b"])
+        self.assertEqual(params, ["a", "b", "id_set_a", "id_set_b"])
         self.assertEqual(sig.return_annotation, bool)
 
 
