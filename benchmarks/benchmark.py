@@ -44,6 +44,9 @@ from vcache.vcache_core.similarity_evaluator import SimilarityEvaluator
 from vcache.vcache_core.similarity_evaluator.strategies.benchmark_comparison import (
     BenchmarkComparisonSimilarityEvaluator,
 )
+from vcache.vcache_core.similarity_evaluator.strategies.llm_comparison import (
+    LLMComparisonSimilarityEvaluator,
+)
 from vcache.vcache_core.similarity_evaluator.strategies.string_comparison import (
     StringComparisonSimilarityEvaluator,
 )
@@ -82,6 +85,12 @@ class EmbeddingModel(Enum):
     E5_MISTRAL_7B = ("emb_e5_mistral_7b", "E5_Mistral_7B_Instruct", "float16", 4096)
     E5_LARGE_V2 = ("emb_e5_large_v2", "E5_Large_v2", "float16", 512)
     E5_LARGE_V2_FT = ("emb_e5_large_v2_ft", "E5_Large_v2", "float16", 512)
+    OPENAI_TEXT_EMBEDDING_SMALL = (
+        "emb_openai_text_embedding_small",
+        "text-embedding-3-small",
+        "float16",
+        1536,
+    )
 
 
 class LargeLanguageModel(Enum):
@@ -104,8 +113,8 @@ class Dataset(Enum):
     SEM_BENCHMARK_CLASSIFICATION = "vCache/SemBenchmarkClassification"
     SEM_BENCHMARK_ARENA = "vCache/SemBenchmarkLmArena"
     SEM_BENCHMARK_SEARCH_QUERIES = "vCache/SemBenchmarkSearchQueries"
-    # Example for custom dataset. The path is relative to 'benchmarks/data/'
-    CUSTOM_EXAMPLE = "datasets/your_custom_dataset.csv"
+    # Example for custom dataset. The path is relative to 'benchmarks/your_datasets/'
+    CUSTOM_EXAMPLE = "your_datasets/your_custom_dataset.csv"
 
 
 class GeneratePlotsOnly(Enum):
@@ -171,6 +180,17 @@ PLOT_FONT_SIZE: int = 50
 RUN_COMBINATIONS: List[
     Tuple[EmbeddingModel, LargeLanguageModel, Dataset, GeneratePlotsOnly]
 ] = [
+    (
+        EmbeddingModel.OPENAI_TEXT_EMBEDDING_SMALL,
+        LargeLanguageModel.GPT_4O_MINI,
+        Dataset.CUSTOM_EXAMPLE,
+        GeneratePlotsOnly.NO,
+        LLMComparisonSimilarityEvaluator(
+            inference_engine=OpenAIInferenceEngine(model_name="gpt-4.1-nano-2025-04-14")
+        ),
+        SCUEvictionPolicy(max_size=2000, watermark=0.99, eviction_percentage=0.1),
+        2000,
+    ),
     (
         EmbeddingModel.GTE,
         LargeLanguageModel.GPT_4O_MINI,
@@ -738,12 +758,9 @@ def __run_baseline(
 
 def main():
     benchmarks_dir = os.path.dirname(os.path.abspath(__file__))
-    datasets_dir = os.path.join(benchmarks_dir, "data", "large_scale")
-    if not os.path.exists(datasets_dir):
-        os.makedirs(datasets_dir, exist_ok=True)
-        logging.info(f"Created directory: {datasets_dir}")
-    # Custom datasets are expected to be in "benchmarks/data/datasets/"
-    custom_datasets_dir = os.path.join(benchmarks_dir, "data", "datasets")
+
+    # Custom datasets are expected to be in "benchmarks/your_datasets/"
+    custom_datasets_dir = os.path.join(benchmarks_dir, "your_datasets")
     if not os.path.exists(custom_datasets_dir):
         os.makedirs(custom_datasets_dir, exist_ok=True)
         logging.info(f"Created directory: {custom_datasets_dir}")
@@ -761,7 +778,7 @@ def main():
     ) in RUN_COMBINATIONS:
         try:
             dataset_value = dataset.value
-            is_custom_dataset = dataset_value.startswith("datasets/")
+            is_custom_dataset = dataset_value.startswith("your_datasets/")
 
             if is_custom_dataset:
                 # The path in the enum is relative to 'benchmarks/data/'
@@ -775,9 +792,11 @@ def main():
                 if "/" in dataset_name:  # HuggingFace dataset
                     dataset_path = dataset_name
                     logging.info(f"Using Hugging Face dataset: {dataset_path}")
-                else:  # Local JSON from 'large_scale'
-                    dataset_path = os.path.join(datasets_dir, f"{dataset_name}.json")
-                    logging.info(f"Using local dataset: {dataset_path}")
+                else:
+                    logging.warning(
+                        f"Dataset {dataset_name} not found. Please check the dataset path."
+                    )
+                    continue
 
             logging.info(
                 f"\nRunning benchmark for dataset: {dataset_name}, embedding model: {embedding_model.value[1]}, LLM model: {llm_model.value[1]}\n"
