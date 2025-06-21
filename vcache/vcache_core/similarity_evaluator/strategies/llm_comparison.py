@@ -11,7 +11,7 @@ class LLMComparisonSimilarityEvaluator(SimilarityEvaluator):
     LLM-based similarity evaluator for comparing answer similarity.
     """
 
-    def __init__(self, inference_engine: InferenceEngine = None):
+    def __init__(self, inference_engine: InferenceEngine):
         """
         Initialize LLM comparison similarity evaluator.
         """
