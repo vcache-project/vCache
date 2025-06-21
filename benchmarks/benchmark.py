@@ -41,14 +41,8 @@ from vcache.vcache_core.cache.embedding_store.vector_db import (
 from vcache.vcache_core.cache.eviction_policy.eviction_policy import EvictionPolicy
 from vcache.vcache_core.cache.eviction_policy.strategies.scu import SCUEvictionPolicy
 from vcache.vcache_core.similarity_evaluator import SimilarityEvaluator
-from vcache.vcache_core.similarity_evaluator.strategies.benchmark_comparison import (
-    BenchmarkComparisonSimilarityEvaluator,
-)
 from vcache.vcache_core.similarity_evaluator.strategies.llm_comparison import (
     LLMComparisonSimilarityEvaluator,
-)
-from vcache.vcache_core.similarity_evaluator.strategies.string_comparison import (
-    StringComparisonSimilarityEvaluator,
 )
 from vcache.vcache_policy.strategies.benchmark_iid_verified import (
     BenchmarkVerifiedIIDDecisionPolicy,
@@ -98,6 +92,7 @@ class LargeLanguageModel(Enum):
     LLAMA_3_70B = ("response_llama_3_70b", "Llama_3_70B_Instruct", "float16", None)
     GPT_4O_MINI = ("response_gpt-4o-mini", "GPT-4o-mini", "float16", None)
     GPT_4O_NANO = ("response_gpt-4.1-nano", "GPT-4.1-nano", "float16", None)
+    GPT_4_1 = ("response_gpt-4.1", "gpt-4.1-2025-04-14", "float16", None)
 
 
 class Baseline(Enum):
@@ -114,7 +109,7 @@ class Dataset(Enum):
     SEM_BENCHMARK_ARENA = "vCache/SemBenchmarkLmArena"
     SEM_BENCHMARK_SEARCH_QUERIES = "vCache/SemBenchmarkSearchQueries"
     # Example for custom dataset. The path is relative to 'benchmarks/your_datasets/'
-    CUSTOM_EXAMPLE = "your_datasets/your_custom_dataset.csv"
+    CUSTOM_EXAMPLE = "your_datasets/your_custom_dataset.parquet"
 
 
 class GeneratePlotsOnly(Enum):
@@ -182,7 +177,7 @@ RUN_COMBINATIONS: List[
 ] = [
     (
         EmbeddingModel.OPENAI_TEXT_EMBEDDING_SMALL,
-        LargeLanguageModel.GPT_4O_MINI,
+        LargeLanguageModel.GPT_4_1,
         Dataset.CUSTOM_EXAMPLE,
         GeneratePlotsOnly.NO,
         LLMComparisonSimilarityEvaluator(
@@ -191,33 +186,33 @@ RUN_COMBINATIONS: List[
         SCUEvictionPolicy(max_size=2000, watermark=0.99, eviction_percentage=0.1),
         2000,
     ),
-    (
-        EmbeddingModel.GTE,
-        LargeLanguageModel.GPT_4O_MINI,
-        Dataset.SEM_BENCHMARK_ARENA,
-        GeneratePlotsOnly.NO,
-        BenchmarkComparisonSimilarityEvaluator(),
-        SCUEvictionPolicy(max_size=6000, watermark=0.99, eviction_percentage=0.1),
-        60000,
-    ),
-    (
-        EmbeddingModel.E5_LARGE_V2,
-        LargeLanguageModel.GPT_4O_MINI,
-        Dataset.SEM_BENCHMARK_SEARCH_QUERIES,
-        GeneratePlotsOnly.NO,
-        BenchmarkComparisonSimilarityEvaluator(),
-        SCUEvictionPolicy(max_size=15000, watermark=0.99, eviction_percentage=0.1),
-        150000,
-    ),
-    (
-        EmbeddingModel.GTE,
-        LargeLanguageModel.LLAMA_3_8B,
-        Dataset.SEM_BENCHMARK_CLASSIFICATION,
-        GeneratePlotsOnly.NO,
-        StringComparisonSimilarityEvaluator(),
-        SCUEvictionPolicy(max_size=4500, watermark=0.99, eviction_percentage=0.1),
-        45000,
-    ),
+    # (
+    #     EmbeddingModel.GTE,
+    #     LargeLanguageModel.GPT_4O_MINI,
+    #     Dataset.SEM_BENCHMARK_ARENA,
+    #     GeneratePlotsOnly.NO,
+    #     BenchmarkComparisonSimilarityEvaluator(),
+    #     SCUEvictionPolicy(max_size=6000, watermark=0.99, eviction_percentage=0.1),
+    #     60000,
+    # ),
+    # (
+    #     EmbeddingModel.E5_LARGE_V2,
+    #     LargeLanguageModel.GPT_4O_MINI,
+    #     Dataset.SEM_BENCHMARK_SEARCH_QUERIES,
+    #     GeneratePlotsOnly.NO,
+    #     BenchmarkComparisonSimilarityEvaluator(),
+    #     SCUEvictionPolicy(max_size=15000, watermark=0.99, eviction_percentage=0.1),
+    #     150000,
+    # ),
+    # (
+    #     EmbeddingModel.GTE,
+    #     LargeLanguageModel.LLAMA_3_8B,
+    #     Dataset.SEM_BENCHMARK_CLASSIFICATION,
+    #     GeneratePlotsOnly.NO,
+    #     StringComparisonSimilarityEvaluator(),
+    #     SCUEvictionPolicy(max_size=4500, watermark=0.99, eviction_percentage=0.1),
+    #     45000,
+    # ),
 ]
 
 BASELINES_TO_RUN: List[Baseline] = [
@@ -312,6 +307,7 @@ class Benchmark(unittest.TestCase):
             # 2.1) Direct Inference (No Cache) - Live call
             start_time = time.time()
             # We use the vcache's inference engine to get the ground truth response
+            print(f"TYPE:{type(self.vcache.vcache_config.inference_engine)}")
             label_response = self.vcache.vcache_config.inference_engine.create(prompt)
             latency_direct = time.time() - start_time
 
@@ -326,6 +322,7 @@ class Benchmark(unittest.TestCase):
 
             if not is_cache_hit:
                 latency_vcache += latency_direct
+            print(f"cache_response: {cache_response[:100]}")
 
             # This is important for the async logic
             time.sleep(0.002)
@@ -584,6 +581,7 @@ class Benchmark(unittest.TestCase):
         Returns: Tuple[bool, str, EmbeddingMetadataObj, EmbeddingMetadataObj, float] - [is_cache_hit, cache_response, response_metadata, nn_metadata, latency_vcache_logic]
         """
         latency_vcache_logic: float = time.time()
+        print("REACHED HERE 1.")
         try:
             (
                 is_cache_hit,
@@ -701,15 +699,14 @@ def __run_baseline(
     is_custom_dataset: bool = False,
 ):
     if is_custom_dataset:
-        # For custom datasets, we need live engines
-        # Assuming model names in enums map to OpenAI models for now
-        # E.g. 'GPT-4o-mini' -> 'gpt-4o-mini'
         llm_model_name = llm_model[1].lower()
         embedding_model_name = embedding_model[1].lower()
 
+        print(f"LLM MODEL NAME: {llm_model_name}")
+        print(f"EMBEDDING MODEL NAME: {embedding_model_name}\n\n")
         vcache_config: VCacheConfig = VCacheConfig(
-            inference_engine=OpenAIInferenceEngine(model=llm_model_name),
-            embedding_engine=OpenAIEmbeddingEngine(model=embedding_model_name),
+            inference_engine=OpenAIInferenceEngine(model_name=llm_model_name),
+            embedding_engine=OpenAIEmbeddingEngine(model_name=embedding_model_name),
             vector_db=HNSWLibVectorDB(
                 similarity_metric_type=SimilarityMetricType.COSINE,
                 max_capacity=MAX_VECTOR_DB_CAPACITY,
@@ -730,6 +727,7 @@ def __run_baseline(
             similarity_evaluator=similarity_evaluator,
             eviction_policy=eviction_policy,
         )
+
     vcache: VCache = VCache(vcache_config, vcache_policy)
 
     benchmark = Benchmark(vcache)
@@ -745,6 +743,7 @@ def __run_baseline(
     benchmark.is_custom_dataset = is_custom_dataset
 
     benchmark.stats_set_up()
+
     try:
         benchmark.test_run_benchmark(max_samples)
     except Exception as e:
@@ -759,7 +758,6 @@ def __run_baseline(
 def main():
     benchmarks_dir = os.path.dirname(os.path.abspath(__file__))
 
-    # Custom datasets are expected to be in "benchmarks/your_datasets/"
     custom_datasets_dir = os.path.join(benchmarks_dir, "your_datasets")
     if not os.path.exists(custom_datasets_dir):
         os.makedirs(custom_datasets_dir, exist_ok=True)
@@ -777,12 +775,12 @@ def main():
         max_samples,
     ) in RUN_COMBINATIONS:
         try:
-            dataset_value = dataset.value
-            is_custom_dataset = dataset_value.startswith("your_datasets/")
+            dataset_value: str = dataset.value
+            is_custom_dataset: bool = dataset_value.startswith("your_datasets")
 
             if is_custom_dataset:
                 # The path in the enum is relative to 'benchmarks/data/'
-                dataset_path = os.path.join(benchmarks_dir, "data", dataset_value)
+                dataset_path = os.path.join(benchmarks_dir, dataset_value)
                 dataset_name = os.path.basename(dataset_path)
                 if not os.path.exists(dataset_path):
                     logging.warning(f"Custom dataset file not found: {dataset_path}")
