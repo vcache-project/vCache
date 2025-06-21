@@ -19,12 +19,17 @@ Reliable and Efficient Semantic Prompt Caching
 
 Semantic caching reduces LLM latency and cost by returning cached model responses for semantically similar prompts (not just exact matches). **vCache** is the first verified semantic cache that **guarantees user-defined error rate bounds**. vCache replaces static thresholds with **online-learned, embedding-specific decision boundaries**—no manual fine-tuning required. This enables reliable cached response reuse across any embedding model or workload.
 
+> 💳
+> **Cost & Latency Optimization** <br> 
+> Reduce LLM API Costs by up to 10x. Decrease latency by up to 100x.
 
+> 💡
+> **Verified Semantic Prompt Caching** <br> 
+> Set an error rate bound—vCache enforces it while maximizing cache hits.
 
-> [NOTE]
-> vCache is currently in active development. Features and APIs may change as we continue to improve the system.
-
-
+> 🏢
+> **System Agnostic Infrastructure** <br> 
+> vCache uses OpenAI by default for both LLM inference and embedding generation, but you can configure any other inference setup.
 
 
 ## 🚀 Quick Install
@@ -40,29 +45,33 @@ Then, set your OpenAI key:
 ```bash
 export OPENAI_API_KEY="your_api_key_here"
 ```
-(Note: vCache uses OpenAI by default for both LLM inference and embedding generation, but you can configure any other backend)
 
 Finally, use vCache in your Python code:
 
 ```python
-from vcache import VCache
+from vcache import VCache, VerifiedDecisionPolicy
 
-vcache: VCache = VCache()
+error_rate_bound: int = 0.01
+policy: VCachePolicy = VerifiedDecisionPolicy(delta=error_rate_bound)
+vcache: VCache = VCache(policy)
+
 response: str = vcache.infer("Is the sky blue?")
 ```
 
-By default, vCache uses:
-- `OpenAIInferenceEngine`
-- `OpenAIEmbeddingEngine`
-- `HNSWLibVectorDB`
-- `InMemoryEmbeddingMetadataStorage`
-- `NoEvictionPolicy`
-- `StringComparisonSimilarityEvaluator`
-- `VerifiedDecisionPolicy` with a maximum failure rate of 2%
 
+## 🎬 How vCache Works
+
+vCache intelligently learns when cached responses are semantically equivalent to new prompts, adapting its decision boundaries based on your accuracy requirements.
+
+<p align="left">
+  <img src="docs/VCacheVisualizer.gif" alt="vCache Visualization" width="60%">
+</p>
 
 
 ## ⚙️ Advanced Configuration
+
+> [NOTE]
+> vCache is currently in active development. Features and APIs may change as we continue to improve the system.
 
 vCache is modular and highly configurable. Below is an example showing how to customize key components:
 
@@ -101,6 +110,15 @@ response: str = vcache.infer("Is the sky blue?")
 ```
 
 You can swap out any component—such as the eviction policy or vector database—for your specific use case.
+
+By default, vCache uses:
+- `OpenAIInferenceEngine`
+- `OpenAIEmbeddingEngine`
+- `HNSWLibVectorDB`
+- `InMemoryEmbeddingMetadataStorage`
+- `NoEvictionPolicy`
+- `StringComparisonSimilarityEvaluator`
+- `VerifiedDecisionPolicy` with a maximum failure rate of 2%
 
 You can find complete working examples in the [`playground`](playground/) directory:
 
