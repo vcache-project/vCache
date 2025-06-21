@@ -1,6 +1,10 @@
-from typing import List, override
+from typing import List
 
-from vcache.vcache_core.cache.embedding_engine.embedding_engine import EmbeddingEngine
+from typing_extensions import override
+
+from vcache.vcache_core.cache.embedding_engine.embedding_engine import (
+    EmbeddingEngine,
+)
 
 
 class BenchmarkEmbeddingEngine(EmbeddingEngine):

@@ -3,31 +3,43 @@ vCache: Reliable and Efficient Semantic Prompt Caching
 """
 
 # Main vCache classes
-from vcache.config import VCacheConfig
+from .config import VCacheConfig
 
-# Inference engines
-from vcache.inference_engine import (
+# Base classes
+# Concrete Inference engines
+from .inference_engine import (
+    BenchmarkInferenceEngine,
     InferenceEngine,
     LangChainInferenceEngine,
     OpenAIInferenceEngine,
 )
-from vcache.main import VCache
-
-# Embedding engines
-from vcache.vcache_core.cache.embedding_engine import (
+from .main import VCache
+from .vcache_core import (
+    Cache,
     EmbeddingEngine,
+    EmbeddingMetadataObj,
+    EmbeddingMetadataStorage,
+    EmbeddingStore,
+    EvictionPolicy,
+    SimilarityEvaluator,
+    Statistics,
+)
+
+# Concrete Embedding engines
+from .vcache_core.cache.embedding_engine import (
+    BenchmarkEmbeddingEngine,
     LangChainEmbeddingEngine,
     OpenAIEmbeddingEngine,
 )
 
-# Embedding metadata storage
-from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage import (
-    EmbeddingMetadataStorage,
+# Concrete Embedding metadata storage
+from .vcache_core.cache.embedding_store.embedding_metadata_storage import (
     InMemoryEmbeddingMetadataStorage,
+    LangchainMetadataStorage,
 )
 
-# Vector databases
-from vcache.vcache_core.cache.embedding_store.vector_db import (
+# Concrete Vector databases
+from .vcache_core.cache.embedding_store.vector_db import (
     ChromaVectorDB,
     FAISSVectorDB,
     HNSWLibVectorDB,
@@ -35,20 +47,25 @@ from vcache.vcache_core.cache.embedding_store.vector_db import (
     VectorDB,
 )
 
-# Eviction policies
-from vcache.vcache_core.cache.eviction_policy import (
-    EvictionPolicy,
+# Concrete Eviction policies
+from .vcache_core.cache.eviction_policy import (
+    FIFOEvictionPolicy,
     LRUEvictionPolicy,
+    MRUEvictionPolicy,
+    NoEvictionPolicy,
+    SCUEvictionPolicy,
 )
 
-# Similarity evaluators
-from vcache.vcache_core.similarity_evaluator import (
-    SimilarityEvaluator,
+# Concrete Similarity evaluators
+from .vcache_core.similarity_evaluator import (
+    BenchmarkComparisonSimilarityEvaluator,
+    EmbeddingComparisonSimilarityEvaluator,
+    LLMComparisonSimilarityEvaluator,
     StringComparisonSimilarityEvaluator,
 )
 
-# vCache Policies
-from vcache.vcache_policy import (
+# Concrete vCache Policies
+from .vcache_policy import (
     BenchmarkStaticDecisionPolicy,
     BenchmarkVerifiedGlobalDecisionPolicy,
     BenchmarkVerifiedIIDDecisionPolicy,
@@ -61,34 +78,49 @@ __all__ = [
     # Main classes
     "VCache",
     "VCacheConfig",
-    # Inference engines
+    # Base classes
+    "VCachePolicy",
     "InferenceEngine",
+    "EmbeddingEngine",
+    "VectorDB",
+    "SimilarityEvaluator",
+    "EvictionPolicy",
+    "EmbeddingMetadataStorage",
+    "Cache",
+    "EmbeddingStore",
+    "Statistics",
+    # Concrete vCache Policies
+    "VerifiedDecisionPolicy",
+    "NoCachePolicy",
+    "BenchmarkStaticDecisionPolicy",
+    "BenchmarkVerifiedGlobalDecisionPolicy",
+    "BenchmarkVerifiedIIDDecisionPolicy",
+    # Concrete Inference engines
     "OpenAIInferenceEngine",
     "LangChainInferenceEngine",
-    # Embedding engines
-    "EmbeddingEngine",
+    "BenchmarkInferenceEngine",
+    # Concrete Embedding engines
     "OpenAIEmbeddingEngine",
     "LangChainEmbeddingEngine",
-    # Vector databases
-    "VectorDB",
+    "BenchmarkEmbeddingEngine",
+    # Concrete Vector databases
     "FAISSVectorDB",
     "HNSWLibVectorDB",
     "ChromaVectorDB",
     "SimilarityMetricType",
-    # Similarity evaluators
-    "SimilarityEvaluator",
+    # Concrete Similarity evaluators
     "StringComparisonSimilarityEvaluator",
-    # Eviction policies
-    "EvictionPolicy",
+    "LLMComparisonSimilarityEvaluator",
+    "EmbeddingComparisonSimilarityEvaluator",
+    "BenchmarkComparisonSimilarityEvaluator",
+    # Concrete Eviction policies
     "LRUEvictionPolicy",
-    # Embedding metadata storage
-    "EmbeddingMetadataStorage",
+    "MRUEvictionPolicy",
+    "FIFOEvictionPolicy",
+    "NoEvictionPolicy",
+    "SCUEvictionPolicy",
+    # Concrete Embedding metadata storage
     "InMemoryEmbeddingMetadataStorage",
-    # vCache Policies
-    "VCachePolicy",
-    "VerifiedDecisionPolicy",
-    "BenchmarkVerifiedGlobalDecisionPolicy",
-    "BenchmarkStaticDecisionPolicy",
-    "NoCachePolicy",
-    "BenchmarkVerifiedIIDDecisionPolicy",
+    "LangchainMetadataStorage",
+    "EmbeddingMetadataObj",
 ]

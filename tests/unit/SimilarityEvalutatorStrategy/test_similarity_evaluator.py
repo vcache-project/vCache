@@ -1,6 +1,7 @@
 import unittest
 from unittest.mock import Mock
 
+from vcache.inference_engine.strategies.open_ai import OpenAIInferenceEngine
 from vcache.vcache_core.similarity_evaluator.strategies.llm_comparison import (
     LLMComparisonSimilarityEvaluator,
 )
@@ -45,12 +46,15 @@ class TestLLMComparisonSimilarityEvaluator(unittest.TestCase):
     """Test the LLM-based comparison similarity evaluator."""
 
     def setUp(self):
-        self.evaluator = LLMComparisonSimilarityEvaluator()
+        self.evaluator = LLMComparisonSimilarityEvaluator(
+            inference_engine=OpenAIInferenceEngine(model_name="gpt-4.1-nano-2025-04-14")
+        )
 
     def test_no_inference_engine(self):
         """Test behavior when no inference engine is set."""
         # inference_engine should be None by default
-        result = self.evaluator.answers_similar("Paris", "The capital of France")
+        evaluator = LLMComparisonSimilarityEvaluator(inference_engine=None)
+        result = evaluator.answers_similar("Paris", "The capital of France")
         self.assertFalse(result)
 
     def test_inference_engine_returns_yes(self):

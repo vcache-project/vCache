@@ -1,3 +1,6 @@
+import logging
+
+from vcache.inference_engine import InferenceEngine
 from vcache.vcache_core.similarity_evaluator.similarity_evaluator import (
     SimilarityEvaluator,
 )
@@ -8,11 +11,12 @@ class LLMComparisonSimilarityEvaluator(SimilarityEvaluator):
     LLM-based similarity evaluator for comparing answer similarity.
     """
 
-    def __init__(self):
+    def __init__(self, inference_engine: InferenceEngine):
         """
         Initialize LLM comparison similarity evaluator.
         """
         super().__init__()
+        self.inference_engine = inference_engine
 
     def answers_similar(
         self,
@@ -34,6 +38,7 @@ class LLMComparisonSimilarityEvaluator(SimilarityEvaluator):
             True if the answers are similar, False otherwise.
         """
         if not self.inference_engine:
+            logging.warning("No inference engine provided. Returning False.")
             return False
 
         system_prompt: str = "You are a judge evaluating whether two answers are semantically equivalent. Respond with only 'YES' if they convey the same meaning, or 'NO' if they differ significantly."

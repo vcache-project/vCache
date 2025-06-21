@@ -1,4 +1,4 @@
-from typing import override
+from typing_extensions import override
 
 from vcache.inference_engine.inference_engine import InferenceEngine
 

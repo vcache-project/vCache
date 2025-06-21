@@ -59,5 +59,4 @@ class VCacheConfig:
         self.eviction_policy = eviction_policy
         self.embedding_metadata_storage = embedding_metadata_storage
         self.similarity_evaluator = similarity_evaluator
-        self.similarity_evaluator.set_inference_engine(self.inference_engine)
         self.system_prompt = system_prompt
