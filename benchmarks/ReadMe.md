@@ -66,11 +66,58 @@ Refer to the docstring in `benchmarks/benchmark.py` for more details on other co
 
 ## 📁 Datasets
 
+### vCache Datasets
+
 The official benchmark datasets are hosted on Hugging Face and will be downloaded automatically when the script is run:
 
 - **`vCache/SemBenchmarkLmArena`** (chat-style prompts): [Dataset ↗](https://huggingface.co/datasets/vCache/SemBenchmarkLmArena)
 - **`vCache/SemBenchmarkClassification`** (structured queries): [Dataset ↗](https://huggingface.co/datasets/vCache/SemBenchmarkClassification)
 - **`vCache/SemBenchmarkSearchQueries`** (real-world browser searches): [Dataset ↗](https://huggingface.co/datasets/vCache/SemBenchmarkSearchQueries)
+
+
+### Custom Datasets
+
+You can benchmark vCache on your own datasets. The script supports `.csv` and `.parquet` files.
+
+1.  **Place Your Dataset**:
+    - Navigate to the directory named `your_datasets` inside the `benchmarks/` directory.
+    - Place your custom `.csv` or `.parquet` file inside `benchmarks/your_datasets/`.
+    - Your dataset **must** have a column named `prompt`.
+
+2.  **Add to `Dataset` Enum**:
+    - Open `benchmarks/benchmark.py`.
+    - Add a new entry to the `Dataset` enum. The value should be the relative path from the `benchmarks` directory.
+
+    ```python
+    # In benchmarks/benchmark.py
+    class Dataset(Enum):
+        ...
+        # Example for a custom dataset
+        MY_AWESOME_DATASET = "your_datasets/my_prompts.csv"
+    ```
+
+3.  **Configure the Benchmark Run**:
+    - In the `RUN_COMBINATIONS` list in `benchmarks/benchmark.py`, add a new tuple for your benchmark.
+    - Use your new `Dataset` enum entry.
+    - **Important**: Since custom datasets only contain prompts, you must use live models for inference and embeddings (e.g., `EmbeddingModel.OPENAI_TEXT_EMBEDDING_SMALL`, `LargeLanguageModel.GPT_4_1`). You cannot use the pre-computed models like `GTE` or `E5_LARGE_V2`.
+    - For accuracy checking, use a live evaluator like `LLMComparisonSimilarityEvaluator`.
+
+    ```python
+    # In benchmarks/benchmark.py
+    RUN_COMBINATIONS = [
+        (
+            EmbeddingModel.OPENAI_TEXT_EMBEDDING_SMALL,
+            LargeLanguageModel.GPT_4_1,
+            Dataset.MY_AWESOME_DATASET,
+            GeneratePlotsOnly.NO,
+            LLMComparisonSimilarityEvaluator(
+                inference_engine=OpenAIInferenceEngine(model_name="gpt-4o-mini")
+            ),
+            SCUEvictionPolicy(max_size=2000, watermark=0.99, eviction_percentage=0.1),
+            200, # Number of samples to run
+        ),
+    ]
+    ```
 
 
 ## 📦 Output
