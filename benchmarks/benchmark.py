@@ -44,8 +44,14 @@ from vcache.vcache_core.cache.embedding_store.vector_db import (
 from vcache.vcache_core.cache.eviction_policy.eviction_policy import EvictionPolicy
 from vcache.vcache_core.cache.eviction_policy.strategies.scu import SCUEvictionPolicy
 from vcache.vcache_core.similarity_evaluator import SimilarityEvaluator
+from vcache.vcache_core.similarity_evaluator.strategies.benchmark_comparison import (
+    BenchmarkComparisonSimilarityEvaluator,
+)
 from vcache.vcache_core.similarity_evaluator.strategies.llm_comparison import (
     LLMComparisonSimilarityEvaluator,
+)
+from vcache.vcache_core.similarity_evaluator.strategies.string_comparison import (
+    StringComparisonSimilarityEvaluator,
 )
 from vcache.vcache_policy.strategies.benchmark_iid_verified import (
     BenchmarkVerifiedIIDDecisionPolicy,
@@ -179,6 +185,33 @@ RUN_COMBINATIONS: List[
     Tuple[EmbeddingModel, LargeLanguageModel, Dataset, GeneratePlotsOnly]
 ] = [
     (
+        EmbeddingModel.GTE,
+        LargeLanguageModel.GPT_4O_MINI,
+        Dataset.SEM_BENCHMARK_ARENA,
+        GeneratePlotsOnly.NO,
+        BenchmarkComparisonSimilarityEvaluator(),
+        SCUEvictionPolicy(max_size=6000, watermark=0.99, eviction_percentage=0.1),
+        60000,
+    ),
+    (
+        EmbeddingModel.E5_LARGE_V2,
+        LargeLanguageModel.GPT_4O_MINI,
+        Dataset.SEM_BENCHMARK_SEARCH_QUERIES,
+        GeneratePlotsOnly.NO,
+        BenchmarkComparisonSimilarityEvaluator(),
+        SCUEvictionPolicy(max_size=15000, watermark=0.99, eviction_percentage=0.1),
+        150000,
+    ),
+    (
+        EmbeddingModel.GTE,
+        LargeLanguageModel.LLAMA_3_8B,
+        Dataset.SEM_BENCHMARK_CLASSIFICATION,
+        GeneratePlotsOnly.NO,
+        StringComparisonSimilarityEvaluator(),
+        SCUEvictionPolicy(max_size=4500, watermark=0.99, eviction_percentage=0.1),
+        45000,
+    ),
+    (
         EmbeddingModel.OPENAI_TEXT_EMBEDDING_SMALL,
         LargeLanguageModel.GPT_4_1,
         Dataset.CUSTOM_EXAMPLE,
@@ -191,33 +224,6 @@ RUN_COMBINATIONS: List[
         SCUEvictionPolicy(max_size=2000, watermark=0.99, eviction_percentage=0.1),
         50,
     ),
-    # (
-    #     EmbeddingModel.GTE,
-    #     LargeLanguageModel.GPT_4O_MINI,
-    #     Dataset.SEM_BENCHMARK_ARENA,
-    #     GeneratePlotsOnly.NO,
-    #     BenchmarkComparisonSimilarityEvaluator(),
-    #     SCUEvictionPolicy(max_size=6000, watermark=0.99, eviction_percentage=0.1),
-    #     60000,
-    # ),
-    # (
-    #     EmbeddingModel.E5_LARGE_V2,
-    #     LargeLanguageModel.GPT_4O_MINI,
-    #     Dataset.SEM_BENCHMARK_SEARCH_QUERIES,
-    #     GeneratePlotsOnly.NO,
-    #     BenchmarkComparisonSimilarityEvaluator(),
-    #     SCUEvictionPolicy(max_size=15000, watermark=0.99, eviction_percentage=0.1),
-    #     150000,
-    # ),
-    # (
-    #     EmbeddingModel.GTE,
-    #     LargeLanguageModel.LLAMA_3_8B,
-    #     Dataset.SEM_BENCHMARK_CLASSIFICATION,
-    #     GeneratePlotsOnly.NO,
-    #     StringComparisonSimilarityEvaluator(),
-    #     SCUEvictionPolicy(max_size=4500, watermark=0.99, eviction_percentage=0.1),
-    #     45000,
-    # ),
 ]
 
 BASELINES_TO_RUN: List[Baseline] = [
@@ -481,9 +487,6 @@ class Benchmark(unittest.TestCase):
                 cache_response_correct: bool = answers_have_same_meaning_llm(
                     label_response, cache_response
                 )
-                print(
-                    f"LLM Judge Comparison. Hit. Is Cache Response Correct: {cache_response_correct}. Label Response: {label_response}. Cache Response: {cache_response}"
-                )
             else:
                 cache_response_correct: bool = answers_have_same_meaning_static(
                     label_response, cache_response
@@ -507,9 +510,6 @@ class Benchmark(unittest.TestCase):
             elif self.is_custom_dataset:
                 nn_response_correct: bool = answers_have_same_meaning_llm(
                     label_response, nn_metadata.response
-                )
-                print(
-                    f"LLM Judge Comparison. Miss. Is NN Response Correct: {nn_response_correct}. Label Response: {label_response}. NN Response: {nn_metadata.response}"
                 )
             else:
                 nn_response_correct: bool = answers_have_same_meaning_static(
