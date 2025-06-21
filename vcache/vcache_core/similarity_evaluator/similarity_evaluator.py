@@ -1,7 +1,5 @@
 from abc import ABC, abstractmethod
 
-from vcache.inference_engine import InferenceEngine
-
 
 class SimilarityEvaluator(ABC):
     """
@@ -12,7 +10,6 @@ class SimilarityEvaluator(ABC):
         """
         Initialize similarity evaluator.
         """
-        self.inference_engine: InferenceEngine = None
 
     @abstractmethod
     def answers_similar(
@@ -35,12 +32,3 @@ class SimilarityEvaluator(ABC):
             True if the answers are similar, False otherwise.
         """
         pass
-
-    def set_inference_engine(self, inference_engine: InferenceEngine):
-        """
-        Set the inference engine for the similarity evaluator.
-
-        Args:
-            inference_engine: The inference engine to use.
-        """
-        self.inference_engine = inference_engine

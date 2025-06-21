@@ -1,3 +1,5 @@
+import logging
+
 from vcache.inference_engine import InferenceEngine
 from vcache.vcache_core.similarity_evaluator.similarity_evaluator import (
     SimilarityEvaluator,
@@ -36,6 +38,7 @@ class LLMComparisonSimilarityEvaluator(SimilarityEvaluator):
             True if the answers are similar, False otherwise.
         """
         if not self.inference_engine:
+            logging.warning("No inference engine provided. Returning False.")
             return False
 
         system_prompt: str = "You are a judge evaluating whether two answers are semantically equivalent. Respond with only 'YES' if they convey the same meaning, or 'NO' if they differ significantly."

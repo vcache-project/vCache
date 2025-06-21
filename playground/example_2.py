@@ -52,20 +52,20 @@ def main():
     vcache: VCache = __get_vcache()
 
     print("Loading sample data from parquet file...")
-    script_dir = Path(__file__).parent
-    df = pd.read_parquet(script_dir / "sample_data.parquet")
+    script_dir: Path = Path(__file__).parent
+    df: pd.DataFrame = pd.read_parquet(script_dir / "sample_data.parquet")
     print(f"Loaded {len(df)} rows of data\n")
     print("Processing data with vCache...")
 
     for i, row in tqdm(
         df.iterrows(), total=len(df), desc="Processing rows", disable=True
     ):
-        prompt = row["text"]
-        system_prompt = row["task"]
+        prompt: str = row["text"]
+        system_prompt: str = row["task"]
 
-        start_time = time.time()
+        start_time: float = time.time()
         is_hit, response, _, _ = vcache.infer_with_cache_info(prompt, system_prompt)
-        end_time = time.time()
+        end_time: float = time.time()
         print(
             f"Response for request {i}: {response}. Is hit: {is_hit}. Time taken: {(end_time - start_time):.3f} seconds"
         )

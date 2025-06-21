@@ -51,16 +51,16 @@ def main():
     vcache: VCache = __get_vcache()
 
     print("Loading sample data from parquet file...")
-    script_dir = Path(__file__).parent
-    df = pd.read_parquet(script_dir / "sample_data.parquet")
+    script_dir: Path = Path(__file__).parent
+    df: pd.DataFrame = pd.read_parquet(script_dir / "sample_data.parquet")
     print(f"Loaded {len(df)} rows of data\n")
     print("Processing data with vCache...")
 
     for i, row in tqdm(df.iterrows(), total=len(df), desc="Processing rows"):
-        prompt = row["text"]
-        system_prompt = row["task"]
+        prompt: str = row["text"]
+        system_prompt: str = row["task"]
 
-        response = vcache.infer(prompt, system_prompt)
+        response: str = vcache.infer(prompt, system_prompt)
         print(f"Response for request {i}: {response}")
 
     print("Data processing completed.")

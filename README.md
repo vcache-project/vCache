@@ -47,8 +47,8 @@ Finally, use vCache in your Python code:
 ```python
 from vcache import VCache
 
-vcache = VCache()
-response, cache_hit = vcache.create("Is the sky blue?")
+vcache: VCache = VCache()
+response: str = vcache.infer("Is the sky blue?")
 ```
 
 By default, vCache uses:
@@ -68,6 +68,18 @@ vCache is modular and highly configurable. Below is an example showing how to cu
 
 
 ```python
+from vcache import (
+    HNSWLibVectorDB,
+    InMemoryEmbeddingMetadataStorage,
+    LLMComparisonSimilarityEvaluator,
+    OpenAIEmbeddingEngine,
+    OpenAIInferenceEngine,
+    VCache,
+    VCacheConfig,
+    VCachePolicy,
+    VerifiedDecisionPolicy,
+)
+
 # 1. Configure the components for vCache
 config: VCacheConfig = VCacheConfig(
     inference_engine=OpenAIInferenceEngine(model_name="gpt-4.1-2025-04-14"),
@@ -94,8 +106,6 @@ You can find complete working examples in the [`playground`](playground/) direct
 
 - [`example_1.py`](playground/example_1.py) - Basic usage with sample data processing
 - [`example_2.py`](playground/example_2.py) - Advanced usage with cache hit tracking and timing
-
-These examples demonstrate how to set up vCache with different configurations and process data efficiently.
 
 
 ### Eviction Policy
