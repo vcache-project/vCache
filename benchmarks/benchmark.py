@@ -7,22 +7,29 @@ from datetime import datetime
 from enum import Enum
 from typing import Dict, List, Tuple
 
-import ijson
 import numpy as np
+import pandas as pd
 import torch
 from datasets import load_dataset
 from tqdm import tqdm
 
 from benchmarks._plotter_combined import generate_combined_plots
 from benchmarks._plotter_individual import generate_individual_plots
-from benchmarks.common.comparison import answers_have_same_meaning_static
+from benchmarks.common.comparison import (
+    answers_have_same_meaning_llm,
+    answers_have_same_meaning_static,
+)
 from vcache.config import VCacheConfig
 from vcache.inference_engine.strategies.benchmark import (
     BenchmarkInferenceEngine,
 )
+from vcache.inference_engine.strategies.open_ai import OpenAIInferenceEngine
 from vcache.main import VCache
 from vcache.vcache_core.cache.embedding_engine.strategies.benchmark import (
     BenchmarkEmbeddingEngine,
+)
+from vcache.vcache_core.cache.embedding_engine.strategies.open_ai import (
+    OpenAIEmbeddingEngine,
 )
 from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage import (
     InMemoryEmbeddingMetadataStorage,
@@ -39,6 +46,9 @@ from vcache.vcache_core.cache.eviction_policy.strategies.scu import SCUEvictionP
 from vcache.vcache_core.similarity_evaluator import SimilarityEvaluator
 from vcache.vcache_core.similarity_evaluator.strategies.benchmark_comparison import (
     BenchmarkComparisonSimilarityEvaluator,
+)
+from vcache.vcache_core.similarity_evaluator.strategies.llm_comparison import (
+    LLMComparisonSimilarityEvaluator,
 )
 from vcache.vcache_core.similarity_evaluator.strategies.string_comparison import (
     StringComparisonSimilarityEvaluator,
@@ -78,6 +88,12 @@ class EmbeddingModel(Enum):
     E5_MISTRAL_7B = ("emb_e5_mistral_7b", "E5_Mistral_7B_Instruct", "float16", 4096)
     E5_LARGE_V2 = ("emb_e5_large_v2", "E5_Large_v2", "float16", 512)
     E5_LARGE_V2_FT = ("emb_e5_large_v2_ft", "E5_Large_v2", "float16", 512)
+    OPENAI_TEXT_EMBEDDING_SMALL = (
+        "emb_openai_text_embedding_small",
+        "text-embedding-3-small",
+        "float16",
+        1536,
+    )
 
 
 class LargeLanguageModel(Enum):
@@ -85,6 +101,7 @@ class LargeLanguageModel(Enum):
     LLAMA_3_70B = ("response_llama_3_70b", "Llama_3_70B_Instruct", "float16", None)
     GPT_4O_MINI = ("response_gpt-4o-mini", "GPT-4o-mini", "float16", None)
     GPT_4O_NANO = ("response_gpt-4.1-nano", "GPT-4.1-nano", "float16", None)
+    GPT_4_1 = ("response_gpt-4.1", "gpt-4.1-2025-04-14", "float16", None)
 
 
 class Baseline(Enum):
@@ -100,6 +117,8 @@ class Dataset(Enum):
     SEM_BENCHMARK_CLASSIFICATION = "vCache/SemBenchmarkClassification"
     SEM_BENCHMARK_ARENA = "vCache/SemBenchmarkLmArena"
     SEM_BENCHMARK_SEARCH_QUERIES = "vCache/SemBenchmarkSearchQueries"
+    # Example for custom dataset. The path is relative to 'benchmarks/your_datasets/'
+    CUSTOM_EXAMPLE = "your_datasets/your_custom_dataset.parquet"
 
 
 class GeneratePlotsOnly(Enum):
@@ -192,6 +211,19 @@ RUN_COMBINATIONS: List[
         SCUEvictionPolicy(max_size=4500, watermark=0.99, eviction_percentage=0.1),
         45000,
     ),
+    (
+        EmbeddingModel.OPENAI_TEXT_EMBEDDING_SMALL,
+        LargeLanguageModel.GPT_4_1,
+        Dataset.CUSTOM_EXAMPLE,
+        GeneratePlotsOnly.NO,
+        LLMComparisonSimilarityEvaluator(
+            inference_engine=OpenAIInferenceEngine(
+                model_name="gpt-4.1-nano-2025-04-14", temperature=0.0
+            )
+        ),
+        SCUEvictionPolicy(max_size=2000, watermark=0.99, eviction_percentage=0.1),
+        50,
+    ),
 ]
 
 BASELINES_TO_RUN: List[Baseline] = [
@@ -248,6 +280,7 @@ class Benchmark(unittest.TestCase):
         self.delta: float = None
         self.is_static_threshold: bool = None
         self.eviction_policy: EvictionPolicy = None
+        self.is_custom_dataset: bool = False
 
     def stats_set_up(self):
         self.cache_hit_list: List[int] = []
@@ -267,7 +300,56 @@ class Benchmark(unittest.TestCase):
         if self.output_folder_path and not os.path.exists(self.output_folder_path):
             os.makedirs(self.output_folder_path)
 
-    def run_benchmark_loop(self, data_entries, max_samples):
+    def run_benchmark_loop_custom(self, data_entries: List[Dict], max_samples: int):
+        logging.info("Running benchmark loop for custom dataset")
+        pbar = tqdm(
+            total=min(max_samples, len(data_entries)),
+            desc="Processing entries",
+            disable=DISABLE_PROGRESS_BAR,
+        )
+
+        for idx, data_entry in enumerate(data_entries):
+            if idx >= max_samples:
+                break
+
+            # 1) Get Data
+            prompt: str = data_entry["prompt"]
+
+            # 2.1) Direct Inference (No Cache) - Live call
+            start_time = time.time()
+
+            label_response = self.vcache.vcache_config.inference_engine.create(prompt)
+            latency_direct = time.time() - start_time
+
+            # 2.2) vCache Inference (With Cache)
+            (
+                is_cache_hit,
+                cache_response,
+                response_metadata,
+                nn_metadata,
+                latency_vcache,
+            ) = self.get_vcache_answer_custom(prompt=prompt)
+
+            # This is important for the async logic
+            time.sleep(0.002)
+
+            # 3) Update Stats
+            self.update_stats(
+                is_cache_hit=is_cache_hit,
+                label_response=label_response,
+                cache_response=cache_response,
+                label_id_set=-1,  # Custom datasets don't have id_set
+                response_metadata=response_metadata,
+                nn_metadata=nn_metadata,
+                latency_direct=latency_direct,
+                latency_vcache=latency_vcache,
+            )
+
+            pbar.update(1)
+
+        pbar.close()
+
+    def run_benchmark_loop(self, data_entries: List[Dict], max_samples: int):
         logging.info("Running benchmark loop")
         pbar = tqdm(
             total=min(max_samples, len(data_entries)),
@@ -281,9 +363,8 @@ class Benchmark(unittest.TestCase):
                 break
 
             # 1) Get Data
-            task = data_entry["task"]
-            system_prompt = data_entry.get("output_format", "")
-            review_text = data_entry.get("text", "")
+            prompt: str = data_entry["prompt"]
+            system_prompt: str = data_entry.get("output_format", "")
 
             emb_generation_latency: float = float(
                 data_entry[self.embedding_model[0] + "_lat"]
@@ -311,8 +392,7 @@ class Benchmark(unittest.TestCase):
                 nn_metadata,
                 latency_vcache_logic,
             ) = self.get_vcache_answer(
-                task=task,
-                review_text=review_text,
+                prompt=prompt,
                 candidate_embedding=candidate_embedding,
                 label_response=label_response,
                 system_prompt=system_prompt,
@@ -348,17 +428,24 @@ class Benchmark(unittest.TestCase):
             )
 
         try:
-            if "/" in self.filepath:
+            if self.is_custom_dataset:
+                logging.info(f"Loading custom dataset: {self.filepath}")
+                if self.filepath.endswith(".csv"):
+                    df = pd.read_csv(self.filepath)
+                elif self.filepath.endswith(".parquet"):
+                    df = pd.read_parquet(self.filepath)
+                else:
+                    raise ValueError(
+                        f"Unsupported file format (not .csv or .parquet) for custom dataset: {self.filepath}"
+                    )
+                data_iterator = df.to_dict("records")
+                self.run_benchmark_loop_custom(data_iterator, max_samples)
+            elif "/" in self.filepath:
                 logging.info(f"Loading Hugging Face dataset: {self.filepath}")
                 data_iterator = load_dataset(
                     self.filepath, split=f"train[:{max_samples}]"
                 )
                 self.run_benchmark_loop(data_iterator, max_samples)
-            else:
-                logging.info(f"Loading local dataset: {self.filepath}")
-                with open(self.filepath, "rb") as file:
-                    data_entries = ijson.items(file, "item")
-                    self.run_benchmark_loop(data_entries, max_samples)
 
         except FileNotFoundError as e:
             logging.error(f"Benchmark dataset file not found: {e}")
@@ -396,6 +483,10 @@ class Benchmark(unittest.TestCase):
             equality_check_with_id_set: bool = label_id_set != -1
             if equality_check_with_id_set:
                 cache_response_correct: bool = label_id_set == response_metadata.id_set
+            elif self.is_custom_dataset:
+                cache_response_correct: bool = answers_have_same_meaning_llm(
+                    label_response, cache_response
+                )
             else:
                 cache_response_correct: bool = answers_have_same_meaning_static(
                     label_response, cache_response
@@ -416,6 +507,10 @@ class Benchmark(unittest.TestCase):
             equality_check_with_id_set: bool = label_id_set != -1
             if equality_check_with_id_set:
                 nn_response_correct: bool = label_id_set == nn_metadata.id_set
+            elif self.is_custom_dataset:
+                nn_response_correct: bool = answers_have_same_meaning_llm(
+                    label_response, nn_metadata.response
+                )
             else:
                 nn_response_correct: bool = answers_have_same_meaning_static(
                     label_response, nn_metadata.response
@@ -435,8 +530,7 @@ class Benchmark(unittest.TestCase):
 
     def get_vcache_answer(
         self,
-        task: str,
-        review_text: str,
+        prompt: str,
         candidate_embedding: List[float],
         label_response: str,
         system_prompt: str,
@@ -470,7 +564,6 @@ class Benchmark(unittest.TestCase):
         )
         self.vcache.vcache_config.inference_engine.set_next_response(label_response)
 
-        prompt = f"{task} {review_text}"
         latency_vcache_logic: float = time.time()
         try:
             is_cache_hit, cache_response, response_metadata, nn_metadata = (
@@ -487,6 +580,36 @@ class Benchmark(unittest.TestCase):
             raise e
 
         latency_vcache_logic = time.time() - latency_vcache_logic
+        return (
+            is_cache_hit,
+            cache_response,
+            response_metadata,
+            nn_metadata,
+            latency_vcache_logic,
+        )
+
+    def get_vcache_answer_custom(
+        self, prompt: str
+    ) -> Tuple[bool, str, EmbeddingMetadataObj, EmbeddingMetadataObj, float]:
+        """
+        Returns: Tuple[bool, str, EmbeddingMetadataObj, EmbeddingMetadataObj, float] - [is_cache_hit, cache_response, response_metadata, nn_metadata, latency_vcache_logic]
+        """
+        latency_vcache_logic: float = time.time()
+        try:
+            (
+                is_cache_hit,
+                cache_response,
+                response_metadata,
+                nn_metadata,
+            ) = self.vcache.infer_with_cache_info(prompt=prompt)
+        except Exception as e:
+            logging.error(
+                "Error getting vCache answer. Check vCache logs for more details."
+            )
+            raise e
+
+        latency_vcache_logic = time.time() - latency_vcache_logic
+
         return (
             is_cache_hit,
             cache_response,
@@ -587,18 +710,36 @@ def __run_baseline(
     similarity_evaluator: SimilarityEvaluator,
     eviction_policy: EvictionPolicy,
     max_samples: int,
+    is_custom_dataset: bool = False,
 ):
-    vcache_config: VCacheConfig = VCacheConfig(
-        inference_engine=BenchmarkInferenceEngine(),
-        embedding_engine=BenchmarkEmbeddingEngine(),
-        vector_db=HNSWLibVectorDB(
-            similarity_metric_type=SimilarityMetricType.COSINE,
-            max_capacity=MAX_VECTOR_DB_CAPACITY,
-        ),
-        embedding_metadata_storage=InMemoryEmbeddingMetadataStorage(),
-        similarity_evaluator=similarity_evaluator,
-        eviction_policy=eviction_policy,
-    )
+    if is_custom_dataset:
+        llm_model_name = llm_model[1].lower()
+        embedding_model_name = embedding_model[1].lower()
+
+        vcache_config: VCacheConfig = VCacheConfig(
+            inference_engine=OpenAIInferenceEngine(model_name=llm_model_name),
+            embedding_engine=OpenAIEmbeddingEngine(model_name=embedding_model_name),
+            vector_db=HNSWLibVectorDB(
+                similarity_metric_type=SimilarityMetricType.COSINE,
+                max_capacity=MAX_VECTOR_DB_CAPACITY,
+            ),
+            embedding_metadata_storage=InMemoryEmbeddingMetadataStorage(),
+            similarity_evaluator=similarity_evaluator,
+            eviction_policy=eviction_policy,
+        )
+    else:
+        vcache_config: VCacheConfig = VCacheConfig(
+            inference_engine=BenchmarkInferenceEngine(),
+            embedding_engine=BenchmarkEmbeddingEngine(),
+            vector_db=HNSWLibVectorDB(
+                similarity_metric_type=SimilarityMetricType.COSINE,
+                max_capacity=MAX_VECTOR_DB_CAPACITY,
+            ),
+            embedding_metadata_storage=InMemoryEmbeddingMetadataStorage(),
+            similarity_evaluator=similarity_evaluator,
+            eviction_policy=eviction_policy,
+        )
+
     vcache: VCache = VCache(vcache_config, vcache_policy)
 
     benchmark = Benchmark(vcache)
@@ -611,8 +752,10 @@ def __run_baseline(
     benchmark.is_static_threshold = threshold != -1
     benchmark.output_folder_path = path
     benchmark.eviction_policy = eviction_policy
+    benchmark.is_custom_dataset = is_custom_dataset
 
     benchmark.stats_set_up()
+
     try:
         benchmark.test_run_benchmark(max_samples)
     except Exception as e:
@@ -626,10 +769,11 @@ def __run_baseline(
 
 def main():
     benchmarks_dir = os.path.dirname(os.path.abspath(__file__))
-    datasets_dir = os.path.join(benchmarks_dir, "data", "large_scale")
-    if not os.path.exists(datasets_dir):
-        os.makedirs(datasets_dir, exist_ok=True)
-        logging.info(f"Created directory: {datasets_dir}")
+
+    custom_datasets_dir = os.path.join(benchmarks_dir, "your_datasets")
+    if not os.path.exists(custom_datasets_dir):
+        os.makedirs(custom_datasets_dir, exist_ok=True)
+        logging.info(f"Created directory: {custom_datasets_dir}")
 
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
 
@@ -643,14 +787,26 @@ def main():
         max_samples,
     ) in RUN_COMBINATIONS:
         try:
-            dataset_name = dataset.value
-            dataset_path = ""
-            if "/" in dataset_name:
-                dataset_path = dataset_name
-                logging.info(f"Using Hugging Face dataset: {dataset_path}")
+            dataset_value: str = dataset.value
+            is_custom_dataset: bool = dataset_value.startswith("your_datasets")
+
+            if is_custom_dataset:
+                # The path in the enum is relative to 'benchmarks/data/'
+                dataset_path = os.path.join(benchmarks_dir, dataset_value)
+                dataset_name = os.path.basename(dataset_path)
+                if not os.path.exists(dataset_path):
+                    logging.warning(f"Custom dataset file not found: {dataset_path}")
+                    continue
             else:
-                dataset_path = os.path.join(datasets_dir, f"{dataset_name}.json")
-                logging.info(f"Using local dataset: {dataset_path}")
+                dataset_name = dataset_value
+                if "/" in dataset_name:  # HuggingFace dataset
+                    dataset_path = dataset_name
+                    logging.info(f"Using Hugging Face dataset: {dataset_path}")
+                else:
+                    logging.warning(
+                        f"Dataset {dataset_name} not found. Please check the dataset path."
+                    )
+                    continue
 
             logging.info(
                 f"\nRunning benchmark for dataset: {dataset_name}, embedding model: {embedding_model.value[1]}, LLM model: {llm_model.value[1]}\n"
@@ -691,6 +847,7 @@ def main():
                             similarity_evaluator=similarity_evaluator,
                             eviction_policy=eviction_policy,
                             max_samples=max_samples,
+                            is_custom_dataset=is_custom_dataset,
                         )
 
             #####################################################
@@ -728,6 +885,7 @@ def main():
                         similarity_evaluator=similarity_evaluator,
                         eviction_policy=eviction_policy,
                         max_samples=max_samples,
+                        is_custom_dataset=is_custom_dataset,
                     )
 
             #####################################################
@@ -779,6 +937,7 @@ def main():
                         similarity_evaluator=similarity_evaluator,
                         eviction_policy=eviction_policy,
                         max_samples=max_samples,
+                        is_custom_dataset=is_custom_dataset,
                     )
 
             #####################################################
@@ -831,6 +990,7 @@ def main():
                             similarity_evaluator=similarity_evaluator,
                             eviction_policy=eviction_policy,
                             max_samples=max_samples,
+                            is_custom_dataset=is_custom_dataset,
                         )
 
             #####################################################
@@ -866,6 +1026,7 @@ def main():
                             similarity_evaluator=similarity_evaluator,
                             eviction_policy=eviction_policy,
                             max_samples=max_samples,
+                            is_custom_dataset=is_custom_dataset,
                         )
 
             #####################################################
@@ -898,6 +1059,7 @@ def main():
                         similarity_evaluator=similarity_evaluator,
                         eviction_policy=eviction_policy,
                         max_samples=max_samples,
+                        is_custom_dataset=is_custom_dataset,
                     )
 
             #####################################################
