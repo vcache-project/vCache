@@ -61,11 +61,31 @@ response: str = vcache.infer("Is the sky blue?")
 
 ## 🎬 How vCache Works
 
-vCache intelligently learns when cached responses are semantically equivalent to new prompts, adapting its decision boundaries based on your accuracy requirements.
+vCache intelligently detects when a new prompt is semantically equivalent to a cached one, and adapts its decision boundaries based on your accuracy requirements.
+This lets it return cached model responses for semantically similar prompts—not just exact matches—reducing both inference latency and cost without sacrificing correctness.
 
 <p align="left">
   <img src="docs/VCacheVisualizer.gif" alt="vCache Visualization" width="60%">
 </p>
+
+Please refer to the [vCache paper](https://arxiv.org/abs/2502.03771) for further details.
+
+
+### System Integration
+
+Semantic caches sit between the application server and the LLM inference backend.
+
+<p align="left">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./docs/vCache_architecture.png">
+    <source media="(prefers-color-scheme: light)" srcset="./docs/vCache_architecture_white.png">
+    <!-- Fallback -->
+    <img alt="vCache Architecture" src="./docs/vCache_architecture.png" width="50%">
+  </picture>
+</p>
+
+Applications can range from agentic systems and RAG pipelines to database systems issuing LLM-based SQL queries. The inference backend can be a closed-source API (e.g., OpenAI, Anthropic) or a proprietary model hosted on-prem or in the cloud (e.g., LLaMA on AWS).
+
 
 
 ## ⚙️ Advanced Configuration
@@ -87,6 +107,7 @@ from vcache import (
     VCacheConfig,
     VCachePolicy,
     VerifiedDecisionPolicy,
+    MRUEvictionPolicy,
 )
 
 # 1. Configure the components for vCache
@@ -98,6 +119,7 @@ config: VCacheConfig = VCacheConfig(
     similarity_evaluator=LLMComparisonSimilarityEvaluator(
         inference_engine=OpenAIInferenceEngine(model_name="gpt-4.1-nano-2025-04-14")
     ),
+    eviction_policy=MRUEvictionPolicy(max_size=4096),
 )
 
 # 2. Choose a caching policy
@@ -129,82 +151,6 @@ You can find complete working examples in the [`playground`](playground/) direct
 ### Eviction Policy
 vCache supports FIFO, LRU, MRU, and a custom SCU eviction policy. See the [Eviction Policy Documentation](vcache/vcache_core/cache/eviction_policy/README.md) for further details.
 
-## 🧠 What Is Semantic Caching?
-
-Semantic caching reduces LLM latency and cost by returning cached model responses for **semantically similar** prompts (not just exact matches)—so you don’t pay for inference cost and latency on repeated questions that have the same answer.
-
-<p align="left">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="./docs/vCache_architecture.png">
-    <source media="(prefers-color-scheme: light)" srcset="./docs/vCache_architecture_white.png">
-    <!-- Fallback -->
-    <img alt="vCache Architecture" src="./docs/vCache_architecture.png" width="50%">
-  </picture>
-</p>
-
-### Architecture Overview
-
-1. **Embed & Store**  
-Each prompt is converted to a fixed-length vector (an “embedding”) and stored in a vector database along with its LLM response.
-
-2. **Nearest-Neighbor Lookup**  
-When a new prompt arrives, the cache embeds it and finds its most similar stored prompt using a similarity metric (e.g., cosine similarity).
-
-3. **Similarity Score**  
-The system computes a score between 0 and 1 that quantifies how “close” the new prompt is to the retrieved entry.
-
-4. **Decision: Exploit vs. Explore**  
-   - **Exploit (cache hit):** If the similarity is above a confidence bound, return the cached response.  
-   - **Explore (cache miss):** Otherwise, infer the LLM for a response, add its embedding and answer to the cache, and return it.
-
-<p align="left">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="./docs/vCache_workflow.png">
-    <source media="(prefers-color-scheme: light)" srcset="./docs/vCache_workflow_white.png">
-    <!-- Fallback -->
-    <img alt="vCache Architecture" src="./docs/vCache_workflow.png" width="45%">
-  </picture>
-</p>
-
-### Why Fixed Thresholds Fall Short
-Existing semantic caches rely on a **global static threshold** to decide whether to reuse a cached response (exploit) or invoke the LLM (explore). If the similarity score exceeds this threshold, the cache reuses the response; otherwise, it infers the model. This strategy is fundamentally limited.
-
-- **Uniform threshold, diverse prompts:** A fixed threshold assumes all embeddings are equally distributed—ignoring that similarity is context-dependent.
-- **Threshold too low → false positives:** Prompts with low semantic similarity may be incorrectly treated as equivalent, resulting in reused responses that do not match the intended output.
-- **Threshold too high → false negatives:** Prompts with semantically equivalent meaning may fail the similarity check, forcing unnecessary LLM inference and reducing cache efficiency.
-- **No correctness control:** There is no mechanism to ensure or even estimate how often reused answers will be wrong.
-
-In short, fixed thresholds trade correctness for simplicity and offer no guarantees. Please refer to the [vCache paper](https://arxiv.org/abs/2502.03771) for further details.
-
-### Introducing vCache
-
-vCache overcomes these limitations with two ideas:
-
-- **Per-Prompt Decision Boundary**  
-  vCache learns a custom decision boundary for each cached prompt, based on past observations of “how often similarity × actually matched the correct response.”
-
-- **Built-In Error Constraint**  
-  You specify a maximum error rate (e.g., 1%). vCache adjusts every per-prompt decision boundary online. The algorithm enforces optimized cache hit rates and does not require offline training or manual fine-tuning.
-
-### Benefits
-
-- **Reliability**  
-  Formally bounds the rate of incorrect cache hits to your chosen tolerance.  
-- **Performance**  
-  Matches or exceeds static-threshold systems in cache hit rate and end-to-end latency.  
-- **Simplicity**  
-  Plug in any embedding model; vCache learns and adapts automatically at runtime.
-
-  <p align="left">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="./docs/vCache_core.png">
-    <source media="(prefers-color-scheme: light)" srcset="./docs/vCache_core_white.png">
-    <!-- Fallback -->
-    <img alt="vCache Architecture" src="./docs/vCache_core.png" width="50%">
-  </picture>
-</p>
-
-Please refer to the [vCache paper](https://arxiv.org/abs/2502.03771) for further details.
 
 
 ## 🛠 Developer Guide

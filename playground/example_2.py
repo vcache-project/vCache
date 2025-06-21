@@ -8,6 +8,7 @@ from vcache import (
     HNSWLibVectorDB,
     InMemoryEmbeddingMetadataStorage,
     LLMComparisonSimilarityEvaluator,
+    MRUEvictionPolicy,
     OpenAIEmbeddingEngine,
     OpenAIInferenceEngine,
     VCache,
@@ -36,6 +37,7 @@ def __get_vcache() -> VCache:
         similarity_evaluator=LLMComparisonSimilarityEvaluator(
             inference_engine=OpenAIInferenceEngine(model_name="gpt-4.1-nano-2025-04-14")
         ),
+        eviction_policy=MRUEvictionPolicy(max_size=4096),
     )
 
     # 2. Choose a caching policy
