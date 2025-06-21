@@ -15,7 +15,10 @@ from tqdm import tqdm
 
 from benchmarks._plotter_combined import generate_combined_plots
 from benchmarks._plotter_individual import generate_individual_plots
-from benchmarks.common.comparison import answers_have_same_meaning_static
+from benchmarks.common.comparison import (
+    answers_have_same_meaning_llm,
+    answers_have_same_meaning_static,
+)
 from vcache.config import VCacheConfig
 from vcache.inference_engine.strategies.benchmark import (
     BenchmarkInferenceEngine,
@@ -181,10 +184,12 @@ RUN_COMBINATIONS: List[
         Dataset.CUSTOM_EXAMPLE,
         GeneratePlotsOnly.NO,
         LLMComparisonSimilarityEvaluator(
-            inference_engine=OpenAIInferenceEngine(model_name="gpt-4.1-nano-2025-04-14")
+            inference_engine=OpenAIInferenceEngine(
+                model_name="gpt-4.1-nano-2025-04-14", temperature=0.0
+            )
         ),
         SCUEvictionPolicy(max_size=2000, watermark=0.99, eviction_percentage=0.1),
-        2000,
+        50,
     ),
     # (
     #     EmbeddingModel.GTE,
@@ -306,8 +311,7 @@ class Benchmark(unittest.TestCase):
 
             # 2.1) Direct Inference (No Cache) - Live call
             start_time = time.time()
-            # We use the vcache's inference engine to get the ground truth response
-            print(f"TYPE:{type(self.vcache.vcache_config.inference_engine)}")
+
             label_response = self.vcache.vcache_config.inference_engine.create(prompt)
             latency_direct = time.time() - start_time
 
@@ -319,10 +323,6 @@ class Benchmark(unittest.TestCase):
                 nn_metadata,
                 latency_vcache,
             ) = self.get_vcache_answer_custom(prompt=prompt)
-
-            if not is_cache_hit:
-                latency_vcache += latency_direct
-            print(f"cache_response: {cache_response[:100]}")
 
             # This is important for the async logic
             time.sleep(0.002)
@@ -477,6 +477,13 @@ class Benchmark(unittest.TestCase):
             equality_check_with_id_set: bool = label_id_set != -1
             if equality_check_with_id_set:
                 cache_response_correct: bool = label_id_set == response_metadata.id_set
+            elif self.is_custom_dataset:
+                cache_response_correct: bool = answers_have_same_meaning_llm(
+                    label_response, cache_response
+                )
+                print(
+                    f"LLM Judge Comparison. Hit. Is Cache Response Correct: {cache_response_correct}. Label Response: {label_response}. Cache Response: {cache_response}"
+                )
             else:
                 cache_response_correct: bool = answers_have_same_meaning_static(
                     label_response, cache_response
@@ -497,6 +504,13 @@ class Benchmark(unittest.TestCase):
             equality_check_with_id_set: bool = label_id_set != -1
             if equality_check_with_id_set:
                 nn_response_correct: bool = label_id_set == nn_metadata.id_set
+            elif self.is_custom_dataset:
+                nn_response_correct: bool = answers_have_same_meaning_llm(
+                    label_response, nn_metadata.response
+                )
+                print(
+                    f"LLM Judge Comparison. Miss. Is NN Response Correct: {nn_response_correct}. Label Response: {label_response}. NN Response: {nn_metadata.response}"
+                )
             else:
                 nn_response_correct: bool = answers_have_same_meaning_static(
                     label_response, nn_metadata.response
@@ -581,7 +595,6 @@ class Benchmark(unittest.TestCase):
         Returns: Tuple[bool, str, EmbeddingMetadataObj, EmbeddingMetadataObj, float] - [is_cache_hit, cache_response, response_metadata, nn_metadata, latency_vcache_logic]
         """
         latency_vcache_logic: float = time.time()
-        print("REACHED HERE 1.")
         try:
             (
                 is_cache_hit,
@@ -596,6 +609,7 @@ class Benchmark(unittest.TestCase):
             raise e
 
         latency_vcache_logic = time.time() - latency_vcache_logic
+
         return (
             is_cache_hit,
             cache_response,
@@ -702,8 +716,6 @@ def __run_baseline(
         llm_model_name = llm_model[1].lower()
         embedding_model_name = embedding_model[1].lower()
 
-        print(f"LLM MODEL NAME: {llm_model_name}")
-        print(f"EMBEDDING MODEL NAME: {embedding_model_name}\n\n")
         vcache_config: VCacheConfig = VCacheConfig(
             inference_engine=OpenAIInferenceEngine(model_name=llm_model_name),
             embedding_engine=OpenAIEmbeddingEngine(model_name=embedding_model_name),
