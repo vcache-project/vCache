@@ -100,6 +100,7 @@ class Dataset(Enum):
     SEM_BENCHMARK_CLASSIFICATION = "vCache/SemBenchmarkClassification"
     SEM_BENCHMARK_ARENA = "vCache/SemBenchmarkLmArena"
     SEM_BENCHMARK_SEARCH_QUERIES = "vCache/SemBenchmarkSearchQueries"
+    CUSTOM = "datasets/"
 
 
 class GeneratePlotsOnly(Enum):
@@ -281,9 +282,8 @@ class Benchmark(unittest.TestCase):
                 break
 
             # 1) Get Data
-            task = data_entry["task"]
-            system_prompt = data_entry.get("output_format", "")
-            review_text = data_entry.get("text", "")
+            prompt: str = data_entry["prompt"]
+            system_prompt: str = data_entry.get("output_format", "")
 
             emb_generation_latency: float = float(
                 data_entry[self.embedding_model[0] + "_lat"]
@@ -311,8 +311,7 @@ class Benchmark(unittest.TestCase):
                 nn_metadata,
                 latency_vcache_logic,
             ) = self.get_vcache_answer(
-                task=task,
-                review_text=review_text,
+                prompt=prompt,
                 candidate_embedding=candidate_embedding,
                 label_response=label_response,
                 system_prompt=system_prompt,
@@ -435,8 +434,7 @@ class Benchmark(unittest.TestCase):
 
     def get_vcache_answer(
         self,
-        task: str,
-        review_text: str,
+        prompt: str,
         candidate_embedding: List[float],
         label_response: str,
         system_prompt: str,
@@ -470,7 +468,6 @@ class Benchmark(unittest.TestCase):
         )
         self.vcache.vcache_config.inference_engine.set_next_response(label_response)
 
-        prompt = f"{task} {review_text}"
         latency_vcache_logic: float = time.time()
         try:
             is_cache_hit, cache_response, response_metadata, nn_metadata = (
