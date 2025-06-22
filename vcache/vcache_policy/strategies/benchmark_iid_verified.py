@@ -497,12 +497,14 @@ class _Algorithm:
         negative_samples = similarities[labels==0].reshape(-1,1,1)
         labels = labels.reshape(-1,1,1)
         tholds = self.thold_grid.reshape(1,-1,1)
-        epsilon = self.epsilon_grid.reshape(1,1,-1)
+        deltap = self.delta * (num_negative_samples + num_positive_samples)/num_negative_samples
+
+        epsilon = self.epsilon_grid[self.epsilon_grid < deltap].reshape(1,1,-1)
         
         cdf_estimate = np.sum(negative_samples < tholds, axis=0, keepdims=True) / num_negative_samples # (1, tholds, 1)
         cdf_ci_lower, cdf_ci_upper = self.wilson_proportion_ci(cdf_estimate, num_negative_samples, confidence=1-epsilon) # (1, tholds, epsilon)
 
-        pc_adjusted = (1 - self.delta * (num_negative_samples + num_positive_samples)/num_negative_samples) / (1 - epsilon) # adjust for positive samples (1,1,epsilon)
+        pc_adjusted = 1 - (deltap - epsilon) / (1 - epsilon) # adjust for positive samples (1,1,epsilon)
         
 
         t_hats = (np.sum(cdf_estimate > pc_adjusted, axis=1, keepdims=True) == 0) * 1.0 + (1 - (np.sum(cdf_estimate > pc_adjusted, axis=1, keepdims=True) == 0)) * self.thold_grid[np.argmax(cdf_estimate > pc_adjusted, axis=1, keepdims=True)]
