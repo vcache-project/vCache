@@ -49,13 +49,14 @@ export OPENAI_API_KEY="your_api_key_here"
 Finally, use vCache in your Python code:
 
 ```python
-from vcache import VCache, VerifiedDecisionPolicy
+from vcache import VCache, VCachePolicy, VerifiedDecisionPolicy
 
 error_rate_bound: int = 0.01
 policy: VCachePolicy = VerifiedDecisionPolicy(delta=error_rate_bound)
-vcache: VCache = VCache(policy)
+vcache: VCache = VCache(policy=policy)
 
 response: str = vcache.infer("Is the sky blue?")
+print(response)
 ```
 
 
