@@ -22,10 +22,10 @@ This directory provides the official benchmarking tools for evaluating the perfo
 
 ## ⚙️ Installation
 
-To enable benchmarking capabilities, install vCache with the `benchmarks` extras:
+To enable benchmarking capabilities, install vCache with the `benchmarks` extras from the project root:
 
 ```bash
-pip install -e .
+pip install -e .[benchmarks]
 ```
 
 
