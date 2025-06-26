@@ -156,7 +156,7 @@ vCache supports FIFO, LRU, MRU, and a custom SCU eviction policy. See the [Evict
 
 ## 🛠 Developer Guide
 
-For advanced usage and development setup, see the [Developer Guide](ReadMe_Dev.md).
+For development setup and contribution guidelines, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 
 
