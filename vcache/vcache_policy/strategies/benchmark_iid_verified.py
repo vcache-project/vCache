@@ -26,6 +26,7 @@ from vcache.vcache_policy.vcache_policy import VCachePolicy
 # vCache in multi-threaded applications. This is a library-level fix.
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
 
+
 # TODO(aditya) pull out CallbackQueue out of strategy and use uniformly across vCache baselines
 class CallbackQueue(queue.Queue):
     """
@@ -188,7 +189,7 @@ class BenchmarkVerifiedIIDDecisionPolicy(VCachePolicy):
 
         Returns:
             Tuple containing [is_cache_hit, actual_response, nn_metadata_object].
-        """        
+        """
         if self.inference_engine is None or self.cache is None:
             raise ValueError("Policy has not been setup")
 
@@ -217,7 +218,6 @@ class BenchmarkVerifiedIIDDecisionPolicy(VCachePolicy):
                 new_response,
                 EmbeddingMetadataObj(embedding_id=-1, response=""),
             )
-
 
         action = self.bayesian.select_action(
             similarity_score=similarity_score, metadata=nn_metadata
@@ -420,7 +420,6 @@ class _Algorithm:
         self.P_c: float = 1.0 - self.delta
         self.epsilon_grid: np.ndarray = np.linspace(1e-6, 1 - 1e-6, 50)
         self.thold_grid: np.ndarray = np.linspace(0, 1, 100)
-        
 
     def add_observation_to_metadata(
         self, similarity_score: float, is_correct: bool, metadata: EmbeddingMetadataObj
@@ -450,14 +449,14 @@ class _Algorithm:
         Returns:
         - ci_low, ci_upp : np.ndarray, lower and upper bounds of the confidence interval
         """
-        k = np.asarray((cdf_estimates * n).astype(int)) # (1, tholds,1)
-        n = np.asarray(n) # 1
+        k = np.asarray((cdf_estimates * n).astype(int))  # (1, tholds,1)
+        n = np.asarray(n)  # 1
 
         assert np.all((0 <= k) & (k <= n)), "k must be between 0 and n"
         assert np.all(n > 0), "n must be > 0"
 
-        p_hat = k / n # (1, tholds,1)
-        z = norm.ppf(confidence) # this is single sided # (1,1,epsilons)
+        p_hat = k / n  # (1, tholds,1)
+        z = norm.ppf(confidence)  # this is single sided # (1,1,epsilons)
 
         denom = 1 + z**2 / n
         center = (p_hat + z**2 / (2 * n)) / denom
@@ -466,7 +465,7 @@ class _Algorithm:
         ci_low = center - margin
         ci_upp = center + margin
 
-        return ci_low, ci_upp #(1,tholds,epsilons)
+        return ci_low, ci_upp  # (1,tholds,epsilons)
 
     def select_action(
         self, similarity_score: float, metadata: EmbeddingMetadataObj
@@ -486,55 +485,50 @@ class _Algorithm:
 
         if len(similarities) < 6 or len(labels) < 6:
             return _Action.EXPLORE
-        num_positive_samples = np.sum(labels==1)
-        num_negative_samples = np.sum(labels==0)
-        
+        num_positive_samples = np.sum(labels == 1)
+        num_negative_samples = np.sum(labels == 0)
+
         # ( for vectorization , [samples, tholds, epsilon])
-        negative_samples = similarities[labels==0].reshape(-1,1,1)
-        labels = labels.reshape(-1,1,1)
-        tholds = self.thold_grid.reshape(1,-1,1)
+        negative_samples = similarities[labels == 0].reshape(-1, 1, 1)
+        labels = labels.reshape(-1, 1, 1)
+        tholds = self.thold_grid.reshape(1, -1, 1)
         deltap = (
             self.delta * (num_negative_samples + num_positive_samples)
         ) / num_negative_samples
 
-        epsilon = self.epsilon_grid[self.epsilon_grid < deltap].reshape(1,1,-1)
-        
+        epsilon = self.epsilon_grid[self.epsilon_grid < deltap].reshape(1, 1, -1)
+
         cdf_estimate = (
-            np.sum(negative_samples < tholds, axis=0, keepdims=True) /
-            num_negative_samples
+            np.sum(negative_samples < tholds, axis=0, keepdims=True)
+            / num_negative_samples
         )  # (1, tholds, 1)
         cdf_ci_lower, cdf_ci_upper = self.wilson_proportion_ci(
             cdf_estimate, num_negative_samples, confidence=1 - epsilon
         )  # (1, tholds, epsilon)
-        
+
         # adjust for positive samples (1,1,epsilon)
-        pc_adjusted = 1 - (deltap - epsilon) / (1 - epsilon)  
-        
+        pc_adjusted = 1 - (deltap - epsilon) / (1 - epsilon)
 
         t_hats = (
-            (np.sum(cdf_estimate > pc_adjusted, axis=1, keepdims=True) == 0) * 1.0
-            + (
-                1 - (np.sum(cdf_estimate > pc_adjusted, axis=1, keepdims=True) == 0)
-            )
-            * self.thold_grid[
-                np.argmax(cdf_estimate > pc_adjusted, axis=1, keepdims=True)
-            ]
-        )
+            np.sum(cdf_estimate > pc_adjusted, axis=1, keepdims=True) == 0
+        ) * 1.0 + (
+            1 - (np.sum(cdf_estimate > pc_adjusted, axis=1, keepdims=True) == 0)
+        ) * self.thold_grid[
+            np.argmax(cdf_estimate > pc_adjusted, axis=1, keepdims=True)
+        ]
         t_primes = (
-            (np.sum(cdf_ci_lower > pc_adjusted, axis=1, keepdims=True) == 0) * 1.0
-            + (
-                1 - (np.sum(cdf_ci_lower > pc_adjusted, axis=1, keepdims=True) == 0)
-            )
-            * self.thold_grid[
-                np.argmax(cdf_ci_lower > pc_adjusted, axis=1, keepdims=True)
-            ]
-        )
-        
+            np.sum(cdf_ci_lower > pc_adjusted, axis=1, keepdims=True) == 0
+        ) * 1.0 + (
+            1 - (np.sum(cdf_ci_lower > pc_adjusted, axis=1, keepdims=True) == 0)
+        ) * self.thold_grid[
+            np.argmax(cdf_ci_lower > pc_adjusted, axis=1, keepdims=True)
+        ]
+
         t_hat = np.min(t_hats)
         t_prime = np.min(t_primes)
         metadata.t_prime = t_prime
         metadata.t_hat = t_hat
-        metadata.var_t = -1 # not computed
+        metadata.var_t = -1  # not computed
 
         if similarity_score <= t_prime:
             return _Action.EXPLORE
