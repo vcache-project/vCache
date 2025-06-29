@@ -215,9 +215,9 @@ class _Algorithm:
             metadata: The metadata of the embedding.
         """
         if is_correct:
-            self.global_observations.append((round(similarity_score, 3), 1))
+            self.global_observations.append((round(similarity_score, 3).item(), 1))
         else:
-            self.global_observations.append((round(similarity_score, 3), 0))
+            self.global_observations.append((round(similarity_score, 3).item(), 0))
 
     def select_action(
         self, similarity_score: float, metadata: EmbeddingMetadataObj
