@@ -15,6 +15,12 @@ Reliable and Efficient Semantic Prompt Caching
 <br>
 
 
+<p align="center">
+  <img src="https://img.shields.io/badge/Status-Active-brightgreen" alt="vCache Status">
+  <img src="https://img.shields.io/badge/Version-1.0-blue" alt="vCache Version">
+  <img src="https://img.shields.io/badge/License-CC%20NC--ND%203.0-yellow" alt="vCache License">
+</p>
+
 
 
 Semantic caching reduces LLM latency and cost by returning cached model responses for semantically similar prompts (not just exact matches). **vCache** is the first verified semantic cache that **guarantees user-defined error rate bounds**. vCache replaces static thresholds with **online-learned, embedding-specific decision boundaries**—no manual fine-tuning required. This enables reliable cached response reuse across any embedding model or workload.
