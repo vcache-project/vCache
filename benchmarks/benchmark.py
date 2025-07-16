@@ -1,3 +1,50 @@
+"""
+
+This script is designed to benchmark the performance of vCache against several baselines.
+It evaluates cache hit rates, accuracy, latency, and other metrics across different configurations.
+
+The primary configuration is done by modifying the global variables in the Benchmark Config section:
+
+1.  `RUN_COMBINATIONS`: This is the most important setting. It's a list of tuples, where each tuple
+    defines a complete benchmark scenario to run. Each tuple contains:
+    - `EmbeddingModel`: The embedding model to use (e.g., `EmbeddingModel.GTE`).
+    - `LargeLanguageModel`: The large language model to use (e.g., `LargeLanguageModel.GPT_4O_MINI`).
+    - `Dataset`: The dataset for the benchmark. The string values correspond to Hugging Face dataset
+        repository IDs (e.g., 'vCache/SemBenchmarkSearchQueries'). These datasets will be automatically
+        downloaded and cached by the `datasets` library on the first run.
+    - `GeneratePlotsOnly`: Set to `GeneratePlotsOnly.YES` to skip the benchmark and only regenerate
+        plots from existing results.
+    - `SimilarityEvaluator`: The strategy for comparing semantic similarity (e.g., `StringComparisonSimilarityEvaluator`,
+        `BenchmarkComparisonSimilarityEvaluator`).
+    - `EvictionPolicy`: The cache eviction policy to use (e.g., `SCUEvictionPolicy`).
+    - `int`: The maximum number of samples to process
+
+2.  `BASELINES_TO_RUN`: A list to specify which caching strategies to evaluate. Every baseline is run
+    for every run combination. Comment out or remove baselines you don't want to run. Available baselines
+    include `VCacheLocal`, `GPTCache`, `BerkeleyEmbedding`, etc.
+
+3.  `STATIC_THRESHOLDS`: A list of floating-point values for the similarity thresholds used by static policies
+    like GPTCache and BerkeleyEmbedding. The benchmark will run once for each threshold in this list.
+
+4.  `DELTAS`: A list of floating-point values for the `delta` parameter used by dynamic policies
+    like vCache. The benchmark will run once for each delta in this list.
+
+Additional configuration variables:
+
+5.  `CONFIDENCE_INTERVALS_ITERATIONS`: Number of iterations to run each configuration for calculating
+    confidence intervals in statistical analysis.
+
+6.  `DISABLE_PROGRESS_BAR`: Set to `True` to disable the progress bar during benchmark execution.
+
+7.  `KEEP_SPLIT`: Determines how many samples to keep from the dataset for evaluation. This controls
+    the size of the test set used in the benchmark.
+
+8.  `MAX_VECTOR_DB_CAPACITY`: Maximum capacity for the vector database.
+
+9.  `PLOT_FONT_SIZE`: Font size used in generated plots and visualizations.
+
+"""
+
 import json
 import logging
 import os
@@ -83,6 +130,15 @@ logging.basicConfig(
 
 
 class EmbeddingModel(Enum):
+    """Enumeration of available embedding models for benchmarking.
+
+    Each enum value contains a tuple with:
+    - Column name prefix in datasets
+    - Model display name
+    - Data type (float32/float16)
+    - Embedding dimension
+    """
+
     GTE = ("emb_gte", "GteLargeENv1_5", "float32", 1024)
     GTE_FT = ("emb_gte_ft", "GteLargeENv1_5", "float32", 1024)
     E5_MISTRAL_7B = ("emb_e5_mistral_7b", "E5_Mistral_7B_Instruct", "float16", 4096)
@@ -97,6 +153,15 @@ class EmbeddingModel(Enum):
 
 
 class LargeLanguageModel(Enum):
+    """Enumeration of available large language models for benchmarking.
+
+    Each enum value contains a tuple with:
+    - Column name prefix in datasets
+    - Model display name
+    - Data type (float16)
+    - Context length (None for variable)
+    """
+
     LLAMA_3_8B = ("response_llama_3_8b", "Llama_3_8B_Instruct", "float16", None)
     LLAMA_3_70B = ("response_llama_3_70b", "Llama_3_70B_Instruct", "float16", None)
     GPT_4O_MINI = ("response_gpt-4o-mini", "GPT-4o-mini", "float16", None)
@@ -105,6 +170,17 @@ class LargeLanguageModel(Enum):
 
 
 class Baseline(Enum):
+    """Enumeration of available caching baselines for comparison.
+
+    Each baseline represents a different caching strategy:
+    - GPTCache: Static threshold-based caching
+    - VCacheLocal: vCache with local threshold adaptation
+    - VCacheGlobal: vCache with global threshold adaptation
+    - BerkeleyEmbedding: Fine-tuned embeddings with static threshold
+    - VCacheBerkeleyEmbedding: vCache with fine-tuned embeddings
+    - IID: Independent and Identically Distributed threshold policy
+    """
+
     GPTCache = "GPTCache"
     VCacheLocal = "vCacheLocal"
     VCacheGlobal = "vCacheGlobal"
@@ -114,6 +190,12 @@ class Baseline(Enum):
 
 
 class Dataset(Enum):
+    """Enumeration of available datasets for benchmarking.
+
+    Supports both HuggingFace datasets (with repository IDs) and custom datasets
+    (with relative paths from benchmarks/your_datasets/).
+    """
+
     SEM_BENCHMARK_CLASSIFICATION = "vCache/SemBenchmarkClassification"
     SEM_BENCHMARK_ARENA = "vCache/SemBenchmarkLmArena"
     SEM_BENCHMARK_SEARCH_QUERIES = "vCache/SemBenchmarkSearchQueries"
@@ -122,6 +204,12 @@ class Dataset(Enum):
 
 
 class GeneratePlotsOnly(Enum):
+    """Enumeration for controlling whether to run benchmarks or only generate plots.
+
+    YES: Skip benchmark execution and only generate plots from existing results
+    NO: Run full benchmark and generate plots
+    """
+
     YES = True
     NO = False
 
@@ -130,51 +218,6 @@ class GeneratePlotsOnly(Enum):
 ### Benchmark Config ###################################################################################################
 ########################################################################################################################
 
-"""
-    This script is designed to benchmark the performance of vCache against several baselines. 
-    It evaluates cache hit rates, accuracy, latency, and other metrics across different configurations.
-
-    The primary configuration is done by modifying the global variables in the Benchmark Config section:
-
-    1.  `RUN_COMBINATIONS`: This is the most important setting. It's a list of tuples, where each tuple 
-        defines a complete benchmark scenario to run. Each tuple contains:
-        - `EmbeddingModel`: The embedding model to use (e.g., `EmbeddingModel.GTE`).
-        - `LargeLanguageModel`: The large language model to use (e.g., `LargeLanguageModel.GPT_4O_MINI`).
-        - `Dataset`: The dataset for the benchmark. The string values correspond to Hugging Face dataset 
-           repository IDs (e.g., 'vCache/SemBenchmarkSearchQueries'). These datasets will be automatically 
-           downloaded and cached by the `datasets` library on the first run.
-        - `GeneratePlotsOnly`: Set to `GeneratePlotsOnly.YES` to skip the benchmark and only regenerate 
-           plots from existing results.
-        - `SimilarityEvaluator`: The strategy for comparing semantic similarity (e.g., `StringComparisonSimilarityEvaluator`, 
-          `BenchmarkComparisonSimilarityEvaluator`).
-        - `EvictionPolicy`: The cache eviction policy to use (e.g., `SCUEvictionPolicy`).
-
-    2.  `BASELINES_TO_RUN`: A list to specify which caching strategies to evaluate. Every baseline is run 
-        for every run combination. Comment out or remove baselines you don't want to run. Available baselines 
-        include `VCacheLocal`, `GPTCache`, `BerkeleyEmbedding`, etc.
-
-    3.  `STATIC_THRESHOLDS`: A list of floating-point values for the similarity thresholds used by static policies 
-        like GPTCache and BerkeleyEmbedding. The benchmark will run once for each threshold in this list.
-
-    4.  `DELTAS`: A list of floating-point values for the `delta` parameter used by dynamic policies 
-        like vCache. The benchmark will run once for each delta in this list.
-
-    Additional configuration variables:
-
-    5.  `CONFIDENCE_INTERVALS_ITERATIONS`: Number of iterations to run each configuration for calculating 
-        confidence intervals in statistical analysis.
-
-    6.  `DISABLE_PROGRESS_BAR`: Set to `True` to disable the progress bar during benchmark execution. 
-
-    7.  `KEEP_SPLIT`: Determines how many samples to keep from the dataset for evaluation. This controls 
-        the size of the test set used in the benchmark.
-
-    8.  `MAX_VECTOR_DB_CAPACITY`: Maximum capacity for the vector database.
-
-    9.  `PLOT_FONT_SIZE`: Font size used in generated plots and visualizations.
-
-"""
-
 CONFIDENCE_INTERVALS_ITERATIONS: int = 1
 DISABLE_PROGRESS_BAR: bool = False
 KEEP_SPLIT: int = 100
@@ -182,7 +225,15 @@ MAX_VECTOR_DB_CAPACITY: int = 150000
 PLOT_FONT_SIZE: int = 50
 
 RUN_COMBINATIONS: List[
-    Tuple[EmbeddingModel, LargeLanguageModel, Dataset, GeneratePlotsOnly]
+    Tuple[
+        EmbeddingModel,
+        LargeLanguageModel,
+        Dataset,
+        GeneratePlotsOnly,
+        SimilarityEvaluator,
+        EvictionPolicy,
+        int,
+    ]
 ] = [
     (
         EmbeddingModel.GTE,
@@ -234,40 +285,39 @@ BASELINES_TO_RUN: List[Baseline] = [
     Baseline.VCacheBerkeleyEmbedding,
 ]
 
-STATIC_THRESHOLDS: List[float] = [0.98]
-# STATIC_THRESHOLDS: List[float] = [
-#     0.80,
-#     0.81,
-#     0.82,
-#     0.83,
-#     0.84,
-#     0.85,
-#     0.86,
-#     0.87,
-#     0.88,
-#     0.89,
-#     0.90,
-#     0.91,
-#     0.92,
-#     0.93,
-#     0.94,
-#     0.95,
-#     0.96,
-#     0.97,
-#     0.98,
-#     0.99
-# ]
+STATIC_THRESHOLDS: List[float] = [0.80, 0.83, 0.86, 0.89, 0.92, 0.95, 0.97, 0.98, 0.99]
 
-DELTAS: List[float] = [0.05]
-# DELTAS: List[float] = [
-#     0.01, 0.015, 0.02, 0.025, 0.03, 0.035, 0.04, 0.05, 0.06, 0.07
-# ]
+DELTAS: List[float] = [0.01, 0.015, 0.02, 0.025, 0.03, 0.035, 0.04, 0.05, 0.06, 0.07]
 
 
 ########################################################################################################################
 ### Benchmark Class ####################################################################################################
 ########################################################################################################################
 class Benchmark(unittest.TestCase):
+    """Main benchmark class for evaluating vCache performance against baselines.
+
+    This class extends unittest.TestCase to leverage testing infrastructure while
+    providing comprehensive benchmarking capabilities. It handles dataset loading,
+    cache evaluation, statistics collection, and result serialization.
+
+    The benchmark evaluates caching strategies by comparing cache hits/misses,
+    accuracy (true/false positives/negatives), and latency between direct inference
+    and cached inference across different datasets and model configurations.
+
+    Attributes:
+        vcache: The vCache instance being benchmarked
+        embedding_model: Tuple containing embedding model configuration
+        llm_model: Tuple containing LLM model configuration
+        filepath: Path to the dataset file
+        output_folder_path: Directory for saving results
+        timestamp: Timestamp for result file naming
+        threshold: Static threshold value (for static policies)
+        delta: Delta parameter (for dynamic policies)
+        is_static_threshold: Whether using static or dynamic threshold
+        eviction_policy: Cache eviction policy instance
+        is_custom_dataset: Whether using custom dataset format
+    """
+
     def __init__(self, vcache: VCache):
         super().__init__()
         self.vcache: VCache = vcache
@@ -283,6 +333,16 @@ class Benchmark(unittest.TestCase):
         self.is_custom_dataset: bool = False
 
     def stats_set_up(self):
+        """Initialize statistics tracking lists and create output directory.
+
+        Sets up all the necessary data structures for tracking benchmark metrics
+        including cache hits/misses, true/false positives/negatives, latency
+        measurements, and advanced statistics from the caching policy.
+
+        Note:
+            This method must be called before running the benchmark to ensure
+            proper statistics collection.
+        """
         self.cache_hit_list: List[int] = []
         self.cache_miss_list: List[int] = []
         self.tp_list: List[int] = []
@@ -301,6 +361,22 @@ class Benchmark(unittest.TestCase):
             os.makedirs(self.output_folder_path)
 
     def run_benchmark_loop_custom(self, data_entries: List[Dict], max_samples: int):
+        """Run benchmark loop for custom datasets with live inference.
+
+        This method processes custom datasets that only contain prompts, requiring
+        live inference calls to both the embedding and language models. It compares
+        direct inference (no cache) against vCache inference for each prompt.
+
+        Args:
+            data_entries: List of dictionaries containing dataset entries. Each entry
+                must have a 'prompt' key.
+            max_samples: Maximum number of samples to process from the dataset.
+
+        Note:
+            Custom datasets use live model calls, so this method will make actual
+            API calls to embedding and inference engines. Ensure proper API keys
+            and rate limits are configured.
+        """
         logging.info("Running benchmark loop for custom dataset")
         pbar = tqdm(
             total=min(max_samples, len(data_entries)),
@@ -350,6 +426,24 @@ class Benchmark(unittest.TestCase):
         pbar.close()
 
     def run_benchmark_loop(self, data_entries: List[Dict], max_samples: int):
+        """Run benchmark loop for pre-computed datasets from HuggingFace.
+
+        This method processes datasets that contain pre-computed embeddings and
+        responses, avoiding the need for live model calls. It extracts embeddings
+        and responses from the dataset and uses them to simulate the caching
+        behavior.
+
+        Args:
+            data_entries: List of dictionaries containing dataset entries. Each entry
+                must contain prompt, pre-computed embeddings, responses, and latency
+                measurements.
+            max_samples: Maximum number of samples to process from the dataset.
+
+        Note:
+            This method uses pre-computed embeddings and responses from the dataset,
+            making it much faster than the custom dataset approach but limiting it
+            to specific model combinations available in the dataset.
+        """
         logging.info("Running benchmark loop")
         pbar = tqdm(
             total=min(max_samples, len(data_entries)),
@@ -422,6 +516,25 @@ class Benchmark(unittest.TestCase):
         pbar.close()
 
     def test_run_benchmark(self, max_samples):
+        """Main benchmark execution method that loads data and runs evaluation.
+
+        This method serves as the main entry point for benchmark execution. It
+        determines whether to use custom or pre-computed datasets, loads the
+        appropriate data, runs the benchmark loop, and generates results.
+
+        Args:
+            max_samples: Maximum number of samples to process from the dataset.
+
+        Raises:
+            ValueError: If required parameters (filepath, embedding_model, llm_model)
+                are not set.
+            FileNotFoundError: If the specified dataset file cannot be found.
+            Exception: For any other errors during benchmark execution.
+
+        Note:
+            Results are automatically saved to JSON and plots are generated upon
+            successful completion.
+        """
         if not self.filepath or not self.embedding_model or not self.llm_model:
             raise ValueError(
                 f"Required parameters not set: filepath: {self.filepath}, embedding_model: {self.embedding_model}, or llm_model: {self.llm_model}"
@@ -476,6 +589,28 @@ class Benchmark(unittest.TestCase):
         latency_direct: float,
         latency_vcache: float,
     ):
+        """Update benchmark statistics with results from a single inference.
+
+        This method processes the results of a single inference request and updates
+        the appropriate statistics tracking lists. It handles both cache hits and
+        misses, calculating true/false positives/negatives based on response
+        correctness.
+
+        Args:
+            is_cache_hit: Whether the request resulted in a cache hit.
+            label_response: The ground truth response for the prompt.
+            cache_response: The response returned from the cache (if cache hit).
+            label_id_set: The ground truth ID set for the prompt (-1 if not available).
+            response_metadata: Metadata object for the cache response.
+            nn_metadata: Metadata object for the nearest neighbor in cache.
+            latency_direct: Latency for direct inference without cache.
+            latency_vcache: Latency for vCache inference including cache logic.
+
+        Note:
+            The method uses different correctness evaluation strategies based on
+            whether ID sets are available or if it's a custom dataset requiring
+            LLM-based evaluation.
+        """
         if is_cache_hit:  # If cache hit, the actual response is the nearest neighbor response (cache_response == nn_response)
             self.cache_hit_list.append(1)
             self.cache_miss_list.append(0)
@@ -536,8 +671,30 @@ class Benchmark(unittest.TestCase):
         system_prompt: str,
         id_set: int,
     ) -> Tuple[bool, str, EmbeddingMetadataObj, EmbeddingMetadataObj, float]:
-        """
-        Returns: Tuple[bool, str, EmbeddingMetadataObj, EmbeddingMetadataObj, float] - [is_cache_hit, cache_response, response_metadata, nn_metadata, latency_vcache_logic]
+        """Get vCache response for pre-computed datasets with embedding injection.
+
+        This method simulates vCache inference by injecting pre-computed embeddings
+        and responses into the vCache engines, then measuring the cache decision
+        and response retrieval performance.
+
+        Args:
+            prompt: The input prompt for inference.
+            candidate_embedding: Pre-computed embedding vector for the prompt.
+            label_response: Ground truth response to inject into inference engine.
+            system_prompt: System prompt for structured outputs.
+            id_set: ID set for the prompt (used for correctness evaluation).
+
+        Returns:
+            Tuple containing:
+            - is_cache_hit: Whether the request resulted in a cache hit
+            - cache_response: The response returned by vCache
+            - response_metadata: Metadata for the cache response
+            - nn_metadata: Metadata for the nearest neighbor
+            - latency_vcache_logic: Time spent in vCache logic (excluding model calls)
+
+        Note:
+            This method handles various embedding formats (string, tensor, numpy array)
+            and converts them to the appropriate list format for vCache processing.
         """
         if isinstance(candidate_embedding, str):
             try:
@@ -591,8 +748,26 @@ class Benchmark(unittest.TestCase):
     def get_vcache_answer_custom(
         self, prompt: str
     ) -> Tuple[bool, str, EmbeddingMetadataObj, EmbeddingMetadataObj, float]:
-        """
-        Returns: Tuple[bool, str, EmbeddingMetadataObj, EmbeddingMetadataObj, float] - [is_cache_hit, cache_response, response_metadata, nn_metadata, latency_vcache_logic]
+        """Get vCache response for custom datasets with live inference.
+
+        This method performs live vCache inference for custom datasets, making
+        actual calls to embedding and inference engines without pre-computed
+        values.
+
+        Args:
+            prompt: The input prompt for inference.
+
+        Returns:
+            Tuple containing:
+            - is_cache_hit: Whether the request resulted in a cache hit
+            - cache_response: The response returned by vCache
+            - response_metadata: Metadata for the cache response
+            - nn_metadata: Metadata for the nearest neighbor
+            - latency_vcache_logic: Time spent in vCache logic (excluding model calls)
+
+        Note:
+            This method makes live API calls and may incur costs and latency
+            depending on the configured engines.
         """
         latency_vcache_logic: float = time.time()
         try:
@@ -619,6 +794,24 @@ class Benchmark(unittest.TestCase):
         )
 
     def dump_results_to_json(self):
+        """Serialize benchmark results to JSON file.
+
+        This method collects all benchmark statistics, configuration parameters,
+        and internal vCache state (observations, Bayesian parameters) and saves
+        them to a JSON file for later analysis and plotting.
+
+        The output includes:
+        - Configuration parameters (models, thresholds, policies)
+        - Performance metrics (cache hits, accuracy, latency)
+        - Internal vCache statistics (observations, policy parameters)
+        - Global statistics (if available from the policy)
+
+        The JSON file is saved in the output folder with a timestamp-based filename.
+
+        Raises:
+            Exception: If there are issues accessing vCache internal state or
+                writing to the output file.
+        """
         observations_dict = {}
         gammas_dict = {}
         t_hats_dict = {}
@@ -712,6 +905,31 @@ def __run_baseline(
     max_samples: int,
     is_custom_dataset: bool = False,
 ):
+    """Run a single baseline benchmark configuration.
+
+    This helper function creates a vCache instance with the specified configuration
+    and runs a complete benchmark evaluation. It handles both custom datasets
+    (requiring live inference) and pre-computed datasets.
+
+    Args:
+        vcache_policy: The caching policy to evaluate (e.g., VerifiedDecisionPolicy).
+        path: Output directory path for saving results.
+        dataset_file: Path to the dataset file or HuggingFace dataset ID.
+        embedding_model: Tuple containing embedding model configuration.
+        llm_model: Tuple containing LLM model configuration.
+        timestamp: Timestamp string for result file naming.
+        delta: Delta parameter for dynamic policies (-1 if not applicable).
+        threshold: Threshold parameter for static policies (-1 if not applicable).
+        similarity_evaluator: Strategy for evaluating response similarity.
+        eviction_policy: Cache eviction policy instance.
+        max_samples: Maximum number of samples to process.
+        is_custom_dataset: Whether using custom dataset format requiring live inference.
+
+    Note:
+        This function creates different vCache configurations based on whether
+        it's processing custom datasets (using OpenAI engines) or pre-computed
+        datasets (using benchmark engines).
+    """
     if is_custom_dataset:
         llm_model_name = llm_model[1].lower()
         embedding_model_name = embedding_model[1].lower()
@@ -768,6 +986,28 @@ def __run_baseline(
 
 
 def main():
+    """Main function that orchestrates the complete benchmarking process.
+
+    This function serves as the entry point for the benchmarking system. It:
+    1. Sets up the benchmarking environment and output directories
+    2. Iterates through all configured RUN_COMBINATIONS
+    3. For each combination, runs all specified baselines with their parameter sweeps
+    4. Generates combined plots comparing all baselines
+    5. Logs timing information and completion status
+
+    The function handles multiple baselines including:
+    - vCache Local: Dynamic local threshold adaptation
+    - vCache Global: Dynamic global threshold adaptation
+    - Berkeley Embedding: Fine-tuned embeddings with static thresholds
+    - vCache + Berkeley Embedding: vCache with fine-tuned embeddings
+    - IID: Independent and Identically Distributed threshold policy
+    - GPTCache: Static threshold-based caching
+
+    Note:
+        Configuration is controlled through global variables in the "Benchmark Config"
+        section. Modify RUN_COMBINATIONS, BASELINES_TO_RUN, and parameter lists to
+        customize the benchmarking process.
+    """
     benchmarks_dir = os.path.dirname(os.path.abspath(__file__))
 
     custom_datasets_dir = os.path.join(benchmarks_dir, "your_datasets")
