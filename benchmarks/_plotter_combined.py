@@ -833,7 +833,7 @@ def __plot_legend(
             Line2D(
                 [0],
                 [0],
-                color="#2F2239",
+                color="#89D572",
                 linewidth=3,
                 linestyle="-",
                 marker="o",
@@ -847,7 +847,7 @@ def __plot_legend(
             Line2D(
                 [0],
                 [0],
-                color="#5D7989",
+                color="#E2A043",
                 linewidth=3,
                 linestyle="-",
                 marker="o",
@@ -1592,7 +1592,7 @@ def __plot_avg_latency_vs_error_rate(
             sp_err_le,
             sp_err_ue,
             sp_multi,
-            "#2F2239",
+            "#89D572",
             "Sigmoid Probability",
             8,
         )
@@ -1615,7 +1615,7 @@ def __plot_avg_latency_vs_error_rate(
             so_err_le,
             so_err_ue,
             so_multi,
-            "#5D7989",
+            "#E2A043",
             "Sigmoid Only",
             8,
         )
@@ -1893,7 +1893,7 @@ def __plot_cache_hit_vs_error_rate(
             sp_ch_le,
             sp_ch_ue,
             sp_multi,
-            "#2F2239",
+            "#89D572",
             "Sigmoid Probability",
             8,
         )
@@ -1915,7 +1915,7 @@ def __plot_cache_hit_vs_error_rate(
             so_ch_le,
             so_ch_ue,
             so_multi,
-            "#5D7989",
+            "#E2A043",
             "Sigmoid Only",
             8,
         )

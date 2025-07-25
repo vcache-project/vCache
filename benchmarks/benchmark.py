@@ -260,6 +260,15 @@ RUN_COMBINATIONS: List[
         SCUEvictionPolicy(max_size=100000, watermark=0.99, eviction_percentage=0.1),
         45000,
     ),
+    (
+        EmbeddingModel.GTE,
+        LargeLanguageModel.LLAMA_3_8B,
+        Dataset.SEM_BENCHMARK_SEARCH_QUERIES,
+        GeneratePlotsOnly.YES,
+        StringComparisonSimilarityEvaluator(),
+        SCUEvictionPolicy(max_size=100000, watermark=0.99, eviction_percentage=0.1),
+        150000,
+    ),
 ]
 
 BASELINES_TO_RUN: List[Baseline] = [
