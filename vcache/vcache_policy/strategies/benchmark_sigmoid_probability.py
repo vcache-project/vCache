@@ -5,7 +5,7 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from enum import Enum
-from typing import Optional
+from typing import List, Optional
 
 import numpy as np
 import statsmodels.api as sm
@@ -428,6 +428,8 @@ class _Algorithm:
             penalty=None, solver="lbfgs", tol=1e-8, max_iter=1000, fit_intercept=False
         )
 
+        self.latency_observations: List[float] = []
+
     def add_observation_to_metadata(
         self, similarity_score: float, is_correct: bool, metadata: EmbeddingMetadataObj
     ) -> None:
@@ -484,7 +486,7 @@ class _Algorithm:
         Returns
             action: Action - Explore or Exploit
         """
-
+        similarities_no_constant = similarities.copy()
         similarities = sm.add_constant(similarities)
 
         try:
@@ -501,8 +503,11 @@ class _Algorithm:
             linear_term = intercept + gamma * similarity_score
             exploration_probability_at_similarity_score = expit(linear_term)
 
+            latency = time.time() - start_time
+            self.latency_observations.append(latency)
+
             logging.info(
-                f"SigmoidOnlyDecision: t_hat: {t_hat}, exploration_prob: {exploration_probability_at_similarity_score}, Regression latency: {start_time - time.time()} Similarities: {similarities}, Labels: {labels}"
+                f"SigmoidOnlyDecision: similarity_score: {similarity_score:.2f}, t_hat: {t_hat:.2f}, exploration_prob: {exploration_probability_at_similarity_score:.2f}, Avg. Regression latency: {np.mean(self.latency_observations):.5f} Similarities: {similarities_no_constant}, Labels: {labels}"
             )
 
             if exploration_probability_at_similarity_score >= self.P_c:
