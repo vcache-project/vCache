@@ -242,20 +242,11 @@ RUN_COMBINATIONS: List[
         int,
     ]
 ] = [
-    # (
-    #     EmbeddingModel.E5_LARGE_V2,
-    #     LargeLanguageModel.GPT_4O_MINI,
-    #     Dataset.SEM_BENCHMARK_ARENA,
-    #     GeneratePlotsOnly.NO,
-    #     BenchmarkComparisonSimilarityEvaluator(),
-    #     SCUEvictionPolicy(max_size=100000, watermark=0.99, eviction_percentage=0.1),
-    #     60000
-    # ),
     (
         EmbeddingModel.E5_LARGE_V2,
         LargeLanguageModel.GPT_4O_MINI,
         Dataset.SEM_BENCHMARK_ARENA,
-        GeneratePlotsOnly.NO,
+        GeneratePlotsOnly.YES,
         BenchmarkComparisonSimilarityEvaluator(),
         SCUEvictionPolicy(max_size=100000, watermark=0.99, eviction_percentage=0.1),
         60000,
@@ -264,16 +255,7 @@ RUN_COMBINATIONS: List[
         EmbeddingModel.GTE,
         LargeLanguageModel.LLAMA_3_8B,
         Dataset.SEM_BENCHMARK_CLASSIFICATION,
-        GeneratePlotsOnly.NO,
-        StringComparisonSimilarityEvaluator(),
-        SCUEvictionPolicy(max_size=100000, watermark=0.99, eviction_percentage=0.1),
-        45000,
-    ),
-    (
-        EmbeddingModel.GTE,
-        LargeLanguageModel.LLAMA_3_8B,
-        Dataset.SEM_BENCHMARK_CLASSIFICATION,
-        GeneratePlotsOnly.NO,
+        GeneratePlotsOnly.YES,
         StringComparisonSimilarityEvaluator(),
         SCUEvictionPolicy(max_size=100000, watermark=0.99, eviction_percentage=0.1),
         45000,

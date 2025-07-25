@@ -381,13 +381,15 @@ def __aggregate_stats_for_cache_hit_error_rate(run_dirs: List[str], z: float = 1
 def __get_result_files(results_dir: str):
     if not os.path.exists(results_dir):
         print(f"No results found in {results_dir}")
-        return [], [], [], [], []
+        return [], [], [], [], [], [], []
 
     gptcache_files: List[str] = []
     vcache_local_files: List[str] = []
     vcache_global_files: List[str] = []
     berkeley_embedding_files: List[str] = []
     vcache_berkeley_embedding_files: List[str] = []
+    sigmoid_probability_files: List[str] = []
+    sigmoid_only_files: List[str] = []
 
     for d in os.listdir(results_dir):
         # Process GPTCache (static threshold) directories
@@ -435,12 +437,32 @@ def __get_result_files(results_dir: str):
                 if file.startswith("results_") and file.endswith(".json"):
                     vcache_berkeley_embedding_files.append(os.path.join(dir_path, file))
 
+        # Process Sigmoid Probability directories
+        elif d.startswith("sigmoid_probability_") and os.path.isdir(
+            os.path.join(results_dir, d)
+        ):
+            dir_path: str = os.path.join(results_dir, d)
+            for file in os.listdir(dir_path):
+                if file.startswith("results_") and file.endswith(".json"):
+                    sigmoid_probability_files.append(os.path.join(dir_path, file))
+
+        # Process Sigmoid Only directories
+        elif d.startswith("sigmoid_only_") and os.path.isdir(
+            os.path.join(results_dir, d)
+        ):
+            dir_path: str = os.path.join(results_dir, d)
+            for file in os.listdir(dir_path):
+                if file.startswith("results_") and file.endswith(".json"):
+                    sigmoid_only_files.append(os.path.join(dir_path, file))
+
     return (
         gptcache_files,
         vcache_local_files,
         vcache_global_files,
         berkeley_embedding_files,
         vcache_berkeley_embedding_files,
+        sigmoid_probability_files,
+        sigmoid_only_files,
     )
 
 
@@ -463,6 +485,8 @@ def generate_combined_plots(
         vcache_global_files,
         berkeley_embedding_files,
         vcache_berkeley_embedding_files,
+        sigmoid_probability_files,
+        sigmoid_only_files,
     ) = __get_result_files(results_dir)
 
     if (
@@ -471,6 +495,8 @@ def generate_combined_plots(
         and not vcache_global_files
         and not berkeley_embedding_files
         and not vcache_berkeley_embedding_files
+        and not sigmoid_probability_files
+        and not sigmoid_only_files
     ):
         print(
             f"No folders found for {dataset}, {embedding_model_name}, {llm_model_name}\n"
@@ -565,6 +591,40 @@ def generate_combined_plots(
                 print(f"Error loading {vcache_berkeley_embedding_file_path}: {e}")
                 continue
 
+    ############################################################
+    ### Sigmoid Probability
+    sigmoid_probability_data_frames: Dict[float, pd.DataFrame] = {}
+    for sigmoid_probability_file_path in sigmoid_probability_files:
+        with open(sigmoid_probability_file_path, "r") as f:
+            try:
+                data: Any = json.load(f)
+                dataframe, _, chopped_index = convert_to_dataframe_from_json_file(
+                    json_data=data, keep_split=keep_split
+                )
+                delta: float = data["config"]["delta"]
+                sigmoid_probability_data_frames[delta] = dataframe
+                chopped_index = chopped_index
+            except Exception as e:
+                print(f"Error loading {sigmoid_probability_file_path}: {e}")
+                continue
+
+    ############################################################
+    ### Sigmoid Only
+    sigmoid_only_data_frames: Dict[float, pd.DataFrame] = {}
+    for sigmoid_only_file_path in sigmoid_only_files:
+        with open(sigmoid_only_file_path, "r") as f:
+            try:
+                data: Any = json.load(f)
+                dataframe, _, chopped_index = convert_to_dataframe_from_json_file(
+                    json_data=data, keep_split=keep_split
+                )
+                delta: float = data["config"]["delta"]
+                sigmoid_only_data_frames[delta] = dataframe
+                chopped_index = chopped_index
+            except Exception as e:
+                print(f"Error loading {sigmoid_only_file_path}: {e}")
+                continue
+
     if chopped_index is None:
         print(
             f"No data found for {dataset}, {embedding_model_name}, {llm_model_name} in {results_dir}"
@@ -577,6 +637,8 @@ def generate_combined_plots(
         vcache_global_data_frames=vcache_global_data_frames,
         berkeley_embedding_data_frames=berkeley_embedding_data_frames,
         vcache_berkeley_embedding_data_frames=vcache_berkeley_embedding_data_frames,
+        sigmoid_probability_data_frames=sigmoid_probability_data_frames,
+        sigmoid_only_data_frames=sigmoid_only_data_frames,
         results_dir=results_dir,
         timestamp=timestamp,
         font_size=font_size,
@@ -620,6 +682,8 @@ def generate_combined_plots(
             vcache_global_data_frames=vcache_global_data_frames,
             berkeley_embedding_data_frames=berkeley_embedding_data_frames,
             vcache_berkeley_embedding_data_frames=vcache_berkeley_embedding_data_frames,
+            sigmoid_probability_data_frames=sigmoid_probability_data_frames,
+            sigmoid_only_data_frames=sigmoid_only_data_frames,
             results_dir=results_dir,
             timestamp=timestamp,
             font_size=font_size,
@@ -635,6 +699,8 @@ def generate_combined_plots(
             vcache_global_data_frames=vcache_global_data_frames,
             berkeley_embedding_data_frames=berkeley_embedding_data_frames,
             vcache_berkeley_embedding_data_frames=vcache_berkeley_embedding_data_frames,
+            sigmoid_probability_data_frames=sigmoid_probability_data_frames,
+            sigmoid_only_data_frames=sigmoid_only_data_frames,
             results_dir=results_dir,
             timestamp=timestamp,
             font_size=font_size,
@@ -679,6 +745,8 @@ def __plot_legend(
     vcache_global_data_frames: Dict[float, pd.DataFrame],
     berkeley_embedding_data_frames: Dict[float, pd.DataFrame],
     vcache_berkeley_embedding_data_frames: Dict[float, pd.DataFrame],
+    sigmoid_probability_data_frames: Dict[float, pd.DataFrame],
+    sigmoid_only_data_frames: Dict[float, pd.DataFrame],
     results_dir: str,
     timestamp: str,
     font_size: int,
@@ -759,6 +827,34 @@ def __plot_legend(
             )
         )
         labels.append("Fine-tuned Embedding")
+
+    if sigmoid_probability_data_frames:
+        lines.append(
+            Line2D(
+                [0],
+                [0],
+                color="#2F2239",
+                linewidth=3,
+                linestyle="-",
+                marker="o",
+                markersize=8,
+            )
+        )
+        labels.append("Sigmoid Probability")
+
+    if sigmoid_only_data_frames:
+        lines.append(
+            Line2D(
+                [0],
+                [0],
+                color="#5D7989",
+                linewidth=3,
+                linestyle="-",
+                marker="o",
+                markersize=8,
+            )
+        )
+        labels.append("Sigmoid Only")
 
     ax.legend(lines, labels, loc="center", ncol=2, fontsize=font_size, frameon=False)
 
@@ -1245,6 +1341,8 @@ def __plot_avg_latency_vs_error_rate(
     vcache_global_data_frames: Dict[float, pd.DataFrame],
     berkeley_embedding_data_frames: Dict[float, pd.DataFrame],
     vcache_berkeley_embedding_data_frames: Dict[float, pd.DataFrame],
+    sigmoid_probability_data_frames: Dict[float, pd.DataFrame],
+    sigmoid_only_data_frames: Dict[float, pd.DataFrame],
     results_dir: str,
     timestamp: str,
     font_size: int,
@@ -1268,6 +1366,12 @@ def __plot_avg_latency_vs_error_rate(
     )
     vcache_berkeley_embedding_run_dirs_map = __collect_run_dirs_by_prefix_and_key(
         results_dir, "vcache_berkeley_embedding_"
+    )
+    sigmoid_probability_run_dirs_map = __collect_run_dirs_by_prefix_and_key(
+        results_dir, "sigmoid_probability_"
+    )
+    sigmoid_only_run_dirs_map = __collect_run_dirs_by_prefix_and_key(
+        results_dir, "sigmoid_only_"
     )
 
     avg_latency_no_cache = -1  # Initialize
@@ -1471,6 +1575,52 @@ def __plot_avg_latency_vs_error_rate(
         )
 
     ############################################################
+    ### Sigmoid Probability
+    if sigmoid_probability_data_frames:
+        sp_lat, sp_err, sp_lat_le, sp_lat_ue, sp_err_le, sp_err_ue, sp_multi = (
+            prepare_latency_error_series_data(
+                sigmoid_probability_data_frames,
+                sigmoid_probability_run_dirs_map,
+                ERROR_RATE_UPPER_BOUND,
+            )
+        )
+        __draw_confidence_series(
+            sp_lat,
+            sp_err,
+            sp_lat_le,
+            sp_lat_ue,
+            sp_err_le,
+            sp_err_ue,
+            sp_multi,
+            "#2F2239",
+            "Sigmoid Probability",
+            8,
+        )
+
+    ############################################################
+    ### Sigmoid Only
+    if sigmoid_only_data_frames:
+        so_lat, so_err, so_lat_le, so_lat_ue, so_err_le, so_err_ue, so_multi = (
+            prepare_latency_error_series_data(
+                sigmoid_only_data_frames,
+                sigmoid_only_run_dirs_map,
+                ERROR_RATE_UPPER_BOUND,
+            )
+        )
+        __draw_confidence_series(
+            so_lat,
+            so_err,
+            so_lat_le,
+            so_lat_ue,
+            so_err_le,
+            so_err_ue,
+            so_multi,
+            "#5D7989",
+            "Sigmoid Only",
+            8,
+        )
+
+    ############################################################
     ### Baseline: No Cache Plotting
     # Ensure avg_latency_no_cache has been set by one of the prepare_latency_error_series_data calls
     if avg_latency_no_cache != -1:  # Check if it was updated
@@ -1508,6 +1658,8 @@ def __plot_cache_hit_vs_error_rate(
     vcache_global_data_frames: Dict[float, pd.DataFrame],
     berkeley_embedding_data_frames: Dict[float, pd.DataFrame],
     vcache_berkeley_embedding_data_frames: Dict[float, pd.DataFrame],
+    sigmoid_probability_data_frames: Dict[float, pd.DataFrame],
+    sigmoid_only_data_frames: Dict[float, pd.DataFrame],
     results_dir: str,
     timestamp: str,
     font_size: int,
@@ -1531,6 +1683,12 @@ def __plot_cache_hit_vs_error_rate(
     )
     vcache_berkeley_embedding_run_dirs_map = __collect_run_dirs_by_prefix_and_key(
         results_dir, "vcache_berkeley_embedding_"
+    )
+    sigmoid_probability_run_dirs_map = __collect_run_dirs_by_prefix_and_key(
+        results_dir, "sigmoid_probability_"
+    )
+    sigmoid_only_run_dirs_map = __collect_run_dirs_by_prefix_and_key(
+        results_dir, "sigmoid_only_"
     )
 
     # Helper to prepare data for a series
@@ -1715,6 +1873,50 @@ def __plot_cache_hit_vs_error_rate(
             vb_multi,
             "#EDBE24",
             "vCache + Fine-tuned Embedding",
+            8,
+        )
+
+    # Sigmoid Probability
+    if sigmoid_probability_data_frames:
+        sp_err, sp_ch, sp_err_le, sp_err_ue, sp_ch_le, sp_ch_ue, sp_multi = (
+            prepare_cache_hit_error_series_data(
+                sigmoid_probability_data_frames,
+                sigmoid_probability_run_dirs_map,
+                ERROR_RATE_UPPER_BOUND,
+            )
+        )
+        __draw_confidence_series(
+            sp_err,
+            sp_ch,
+            sp_err_le,
+            sp_err_ue,
+            sp_ch_le,
+            sp_ch_ue,
+            sp_multi,
+            "#2F2239",
+            "Sigmoid Probability",
+            8,
+        )
+
+    # Sigmoid Only
+    if sigmoid_only_data_frames:
+        so_err, so_ch, so_err_le, so_err_ue, so_ch_le, so_ch_ue, so_multi = (
+            prepare_cache_hit_error_series_data(
+                sigmoid_only_data_frames,
+                sigmoid_only_run_dirs_map,
+                ERROR_RATE_UPPER_BOUND,
+            )
+        )
+        __draw_confidence_series(
+            so_err,
+            so_ch,
+            so_err_le,
+            so_err_ue,
+            so_ch_le,
+            so_ch_ue,
+            so_multi,
+            "#5D7989",
+            "Sigmoid Only",
             8,
         )
 

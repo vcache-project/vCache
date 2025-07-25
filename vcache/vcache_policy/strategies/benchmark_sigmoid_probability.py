@@ -507,7 +507,7 @@ class _Algorithm:
             self.latency_observations.append(latency)
 
             logging.info(
-                f"SigmoidOnlyDecision: similarity_score: {similarity_score:.2f}, t_hat: {t_hat:.2f}, exploration_prob: {exploration_probability_at_similarity_score:.2f}, Avg. Regression latency: {np.mean(self.latency_observations):.5f} Similarities: {similarities_no_constant}, Labels: {labels}"
+                f"SigmoidProbability: similarity_score: {similarity_score:.2f}, t_hat: {t_hat:.2f}, exploration_prob: {exploration_probability_at_similarity_score:.2f}, Avg. Regression latency: {np.mean(self.latency_observations):.5f} Similarities: {similarities_no_constant}, Labels: {labels}"
             )
 
             if exploration_probability_at_similarity_score >= self.P_c:
