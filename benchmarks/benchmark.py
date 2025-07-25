@@ -91,17 +91,14 @@ from vcache.vcache_core.cache.embedding_store.vector_db import (
 from vcache.vcache_core.cache.eviction_policy.eviction_policy import EvictionPolicy
 from vcache.vcache_core.cache.eviction_policy.strategies.scu import SCUEvictionPolicy
 from vcache.vcache_core.similarity_evaluator import SimilarityEvaluator
-from vcache.vcache_core.similarity_evaluator.strategies.benchmark_comparison import (
-    BenchmarkComparisonSimilarityEvaluator,
-)
-from vcache.vcache_core.similarity_evaluator.strategies.llm_comparison import (
-    LLMComparisonSimilarityEvaluator,
-)
-from vcache.vcache_core.similarity_evaluator.strategies.string_comparison import (
-    StringComparisonSimilarityEvaluator,
-)
 from vcache.vcache_policy.strategies.benchmark_iid_verified import (
     BenchmarkVerifiedIIDDecisionPolicy,
+)
+from vcache.vcache_policy.strategies.benchmark_sigmoid_only import (
+    SigmoidOnlyDecisionPolicy,
+)
+from vcache.vcache_policy.strategies.benchmark_sigmoid_probability import (
+    SigmoidProbabilityDecisionPolicy,
 )
 from vcache.vcache_policy.strategies.benchmark_static import (
     BenchmarkStaticDecisionPolicy,
@@ -179,6 +176,8 @@ class Baseline(Enum):
     - BerkeleyEmbedding: Fine-tuned embeddings with static threshold
     - VCacheBerkeleyEmbedding: vCache with fine-tuned embeddings
     - IID: Independent and Identically Distributed threshold policy
+    - SigmoidProbability: Sigmoid probability-based threshold policy
+    - SigmoidOnly: Sigmoid only-based threshold policy
     """
 
     GPTCache = "GPTCache"
@@ -187,6 +186,8 @@ class Baseline(Enum):
     BerkeleyEmbedding = "BerkeleyEmbedding"
     VCacheBerkeleyEmbedding = "VCacheBerkeleyEmbedding"
     IID = "iid"
+    SigmoidProbability = "SigmoidProbability"
+    SigmoidOnly = "SigmoidOnly"
 
 
 class Dataset(Enum):
@@ -236,44 +237,40 @@ RUN_COMBINATIONS: List[
     ]
 ] = [
     (
-        EmbeddingModel.GTE,
+        EmbeddingModel.E5_LARGE_V2,
         LargeLanguageModel.GPT_4O_MINI,
         Dataset.SEM_BENCHMARK_ARENA,
         GeneratePlotsOnly.NO,
-        BenchmarkComparisonSimilarityEvaluator(),
-        SCUEvictionPolicy(max_size=6000, watermark=0.99, eviction_percentage=0.1),
+        SigmoidProbabilityDecisionPolicy(),
+        SCUEvictionPolicy(max_size=100000, watermark=0.99, eviction_percentage=0.1),
         60000,
     ),
     (
         EmbeddingModel.E5_LARGE_V2,
         LargeLanguageModel.GPT_4O_MINI,
-        Dataset.SEM_BENCHMARK_SEARCH_QUERIES,
+        Dataset.SEM_BENCHMARK_ARENA,
         GeneratePlotsOnly.NO,
-        BenchmarkComparisonSimilarityEvaluator(),
-        SCUEvictionPolicy(max_size=15000, watermark=0.99, eviction_percentage=0.1),
-        150000,
+        SigmoidOnlyDecisionPolicy(),
+        SCUEvictionPolicy(max_size=100000, watermark=0.99, eviction_percentage=0.1),
+        60000,
     ),
     (
         EmbeddingModel.GTE,
         LargeLanguageModel.LLAMA_3_8B,
         Dataset.SEM_BENCHMARK_CLASSIFICATION,
         GeneratePlotsOnly.NO,
-        StringComparisonSimilarityEvaluator(),
-        SCUEvictionPolicy(max_size=4500, watermark=0.99, eviction_percentage=0.1),
+        SigmoidProbabilityDecisionPolicy(),
+        SCUEvictionPolicy(max_size=100000, watermark=0.99, eviction_percentage=0.1),
         45000,
     ),
     (
-        EmbeddingModel.OPENAI_TEXT_EMBEDDING_SMALL,
-        LargeLanguageModel.GPT_4_1,
-        Dataset.CUSTOM_EXAMPLE,
+        EmbeddingModel.GTE,
+        LargeLanguageModel.LLAMA_3_8B,
+        Dataset.SEM_BENCHMARK_CLASSIFICATION,
         GeneratePlotsOnly.NO,
-        LLMComparisonSimilarityEvaluator(
-            inference_engine=OpenAIInferenceEngine(
-                model_name="gpt-4.1-nano-2025-04-14", temperature=0.0
-            )
-        ),
-        SCUEvictionPolicy(max_size=2000, watermark=0.99, eviction_percentage=0.1),
-        50,
+        SigmoidOnlyDecisionPolicy(),
+        SCUEvictionPolicy(max_size=100000, watermark=0.99, eviction_percentage=0.1),
+        45000,
     ),
 ]
 
@@ -1301,6 +1298,80 @@ def main():
                         max_samples=max_samples,
                         is_custom_dataset=is_custom_dataset,
                     )
+
+            #####################################################
+            ### Baseline: Sigmoid Probability
+            if (
+                Baseline.SigmoidProbability in BASELINES_TO_RUN
+                and not generate_plots_only.value
+            ):
+                for delta in DELTAS:
+                    for i in range(0, CONFIDENCE_INTERVALS_ITERATIONS):
+                        path = os.path.join(
+                            results_dir,
+                            dataset_name,
+                            embedding_model.value[1],
+                            llm_model.value[1],
+                            f"sigmoid_probability_{delta}_run_{i + 1}",
+                        )
+                        if os.path.exists(path) and os.listdir(path):
+                            continue
+
+                        logging.info(
+                            f"Using dynamic threshold with delta: {delta}. Run {i + 1} of {CONFIDENCE_INTERVALS_ITERATIONS}"
+                        )
+
+                        __run_baseline(
+                            vcache_policy=SigmoidProbabilityDecisionPolicy(delta=delta),
+                            path=path,
+                            dataset_file=dataset_path,
+                            embedding_model=embedding_model.value,
+                            llm_model=llm_model.value,
+                            timestamp=timestamp,
+                            delta=delta,
+                            threshold=-1,
+                            similarity_evaluator=similarity_evaluator,
+                            eviction_policy=eviction_policy,
+                            max_samples=max_samples,
+                            is_custom_dataset=is_custom_dataset,
+                        )
+
+            #####################################################
+            ### Baseline: Sigmoid Only
+            if (
+                Baseline.SigmoidOnly in BASELINES_TO_RUN
+                and not generate_plots_only.value
+            ):
+                for delta in DELTAS:
+                    for i in range(0, CONFIDENCE_INTERVALS_ITERATIONS):
+                        path = os.path.join(
+                            results_dir,
+                            dataset_name,
+                            embedding_model.value[1],
+                            llm_model.value[1],
+                            f"sigmoid_only_{delta}_run_{i + 1}",
+                        )
+                        if os.path.exists(path) and os.listdir(path):
+                            continue
+
+                        logging.info(
+                            f"Using dynamic threshold with delta: {delta}. Run {i + 1} of {CONFIDENCE_INTERVALS_ITERATIONS}"
+                        )
+
+                        __run_baseline(
+                            vcache_policy=SigmoidOnlyDecisionPolicy(delta=delta),
+                            path=path,
+                            dataset_file=dataset_path,
+                            embedding_model=embedding_model.value,
+                            llm_model=llm_model.value,
+                            timestamp=timestamp,
+                            delta=delta,
+                            threshold=-1,
+                            similarity_evaluator=similarity_evaluator,
+                            eviction_policy=eviction_policy,
+                            max_samples=max_samples,
+                            is_custom_dataset=is_custom_dataset,
+                        )
 
             #####################################################
             generate_combined_plots(
