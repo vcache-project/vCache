@@ -462,7 +462,7 @@ class _Algorithm:
             return _Action.EXPLORE
 
         t_hat: float = self._estimate_parameters(
-            similarity_score=similarity_score, similarities=similarities, labels=labels
+            similarities=similarities, labels=labels
         )
 
         if similarity_score >= t_hat:
