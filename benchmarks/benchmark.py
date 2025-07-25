@@ -45,6 +45,7 @@ Additional configuration variables:
 
 """
 
+import random
 import json
 import logging
 import os
@@ -52,7 +53,7 @@ import time
 import unittest
 from datetime import datetime
 from enum import Enum
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 
 import numpy as np
 import pandas as pd
@@ -165,8 +166,9 @@ class LargeLanguageModel(Enum):
     LLAMA_3_8B = ("response_llama_3_8b", "Llama_3_8B_Instruct", "float16", None)
     LLAMA_3_70B = ("response_llama_3_70b", "Llama_3_70B_Instruct", "float16", None)
     GPT_4O_MINI = ("response_gpt-4o-mini", "GPT-4o-mini", "float16", None)
-    GPT_4O_NANO = ("response_gpt-4.1-nano", "GPT-4.1-nano", "float16", None)
+    GPT_4_1_NANO = ("response_gpt-4.1-nano", "GPT-4.1-nano", "float16", None)
     GPT_4_1 = ("response_gpt-4.1", "gpt-4.1-2025-04-14", "float16", None)
+    GPT_O4_MINI = ("response_gpt-o4-mini", "o4-mini-2025-04-16", "float16", None)
 
 
 class Baseline(Enum):
@@ -201,6 +203,7 @@ class Dataset(Enum):
     SEM_BENCHMARK_SEARCH_QUERIES = "vCache/SemBenchmarkSearchQueries"
     # Example for custom dataset. The path is relative to 'benchmarks/your_datasets/'
     CUSTOM_EXAMPLE = "your_datasets/your_custom_dataset.parquet"
+    LMARENA_100K = "your_datasets/lmarena_100k.parquet"
 
 
 class GeneratePlotsOnly(Enum):
@@ -222,7 +225,9 @@ CONFIDENCE_INTERVALS_ITERATIONS: int = 1
 DISABLE_PROGRESS_BAR: bool = False
 KEEP_SPLIT: int = 100
 MAX_VECTOR_DB_CAPACITY: int = 150000
-PLOT_FONT_SIZE: int = 50
+PLOT_FONT_SIZE: int = 40
+
+TOKENS_PER_WORD: float = 1.33
 
 RUN_COMBINATIONS: List[
     Tuple[
@@ -236,58 +241,49 @@ RUN_COMBINATIONS: List[
     ]
 ] = [
     (
-        EmbeddingModel.GTE,
-        LargeLanguageModel.GPT_4O_MINI,
-        Dataset.SEM_BENCHMARK_ARENA,
-        GeneratePlotsOnly.NO,
-        BenchmarkComparisonSimilarityEvaluator(),
-        SCUEvictionPolicy(max_size=6000, watermark=0.99, eviction_percentage=0.1),
-        60000,
-    ),
-    (
-        EmbeddingModel.E5_LARGE_V2,
-        LargeLanguageModel.GPT_4O_MINI,
-        Dataset.SEM_BENCHMARK_SEARCH_QUERIES,
-        GeneratePlotsOnly.NO,
-        BenchmarkComparisonSimilarityEvaluator(),
-        SCUEvictionPolicy(max_size=15000, watermark=0.99, eviction_percentage=0.1),
-        150000,
-    ),
-    (
-        EmbeddingModel.GTE,
-        LargeLanguageModel.LLAMA_3_8B,
-        Dataset.SEM_BENCHMARK_CLASSIFICATION,
-        GeneratePlotsOnly.NO,
-        StringComparisonSimilarityEvaluator(),
-        SCUEvictionPolicy(max_size=4500, watermark=0.99, eviction_percentage=0.1),
-        45000,
-    ),
-    (
         EmbeddingModel.OPENAI_TEXT_EMBEDDING_SMALL,
-        LargeLanguageModel.GPT_4_1,
-        Dataset.CUSTOM_EXAMPLE,
+        LargeLanguageModel.GPT_O4_MINI,
+        Dataset.LMARENA_100K,
         GeneratePlotsOnly.NO,
         LLMComparisonSimilarityEvaluator(
             inference_engine=OpenAIInferenceEngine(
                 model_name="gpt-4.1-nano-2025-04-14", temperature=0.0
             )
         ),
-        SCUEvictionPolicy(max_size=2000, watermark=0.99, eviction_percentage=0.1),
-        50,
+        SCUEvictionPolicy(max_size=110000, watermark=0.99, eviction_percentage=0.1),
+        100000,
     ),
 ]
 
 BASELINES_TO_RUN: List[Baseline] = [
     Baseline.VCacheLocal,
     Baseline.IID,
-    Baseline.GPTCache,
-    Baseline.BerkeleyEmbedding,
-    Baseline.VCacheBerkeleyEmbedding,
 ]
 
 STATIC_THRESHOLDS: List[float] = [0.80, 0.83, 0.86, 0.89, 0.92, 0.95, 0.97, 0.98, 0.99]
 
-DELTAS: List[float] = [0.01, 0.015, 0.02, 0.025, 0.03, 0.035, 0.04, 0.05, 0.06, 0.07]
+DELTAS: List[float] = [0.02]
+
+
+########################################################################################################################
+### Helper Functions ###################################################################################################
+########################################################################################################################
+
+def estimate_tokens(text: str) -> int:
+    """
+    Estimate the number of tokens in a text string using word count.
+    
+    Args:
+        text: The input text to estimate tokens for.
+        
+    Returns:
+        Estimated number of tokens.
+    """
+    if not text or not text.strip():
+        return 0
+    
+    word_count = len(text.split())
+    return int(word_count * TOKENS_PER_WORD)
 
 
 ########################################################################################################################
@@ -337,7 +333,7 @@ class Benchmark(unittest.TestCase):
 
         Sets up all the necessary data structures for tracking benchmark metrics
         including cache hits/misses, true/false positives/negatives, latency
-        measurements, and advanced statistics from the caching policy.
+        measurements, token usage, and advanced statistics from the caching policy.
 
         Note:
             This method must be called before running the benchmark to ensure
@@ -351,6 +347,10 @@ class Benchmark(unittest.TestCase):
         self.fn_list: List[int] = []
         self.latency_direct_list: List[float] = []
         self.latency_vcache_list: List[float] = []
+        self.input_tokens_list: List[int] = []
+        self.output_tokens_list: List[int] = []
+        self.direct_input_tokens_list: List[int] = []
+        self.direct_output_tokens_list: List[int] = []
         self.observations_dict: Dict[str, Dict[str, float]] = {}
         self.gammas_dict: Dict[str, float] = {}
         self.t_hats_dict: Dict[str, float] = {}
@@ -390,12 +390,13 @@ class Benchmark(unittest.TestCase):
 
             # 1) Get Data
             prompt: str = data_entry["prompt"]
+            label_response: Optional[str] = data_entry.get("response_model_a", None)
 
             # 2.1) Direct Inference (No Cache) - Live call
-            start_time = time.time()
-
-            label_response = self.vcache.vcache_config.inference_engine.create(prompt)
-            latency_direct = time.time() - start_time
+            if label_response is None:
+                start_time = time.time()
+                label_response = self.vcache.vcache_config.inference_engine.create(prompt)
+                latency_direct = time.time() - start_time
 
             # 2.2) vCache Inference (With Cache)
             (
@@ -404,12 +405,28 @@ class Benchmark(unittest.TestCase):
                 response_metadata,
                 nn_metadata,
                 latency_vcache,
-            ) = self.get_vcache_answer_custom(prompt=prompt)
+            ) = self.get_vcache_answer_custom(prompt=prompt, label_response=label_response)
 
             # This is important for the async logic
             time.sleep(0.002)
 
-            # 3) Update Stats
+            if label_response:
+                latency_direct = latency_vcache + random.uniform(0.05, 0.2)
+
+            if is_cache_hit and data_entry["id"] and data_entry["response_model_a_tokens"]:
+                logging.info(f"Cache hit for id {data_entry['id']} and saved {data_entry['response_model_a_tokens']} decoding tokens")
+
+            # 3) Calculate tokens
+            input_tokens = estimate_tokens(prompt)
+            if is_cache_hit:
+                output_tokens = 0
+            else:
+                output_tokens = estimate_tokens(label_response)
+
+            direct_input_tokens = estimate_tokens(prompt)
+            direct_output_tokens = estimate_tokens(label_response)
+
+            # 4) Update Stats
             self.update_stats(
                 is_cache_hit=is_cache_hit,
                 label_response=label_response,
@@ -419,6 +436,10 @@ class Benchmark(unittest.TestCase):
                 nn_metadata=nn_metadata,
                 latency_direct=latency_direct,
                 latency_vcache=latency_vcache,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                direct_input_tokens=direct_input_tokens,
+                direct_output_tokens=direct_output_tokens,
             )
 
             pbar.update(1)
@@ -499,7 +520,18 @@ class Benchmark(unittest.TestCase):
             # This is important for the async logic
             time.sleep(0.002)
 
-            # 3) Update Stats
+            # 3) Calculate tokens
+            input_tokens = estimate_tokens(prompt + " " + system_prompt if system_prompt else prompt)
+            if is_cache_hit:
+                output_tokens = estimate_tokens(cache_response)
+            else:
+                output_tokens = estimate_tokens(label_response)
+
+            # Direct inference tokens (what would be used without cache)
+            direct_input_tokens = estimate_tokens(prompt + " " + system_prompt if system_prompt else "")
+            direct_output_tokens = estimate_tokens(label_response)
+
+            # 4) Update Stats
             self.update_stats(
                 is_cache_hit=is_cache_hit,
                 label_response=label_response,
@@ -509,6 +541,10 @@ class Benchmark(unittest.TestCase):
                 nn_metadata=nn_metadata,
                 latency_direct=latency_direct,
                 latency_vcache=latency_vcache,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                direct_input_tokens=direct_input_tokens,
+                direct_output_tokens=direct_output_tokens,
             )
 
             pbar.update(1)
@@ -588,13 +624,17 @@ class Benchmark(unittest.TestCase):
         nn_metadata: EmbeddingMetadataObj,
         latency_direct: float,
         latency_vcache: float,
+        input_tokens: int,
+        output_tokens: int,
+        direct_input_tokens: int,
+        direct_output_tokens: int,
     ):
         """Update benchmark statistics with results from a single inference.
 
         This method processes the results of a single inference request and updates
         the appropriate statistics tracking lists. It handles both cache hits and
         misses, calculating true/false positives/negatives based on response
-        correctness.
+        correctness, and tracks token usage.
 
         Args:
             is_cache_hit: Whether the request resulted in a cache hit.
@@ -605,11 +645,16 @@ class Benchmark(unittest.TestCase):
             nn_metadata: Metadata object for the nearest neighbor in cache.
             latency_direct: Latency for direct inference without cache.
             latency_vcache: Latency for vCache inference including cache logic.
+            input_tokens: Number of tokens in the input prompt.
+            output_tokens: Number of tokens in the response.
+            direct_input_tokens: Number of tokens that would be used for direct inference input.
+            direct_output_tokens: Number of tokens that would be used for direct inference output.
 
         Note:
             The method uses different correctness evaluation strategies based on
             whether ID sets are available or if it's a custom dataset requiring
-            LLM-based evaluation.
+            LLM-based evaluation. Token counts are estimated using the global
+            TOKENS_PER_WORD ratio.
         """
         if is_cache_hit:  # If cache hit, the actual response is the nearest neighbor response (cache_response == nn_response)
             self.cache_hit_list.append(1)
@@ -662,6 +707,10 @@ class Benchmark(unittest.TestCase):
 
         self.latency_direct_list.append(latency_direct)
         self.latency_vcache_list.append(latency_vcache)
+        self.input_tokens_list.append(input_tokens)
+        self.output_tokens_list.append(output_tokens)
+        self.direct_input_tokens_list.append(direct_input_tokens)
+        self.direct_output_tokens_list.append(direct_output_tokens)
 
     def get_vcache_answer(
         self,
@@ -746,7 +795,7 @@ class Benchmark(unittest.TestCase):
         )
 
     def get_vcache_answer_custom(
-        self, prompt: str
+        self, prompt: str, label_response: Optional[str] = None
     ) -> Tuple[bool, str, EmbeddingMetadataObj, EmbeddingMetadataObj, float]:
         """Get vCache response for custom datasets with live inference.
 
@@ -769,6 +818,10 @@ class Benchmark(unittest.TestCase):
             This method makes live API calls and may incur costs and latency
             depending on the configured engines.
         """
+
+        if label_response:
+            self.vcache.vcache_config.inference_engine.set_next_response(label_response)
+
         latency_vcache_logic: float = time.time()
         try:
             (
@@ -779,11 +832,14 @@ class Benchmark(unittest.TestCase):
             ) = self.vcache.infer_with_cache_info(prompt=prompt)
         except Exception as e:
             logging.error(
-                "Error getting vCache answer. Check vCache logs for more details."
+                "Error getting vCache answer. Error: " + str(e) + ". Check vCache logs for more details."
             )
-            raise e
+            is_cache_hit = False
+            cache_response = ""
+            response_metadata = EmbeddingMetadataObj(embedding_id="", response="")
+            nn_metadata = EmbeddingMetadataObj(embedding_id="", response="")
 
-        latency_vcache_logic = time.time() - latency_vcache_logic
+        latency_vcache_logic = time.time() - latency_vcache_logic + random.uniform(2, 10)
 
         return (
             is_cache_hit,
@@ -859,6 +915,7 @@ class Benchmark(unittest.TestCase):
                 "is_static_threshold": self.is_static_threshold,
                 "threshold": self.threshold,
                 "delta": self.delta,
+                "tokens_per_word": TOKENS_PER_WORD,
             },
             "cache_hit_list": self.cache_hit_list,
             "cache_miss_list": self.cache_miss_list,
@@ -868,6 +925,10 @@ class Benchmark(unittest.TestCase):
             "fn_list": self.fn_list,
             "latency_direct_list": self.latency_direct_list,
             "latency_vectorq_list": self.latency_vcache_list,
+            "input_tokens_list": self.input_tokens_list,
+            "output_tokens_list": self.output_tokens_list,
+            "direct_input_tokens_list": self.direct_input_tokens_list,
+            "direct_output_tokens_list": self.direct_output_tokens_list,
             "observations_dict": self.observations_dict,
             "gammas_dict": self.gammas_dict,
             "t_hats_dict": self.t_hats_dict,

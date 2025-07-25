@@ -41,9 +41,34 @@ class LLMComparisonSimilarityEvaluator(SimilarityEvaluator):
             logging.warning("No inference engine provided. Returning False.")
             return False
 
-        system_prompt: str = "You are a judge evaluating whether two answers are semantically equivalent. Respond with only 'YES' if they convey the same meaning, or 'NO' if they differ significantly."
+        system_prompt: str = """
+You are an expert judge evaluating whether two answers are semantically equivalent for caching purposes. 
 
-        user_prompt: str = f"Answer 1: {a}\n\nAnswer 2: {b}\n\nAre these answers semantically equivalent?"
+Your task is to determine if two answers convey essentially the same meaning, even if they use different words, phrasing, or structure.
+
+GUIDELINES:
+- Focus on semantic meaning rather than exact wording
+- Consider answers equivalent if they provide the same information
+- Minor differences in phrasing, word choice, or formatting should be ignored
+- Different examples that illustrate the same concept should be considered equivalent
+- Answers with the same conclusion but different reasoning paths may be equivalent
+
+EXAMPLE 1:
+Answer 1: "The capital of France is Paris, which is located in the northern part of the country."
+Answer 2: "Paris is the capital city of France."
+Evaluation: YES
+
+EXAMPLE 2:
+Answer 1: "To solve this equation, multiply both sides by 2 to get x = 10."
+Answer 2: "The solution is x = 5 after dividing both sides by 2."
+Evaluation: NO
+Respond with only "YES" if the answers are semantically equivalent, or "NO" if they differ significantly in meaning."""
+
+        user_prompt: str = f"""
+Answer 1: {a}
+Answer 2: {b}
+
+Are these answers semantically equivalent?"""
 
         try:
             response: str = (

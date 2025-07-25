@@ -36,7 +36,7 @@ class OpenAIEmbeddingEngine(EmbeddingEngine):
         """
         if self._client is None:
             self._client = (
-                OpenAIClient(api_key=self.api_key) if self.api_key else OpenAIClient()
+                OpenAIClient(api_key=self.api_key, timeout=60.0) if self.api_key else OpenAIClient(timeout=60.0)
             )
         return self._client
 

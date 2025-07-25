@@ -9,7 +9,9 @@ import pandas as pd
 from matplotlib.lines import Line2D
 
 from benchmarks._plotter_helper import (
+    compute_avg_input_tokens_score,
     compute_avg_latency_score,
+    compute_avg_output_tokens_score,
     compute_cache_hit_rate_cumulative_list,
     compute_cache_hit_rate_score,
     compute_error_rate_cumulative_list,
@@ -17,6 +19,7 @@ from benchmarks._plotter_helper import (
     compute_false_positive_rate_score,
     compute_precision_score,
     compute_recall_score,
+    compute_total_tokens_score,
     convert_to_dataframe_from_json_file,
 )
 
@@ -671,6 +674,21 @@ def generate_combined_plots(
         )
     except Exception as e:
         print(f"Error plotting delta accuracy: {e}")
+
+    try:
+        __plot_token_usage_per_baseline(
+            gptcache_data_frames=gptcache_data_frames,
+            vcache_local_data_frames=vcache_local_data_frames,
+            vcache_global_data_frames=vcache_global_data_frames,
+            berkeley_embedding_data_frames=berkeley_embedding_data_frames,
+            vcache_berkeley_embedding_data_frames=vcache_berkeley_embedding_data_frames,
+            results_dir=results_dir,
+            timestamp=timestamp,
+            font_size=font_size,
+            chopped_index=chopped_index,
+        )
+    except Exception as e:
+        print(f"Error plotting token usage per baseline: {e}")
 
 
 def __plot_legend(
@@ -1746,8 +1764,25 @@ def __plot_cache_hit_vs_error_rate_vs_sample_size(
     keep_split: int,
     chopped_index: int,
 ):
-    target_deltas = [0.015, 0.02, 0.02, 0.03, 0.03, 0.03]
-    target_error_rates = [2, 2, 2.5, 2.5, 3, 3.5]
+    # Use available deltas from the data instead of hardcoded values
+    available_deltas = []
+    if vcache_local_data_frames:
+        available_deltas.extend(vcache_local_data_frames.keys())
+    if vcache_global_data_frames:
+        available_deltas.extend(vcache_global_data_frames.keys())
+    if vcache_berkeley_embedding_data_frames:
+        available_deltas.extend(vcache_berkeley_embedding_data_frames.keys())
+    
+    # Remove duplicates and sort
+    available_deltas = sorted(list(set(available_deltas)))
+    
+    if not available_deltas:
+        print("No delta values found for sample size plotting")
+        return
+    
+    # Use available deltas and corresponding error rates
+    target_deltas = available_deltas[:6]  # Limit to max 6 for performance
+    target_error_rates = [2.0 + i * 0.5 for i in range(len(target_deltas))]  # Generate corresponding error rates
 
     # Collect all run directories once
     gptcache_run_dirs_map = __collect_run_dirs_by_prefix_and_key(
@@ -2504,3 +2539,456 @@ def __plot_delta_accuracy(
     filename = results_dir + f"/delta_accuracy_{chopped_index}.pdf"
     plt.savefig(filename, format="pdf", bbox_inches="tight", transparent=True)
     plt.close()
+
+
+def __plot_token_usage_per_baseline(
+    gptcache_data_frames: Dict[float, pd.DataFrame],
+    vcache_local_data_frames: Dict[float, pd.DataFrame],
+    vcache_global_data_frames: Dict[float, pd.DataFrame],
+    berkeley_embedding_data_frames: Dict[float, pd.DataFrame],
+    vcache_berkeley_embedding_data_frames: Dict[float, pd.DataFrame],
+    results_dir: str,
+    timestamp: str,
+    font_size: int,
+    chopped_index: int,
+):
+    """Plot input and output token usage comparison across baselines."""
+    
+    # Collect run directories for multi-run aggregation
+    gptcache_run_dirs_map = __collect_run_dirs_by_prefix_and_key(
+        results_dir, "gptcache_"
+    )
+    vcache_local_run_dirs_map = __collect_run_dirs_by_prefix_and_key(
+        results_dir, "vcache_local_"
+    )
+    vcache_global_run_dirs_map = __collect_run_dirs_by_prefix_and_key(
+        results_dir, "vcache_global_"
+    )
+    berkeley_embedding_run_dirs_map = __collect_run_dirs_by_prefix_and_key(
+        results_dir, "berkeley_embedding_"
+    )
+    vcache_berkeley_embedding_run_dirs_map = __collect_run_dirs_by_prefix_and_key(
+        results_dir, "vcache_berkeley_embedding_"
+    )
+
+    # Helper function to aggregate token stats from multiple runs
+    def __aggregate_token_stats(run_dirs: List[str], z: float = 1.96):
+        per_run_input_tokens = []
+        per_run_output_tokens = []
+        per_run_total_tokens = []
+        per_run_direct_input_tokens = []
+        per_run_direct_output_tokens = []
+        per_run_direct_total_tokens = []
+
+        if not run_dirs:
+            return 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+
+        for rd_path in run_dirs:
+            run_total_input = 0
+            run_total_output = 0
+            run_total_direct_input = 0
+            run_total_direct_output = 0
+            run_total_samples = 0
+            has_data_for_run = False
+
+            for file_name in os.listdir(rd_path):
+                if file_name.startswith("results_") and file_name.endswith(".json"):
+                    file_path = os.path.join(rd_path, file_name)
+                    try:
+                        with open(file_path, "r", encoding="utf-8") as f:
+                            data = json.load(f)
+                        df, _, _ = convert_to_dataframe_from_json_file(data)
+                        
+                        run_total_input += int(np.sum(df["input_tokens_list"]))
+                        run_total_output += int(np.sum(df["output_tokens_list"]))
+                        run_total_direct_input += int(np.sum(df["direct_input_tokens_list"]))
+                        run_total_direct_output += int(np.sum(df["direct_output_tokens_list"]))
+                        run_total_samples += len(df["input_tokens_list"])
+                        has_data_for_run = True
+                    except Exception:
+                        continue
+
+            if has_data_for_run and run_total_samples > 0:
+                avg_input = run_total_input / run_total_samples
+                avg_output = run_total_output / run_total_samples
+                avg_total = avg_input + avg_output
+                avg_direct_input = run_total_direct_input / run_total_samples
+                avg_direct_output = run_total_direct_output / run_total_samples
+                avg_direct_total = avg_direct_input + avg_direct_output
+                
+                per_run_input_tokens.append(avg_input)
+                per_run_output_tokens.append(avg_output)
+                per_run_total_tokens.append(avg_total)
+                per_run_direct_input_tokens.append(avg_direct_input)
+                per_run_direct_output_tokens.append(avg_direct_output)
+                per_run_direct_total_tokens.append(avg_direct_total)
+
+        # Calculate mean and CI for each metric
+        input_mean, input_ci_low, input_ci_up = __calculate_mean_and_ci_from_runs(
+            per_run_input_tokens, z, clamp_min=0.0
+        )
+        output_mean, output_ci_low, output_ci_up = __calculate_mean_and_ci_from_runs(
+            per_run_output_tokens, z, clamp_min=0.0
+        )
+        total_mean, total_ci_low, total_ci_up = __calculate_mean_and_ci_from_runs(
+            per_run_total_tokens, z, clamp_min=0.0
+        )
+        direct_input_mean, direct_input_ci_low, direct_input_ci_up = __calculate_mean_and_ci_from_runs(
+            per_run_direct_input_tokens, z, clamp_min=0.0
+        )
+        direct_output_mean, direct_output_ci_low, direct_output_ci_up = __calculate_mean_and_ci_from_runs(
+            per_run_direct_output_tokens, z, clamp_min=0.0
+        )
+        direct_total_mean, direct_total_ci_low, direct_total_ci_up = __calculate_mean_and_ci_from_runs(
+            per_run_direct_total_tokens, z, clamp_min=0.0
+        )
+
+        return (
+            input_mean, input_ci_low, input_ci_up,
+            output_mean, output_ci_low, output_ci_up,
+            total_mean, total_ci_low, total_ci_up,
+            direct_input_mean, direct_input_ci_low, direct_input_ci_up,
+            direct_output_mean, direct_output_ci_low, direct_output_ci_up,
+            direct_total_mean, direct_total_ci_low, direct_total_ci_up
+        )
+
+    # Helper function to get token stats from single dataframe
+    def __get_single_run_token_stats(df: pd.DataFrame):
+        avg_input = compute_avg_input_tokens_score(df["input_tokens_list"])
+        avg_output = compute_avg_output_tokens_score(df["output_tokens_list"])
+        avg_total = compute_total_tokens_score(df["input_tokens_list"], df["output_tokens_list"])
+        avg_direct_input = compute_avg_input_tokens_score(df["direct_input_tokens_list"])
+        avg_direct_output = compute_avg_output_tokens_score(df["direct_output_tokens_list"])
+        avg_direct_total = compute_total_tokens_score(df["direct_input_tokens_list"], df["direct_output_tokens_list"])
+        return avg_input, avg_output, avg_total, avg_direct_input, avg_direct_output, avg_direct_total
+
+    # Collect data for each baseline
+    baseline_data = []
+    baseline_names = []
+    baseline_colors = []
+
+    # GPTCache
+    if gptcache_data_frames:
+        # Use the first available threshold for display
+        first_threshold = sorted(gptcache_data_frames.keys())[0]
+        threshold_key_str = f"{first_threshold:.3f}".rstrip("0").rstrip(".")
+        if not threshold_key_str and first_threshold == 0:
+            threshold_key_str = "0"
+        
+        run_dirs = gptcache_run_dirs_map.get(threshold_key_str, [])
+        
+        if len(run_dirs) > 1:
+            (input_m, input_l, input_u, output_m, output_l, output_u, total_m, total_l, total_u,
+             direct_input_m, direct_input_l, direct_input_u, direct_output_m, direct_output_l, direct_output_u,
+             direct_total_m, direct_total_l, direct_total_u) = __aggregate_token_stats(run_dirs)
+            baseline_data.append({
+                'input_mean': input_m, 'input_ci_low': input_l, 'input_ci_up': input_u,
+                'output_mean': output_m, 'output_ci_low': output_l, 'output_ci_up': output_u,
+                'total_mean': total_m, 'total_ci_low': total_l, 'total_ci_up': total_u,
+                'direct_input_mean': direct_input_m, 'direct_input_ci_low': direct_input_l, 'direct_input_ci_up': direct_input_u,
+                'direct_output_mean': direct_output_m, 'direct_output_ci_low': direct_output_l, 'direct_output_ci_up': direct_output_u,
+                'direct_total_mean': direct_total_m, 'direct_total_ci_low': direct_total_l, 'direct_total_ci_up': direct_total_u,
+                'is_multi': True
+            })
+        else:
+            df = gptcache_data_frames[first_threshold]
+            input_avg, output_avg, total_avg, direct_input_avg, direct_output_avg, direct_total_avg = __get_single_run_token_stats(df)
+            baseline_data.append({
+                'input_mean': input_avg, 'input_ci_low': 0, 'input_ci_up': 0,
+                'output_mean': output_avg, 'output_ci_low': 0, 'output_ci_up': 0,
+                'total_mean': total_avg, 'total_ci_low': 0, 'total_ci_up': 0,
+                'direct_input_mean': direct_input_avg, 'direct_input_ci_low': 0, 'direct_input_ci_up': 0,
+                'direct_output_mean': direct_output_avg, 'direct_output_ci_low': 0, 'direct_output_ci_up': 0,
+                'direct_total_mean': direct_total_avg, 'direct_total_ci_low': 0, 'direct_total_ci_up': 0,
+                'is_multi': False
+            })
+        baseline_names.append("GPTCache")
+        baseline_colors.append("#C23B48")
+
+    # vCache Local
+    if vcache_local_data_frames:
+        first_delta = sorted(vcache_local_data_frames.keys())[0]
+        delta_key_str = f"{first_delta:.3f}".rstrip("0").rstrip(".")
+        if not delta_key_str and first_delta == 0:
+            delta_key_str = "0"
+        
+        run_dirs = vcache_local_run_dirs_map.get(delta_key_str, [])
+        
+        if len(run_dirs) > 1:
+            (input_m, input_l, input_u, output_m, output_l, output_u, total_m, total_l, total_u,
+             direct_input_m, direct_input_l, direct_input_u, direct_output_m, direct_output_l, direct_output_u,
+             direct_total_m, direct_total_l, direct_total_u) = __aggregate_token_stats(run_dirs)
+            baseline_data.append({
+                'input_mean': input_m, 'input_ci_low': input_l, 'input_ci_up': input_u,
+                'output_mean': output_m, 'output_ci_low': output_l, 'output_ci_up': output_u,
+                'total_mean': total_m, 'total_ci_low': total_l, 'total_ci_up': total_u,
+                'direct_input_mean': direct_input_m, 'direct_input_ci_low': direct_input_l, 'direct_input_ci_up': direct_input_u,
+                'direct_output_mean': direct_output_m, 'direct_output_ci_low': direct_output_l, 'direct_output_ci_up': direct_output_u,
+                'direct_total_mean': direct_total_m, 'direct_total_ci_low': direct_total_l, 'direct_total_ci_up': direct_total_u,
+                'is_multi': True
+            })
+        else:
+            df = vcache_local_data_frames[first_delta]
+            input_avg, output_avg, total_avg, direct_input_avg, direct_output_avg, direct_total_avg = __get_single_run_token_stats(df)
+            baseline_data.append({
+                'input_mean': input_avg, 'input_ci_low': 0, 'input_ci_up': 0,
+                'output_mean': output_avg, 'output_ci_low': 0, 'output_ci_up': 0,
+                'total_mean': total_avg, 'total_ci_low': 0, 'total_ci_up': 0,
+                'direct_input_mean': direct_input_avg, 'direct_input_ci_low': 0, 'direct_input_ci_up': 0,
+                'direct_output_mean': direct_output_avg, 'direct_output_ci_low': 0, 'direct_output_ci_up': 0,
+                'direct_total_mean': direct_total_avg, 'direct_total_ci_low': 0, 'direct_total_ci_up': 0,
+                'is_multi': False
+            })
+        baseline_names.append("vCache")
+        baseline_colors.append("#37A9EC")
+
+    # vCache Global
+    if vcache_global_data_frames:
+        first_delta = sorted(vcache_global_data_frames.keys())[0]
+        delta_key_str = f"{first_delta:.3f}".rstrip("0").rstrip(".")
+        if not delta_key_str and first_delta == 0:
+            delta_key_str = "0"
+        
+        run_dirs = vcache_global_run_dirs_map.get(delta_key_str, [])
+        
+        if len(run_dirs) > 1:
+            (input_m, input_l, input_u, output_m, output_l, output_u, total_m, total_l, total_u,
+             direct_input_m, direct_input_l, direct_input_u, direct_output_m, direct_output_l, direct_output_u,
+             direct_total_m, direct_total_l, direct_total_u) = __aggregate_token_stats(run_dirs)
+            baseline_data.append({
+                'input_mean': input_m, 'input_ci_low': input_l, 'input_ci_up': input_u,
+                'output_mean': output_m, 'output_ci_low': output_l, 'output_ci_up': output_u,
+                'total_mean': total_m, 'total_ci_low': total_l, 'total_ci_up': total_u,
+                'direct_input_mean': direct_input_m, 'direct_input_ci_low': direct_input_l, 'direct_input_ci_up': direct_input_u,
+                'direct_output_mean': direct_output_m, 'direct_output_ci_low': direct_output_l, 'direct_output_ci_up': direct_output_u,
+                'direct_total_mean': direct_total_m, 'direct_total_ci_low': direct_total_l, 'direct_total_ci_up': direct_total_u,
+                'is_multi': True
+            })
+        else:
+            df = vcache_global_data_frames[first_delta]
+            input_avg, output_avg, total_avg, direct_input_avg, direct_output_avg, direct_total_avg = __get_single_run_token_stats(df)
+            baseline_data.append({
+                'input_mean': input_avg, 'input_ci_low': 0, 'input_ci_up': 0,
+                'output_mean': output_avg, 'output_ci_low': 0, 'output_ci_up': 0,
+                'total_mean': total_avg, 'total_ci_low': 0, 'total_ci_up': 0,
+                'direct_input_mean': direct_input_avg, 'direct_input_ci_low': 0, 'direct_input_ci_up': 0,
+                'direct_output_mean': direct_output_avg, 'direct_output_ci_low': 0, 'direct_output_ci_up': 0,
+                'direct_total_mean': direct_total_avg, 'direct_total_ci_low': 0, 'direct_total_ci_up': 0,
+                'is_multi': False
+            })
+        baseline_names.append("vCache (Ablation)")
+        baseline_colors.append("#8CBE94")
+
+    # Berkeley Embedding
+    if berkeley_embedding_data_frames:
+        first_threshold = sorted(berkeley_embedding_data_frames.keys())[0]
+        threshold_key_str = f"{first_threshold:.3f}".rstrip("0").rstrip(".")
+        if not threshold_key_str and first_threshold == 0:
+            threshold_key_str = "0"
+        
+        run_dirs = berkeley_embedding_run_dirs_map.get(threshold_key_str, [])
+        
+        if len(run_dirs) > 1:
+            (input_m, input_l, input_u, output_m, output_l, output_u, total_m, total_l, total_u,
+             direct_input_m, direct_input_l, direct_input_u, direct_output_m, direct_output_l, direct_output_u,
+             direct_total_m, direct_total_l, direct_total_u) = __aggregate_token_stats(run_dirs)
+            baseline_data.append({
+                'input_mean': input_m, 'input_ci_low': input_l, 'input_ci_up': input_u,
+                'output_mean': output_m, 'output_ci_low': output_l, 'output_ci_up': output_u,
+                'total_mean': total_m, 'total_ci_low': total_l, 'total_ci_up': total_u,
+                'direct_input_mean': direct_input_m, 'direct_input_ci_low': direct_input_l, 'direct_input_ci_up': direct_input_u,
+                'direct_output_mean': direct_output_m, 'direct_output_ci_low': direct_output_l, 'direct_output_ci_up': direct_output_u,
+                'direct_total_mean': direct_total_m, 'direct_total_ci_low': direct_total_l, 'direct_total_ci_up': direct_total_u,
+                'is_multi': True
+            })
+        else:
+            df = berkeley_embedding_data_frames[first_threshold]
+            input_avg, output_avg, total_avg, direct_input_avg, direct_output_avg, direct_total_avg = __get_single_run_token_stats(df)
+            baseline_data.append({
+                'input_mean': input_avg, 'input_ci_low': 0, 'input_ci_up': 0,
+                'output_mean': output_avg, 'output_ci_low': 0, 'output_ci_up': 0,
+                'total_mean': total_avg, 'total_ci_low': 0, 'total_ci_up': 0,
+                'direct_input_mean': direct_input_avg, 'direct_input_ci_low': 0, 'direct_input_ci_up': 0,
+                'direct_output_mean': direct_output_avg, 'direct_output_ci_low': 0, 'direct_output_ci_up': 0,
+                'direct_total_mean': direct_total_avg, 'direct_total_ci_low': 0, 'direct_total_ci_up': 0,
+                'is_multi': False
+            })
+        baseline_names.append("Fine-tuned Embedding")
+        baseline_colors.append("#3B686A")
+
+    # vCache + Berkeley Embedding
+    if vcache_berkeley_embedding_data_frames:
+        first_delta = sorted(vcache_berkeley_embedding_data_frames.keys())[0]
+        delta_key_str = f"{first_delta:.3f}".rstrip("0").rstrip(".")
+        if not delta_key_str and first_delta == 0:
+            delta_key_str = "0"
+        
+        run_dirs = vcache_berkeley_embedding_run_dirs_map.get(delta_key_str, [])
+        
+        if len(run_dirs) > 1:
+            (input_m, input_l, input_u, output_m, output_l, output_u, total_m, total_l, total_u,
+             direct_input_m, direct_input_l, direct_input_u, direct_output_m, direct_output_l, direct_output_u,
+             direct_total_m, direct_total_l, direct_total_u) = __aggregate_token_stats(run_dirs)
+            baseline_data.append({
+                'input_mean': input_m, 'input_ci_low': input_l, 'input_ci_up': input_u,
+                'output_mean': output_m, 'output_ci_low': output_l, 'output_ci_up': output_u,
+                'total_mean': total_m, 'total_ci_low': total_l, 'total_ci_up': total_u,
+                'direct_input_mean': direct_input_m, 'direct_input_ci_low': direct_input_l, 'direct_input_ci_up': direct_input_u,
+                'direct_output_mean': direct_output_m, 'direct_output_ci_low': direct_output_l, 'direct_output_ci_up': direct_output_u,
+                'direct_total_mean': direct_total_m, 'direct_total_ci_low': direct_total_l, 'direct_total_ci_up': direct_total_u,
+                'is_multi': True
+            })
+        else:
+            df = vcache_berkeley_embedding_data_frames[first_delta]
+            input_avg, output_avg, total_avg, direct_input_avg, direct_output_avg, direct_total_avg = __get_single_run_token_stats(df)
+            baseline_data.append({
+                'input_mean': input_avg, 'input_ci_low': 0, 'input_ci_up': 0,
+                'output_mean': output_avg, 'output_ci_low': 0, 'output_ci_up': 0,
+                'total_mean': total_avg, 'total_ci_low': 0, 'total_ci_up': 0,
+                'direct_input_mean': direct_input_avg, 'direct_input_ci_low': 0, 'direct_input_ci_up': 0,
+                'direct_output_mean': direct_output_avg, 'direct_output_ci_low': 0, 'direct_output_ci_up': 0,
+                'direct_total_mean': direct_total_avg, 'direct_total_ci_low': 0, 'direct_total_ci_up': 0,
+                'is_multi': False
+            })
+        baseline_names.append("vCache + Fine-tuned Embedding")
+        baseline_colors.append("#EDBE24")
+
+    if not baseline_data:
+        print("No token data found for any baseline")
+        return
+
+    # Create comprehensive token comparison plot
+    fig = plt.figure(figsize=(34, 24))
+    
+    # Create a 3x2 grid layout
+    ax1 = plt.subplot2grid((3, 2), (0, 0))
+    ax2 = plt.subplot2grid((3, 2), (0, 1))
+    ax3 = plt.subplot2grid((3, 2), (1, 0))
+    ax4 = plt.subplot2grid((3, 2), (1, 1))
+    ax5 = plt.subplot2grid((3, 2), (2, 0), colspan=2)
+    
+    x_pos = np.arange(len(baseline_names))
+    bar_width = 0.15
+    
+    # Helper function to prepare error bars
+    def prepare_error_bars(data_list, error_type):
+        errors_filtered = []
+        for i, data in enumerate(baseline_data):
+            if data['is_multi']:
+                lower_err = data[f'{error_type}_mean'] - data[f'{error_type}_ci_low']
+                upper_err = data[f'{error_type}_ci_up'] - data[f'{error_type}_mean']
+                errors_filtered.append([lower_err, upper_err])
+            else:
+                errors_filtered.append([0, 0])
+        return np.array(errors_filtered).T
+
+    # Plot 1: Input Tokens Comparison
+    input_means = [data['input_mean'] for data in baseline_data]
+    direct_input_means = [data['direct_input_mean'] for data in baseline_data]
+    input_errors = prepare_error_bars(baseline_data, 'input')
+    direct_input_errors = prepare_error_bars(baseline_data, 'direct_input')
+    
+    bars1a = ax1.bar(x_pos - bar_width/2, input_means, bar_width, label='Actual Usage', 
+                     color=baseline_colors, yerr=input_errors, capsize=4, alpha=0.8)
+    bars1b = ax1.bar(x_pos + bar_width/2, direct_input_means, bar_width, label='Direct Inference',
+                     color=baseline_colors, yerr=direct_input_errors, capsize=4, alpha=0.5, hatch='//')
+    
+    ax1.set_xlabel('Baseline', fontsize=font_size - 2)
+    ax1.set_ylabel('Avg. Input Tokens', fontsize=font_size - 2)
+    ax1.set_title('Input Tokens: Actual vs Direct', fontsize=font_size, pad=10)
+    ax1.set_xticks(x_pos)
+    ax1.set_xticklabels(baseline_names, rotation=45, ha='right', fontsize=font_size - 6)
+    ax1.tick_params(axis='y', labelsize=font_size - 4)
+    ax1.legend(fontsize=font_size - 6)
+
+    # Plot 2: Output Tokens Comparison
+    output_means = [data['output_mean'] for data in baseline_data]
+    direct_output_means = [data['direct_output_mean'] for data in baseline_data]
+    output_errors = prepare_error_bars(baseline_data, 'output')
+    direct_output_errors = prepare_error_bars(baseline_data, 'direct_output')
+    
+    bars2a = ax2.bar(x_pos - bar_width/2, output_means, bar_width, label='Actual Usage',
+                     color=baseline_colors, yerr=output_errors, capsize=4, alpha=0.8)
+    bars2b = ax2.bar(x_pos + bar_width/2, direct_output_means, bar_width, label='Direct Inference',
+                     color=baseline_colors, yerr=direct_output_errors, capsize=4, alpha=0.5, hatch='//')
+    
+    ax2.set_xlabel('Baseline', fontsize=font_size - 2)
+    ax2.set_ylabel('Avg. Output Tokens', fontsize=font_size - 2)
+    ax2.set_title('Output Tokens: Actual vs Direct', fontsize=font_size, pad=10)
+    ax2.set_xticks(x_pos)
+    ax2.set_xticklabels(baseline_names, rotation=45, ha='right', fontsize=font_size - 6)
+    ax2.tick_params(axis='y', labelsize=font_size - 4)
+    ax2.legend(fontsize=font_size - 6)
+
+    # Plot 3: Total Tokens Comparison
+    total_means = [data['total_mean'] for data in baseline_data]
+    direct_total_means = [data['direct_total_mean'] for data in baseline_data]
+    total_errors = prepare_error_bars(baseline_data, 'total')
+    direct_total_errors = prepare_error_bars(baseline_data, 'direct_total')
+    
+    bars3a = ax3.bar(x_pos - bar_width/2, total_means, bar_width, label='Actual Usage',
+                     color=baseline_colors, yerr=total_errors, capsize=4, alpha=0.8)
+    bars3b = ax3.bar(x_pos + bar_width/2, direct_total_means, bar_width, label='Direct Inference',
+                     color=baseline_colors, yerr=direct_total_errors, capsize=4, alpha=0.5, hatch='//')
+    
+    ax3.set_xlabel('Baseline', fontsize=font_size - 2)
+    ax3.set_ylabel('Avg. Total Tokens', fontsize=font_size - 2)
+    ax3.set_title('Total Tokens: Actual vs Direct', fontsize=font_size, pad=10)
+    ax3.set_xticks(x_pos)
+    ax3.set_xticklabels(baseline_names, rotation=45, ha='right', fontsize=font_size - 6)
+    ax3.tick_params(axis='y', labelsize=font_size - 4)
+    ax3.legend(fontsize=font_size - 6)
+
+    # Plot 4: Token Savings Percentage
+    output_savings_pct = [(direct_output_means[i] - output_means[i]) / direct_output_means[i] * 100 
+                          if direct_output_means[i] > 0 else 0 for i in range(len(baseline_names))]
+    total_savings_pct = [(direct_total_means[i] - total_means[i]) / direct_total_means[i] * 100 
+                         if direct_total_means[i] > 0 else 0 for i in range(len(baseline_names))]
+    
+    bars4a = ax4.bar(x_pos - bar_width/2, output_savings_pct, bar_width, label='Output Savings',
+                     color='lightcoral', alpha=0.7)
+    bars4b = ax4.bar(x_pos + bar_width/2, total_savings_pct, bar_width, label='Total Savings',
+                     color='lightblue', alpha=0.7)
+    
+    ax4.set_xlabel('Baseline', fontsize=font_size - 2)
+    ax4.set_ylabel('Token Savings (%)', fontsize=font_size - 2)
+    ax4.set_title('Token Savings from Caching', fontsize=font_size, pad=10)
+    ax4.set_xticks(x_pos)
+    ax4.set_xticklabels(baseline_names, rotation=45, ha='right', fontsize=font_size - 6)
+    ax4.tick_params(axis='y', labelsize=font_size - 4)
+    ax4.legend(fontsize=font_size - 6)
+    ax4.axhline(y=0, color='black', linestyle='-', linewidth=0.5)
+
+    # Plot 5: Cache Efficiency Summary (spans full width)
+    bars5 = ax5.bar(x_pos, total_savings_pct, bar_width*1.5, color=baseline_colors, alpha=0.8)
+    ax5.set_xlabel('Baseline', fontsize=font_size)
+    ax5.set_ylabel('Total Token Savings (%)', fontsize=font_size)
+    ax5.set_title('Cache Efficiency: Total Token Savings by Baseline', fontsize=font_size + 2, pad=15)
+    ax5.set_xticks(x_pos)
+    ax5.set_xticklabels(baseline_names, rotation=45, ha='right', fontsize=font_size - 4)
+    ax5.tick_params(axis='y', labelsize=font_size - 2)
+    ax5.axhline(y=0, color='black', linestyle='-', linewidth=0.5)
+
+    # Add value labels on key plots
+    def add_value_labels(ax, bars, values, suffix=''):
+        if not values:
+            return
+        max_abs_value = max(abs(v) for v in values) if values else 1
+        for i, (bar, value) in enumerate(zip(bars, values)):
+            height = bar.get_height()
+            y_offset = max_abs_value * 0.02 if height >= 0 else -max_abs_value * 0.05
+            ax.text(bar.get_x() + bar.get_width()/2., height + y_offset,
+                   f'{value:.1f}{suffix}', ha='center', 
+                   va='bottom' if height >= 0 else 'top', fontsize=font_size - 8)
+
+    add_value_labels(ax4, bars4b, total_savings_pct, '%')
+    add_value_labels(ax5, bars5, total_savings_pct, '%')
+
+    # Adjust layout with proper spacing
+    plt.tight_layout(pad=3.0, h_pad=4.0, w_pad=2.0)
+    
+    filename = results_dir + f"/token_usage_per_baseline_{chopped_index}.pdf"
+    plt.savefig(filename, format="pdf", bbox_inches="tight", transparent=True)
+    plt.close()
+    
+    print(f"Token usage plot saved to: {filename}")

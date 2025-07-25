@@ -89,4 +89,8 @@ class LangChainInferenceEngine(InferenceEngine):
             response = self.chat_model(messages)
             return response.content
         except Exception as e:
-            raise Exception(f"Error creating completion from LangChain: {e}")
+            error_str = str(e).lower()
+            if any(keyword in error_str for keyword in ["invalid_prompt", "flagged", "usage policy", "content policy", "safety", "harmful"]):
+                return "I apologize, but I cannot provide a response to this prompt due to content policy restrictions."
+            else:
+                raise Exception(f"Error creating completion from LangChain: {e}")

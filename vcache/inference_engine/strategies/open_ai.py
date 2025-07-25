@@ -29,6 +29,13 @@ class OpenAIInferenceEngine(InferenceEngine):
         self.temperature = temperature
         self.api_key = api_key
         self._client = None
+        self.next_response = None
+
+    def set_next_response(self, response: str):
+        """
+        Set the next response to be used for the next inference.
+        """
+        self.next_response = response
 
     @property
     def client(self) -> OpenAIClient:
@@ -39,7 +46,7 @@ class OpenAIInferenceEngine(InferenceEngine):
             The OpenAI client instance.
         """
         if self._client is None:
-            self._client = OpenAIClient(api_key=self.api_key)
+            self._client = OpenAIClient(api_key=self.api_key, timeout=60.0)
         return self._client
 
     def create(self, prompt: str, system_prompt: Optional[str] = None) -> str:
@@ -53,6 +60,11 @@ class OpenAIInferenceEngine(InferenceEngine):
         Returns:
             The answer to the prompt.
         """
+        if self.next_response is not None:
+            next_response = self.next_response
+            self.next_response = None
+            return next_response
+
         try:
             messages = []
             if system_prompt:
@@ -62,7 +74,13 @@ class OpenAIInferenceEngine(InferenceEngine):
                 model=self.model_name,
                 messages=messages,
                 temperature=self.temperature,
+                timeout=60.0,
             )
             return completion.choices[0].message.content
         except Exception as e:
-            raise Exception(f"Error creating completion from OpenAI: {e}")
+            error_str = str(e).lower()
+            print(f"Error creating completion from OpenAI: {e}")
+            if any(keyword in error_str for keyword in ["invalid_prompt", "invalid prompt", "flagged", "usage policy", "content policy", "safety", "harmful"]):
+                return "I apologize, but I cannot provide a response to this prompt due to content policy restrictions."
+            else:
+                raise Exception(f"Error creating completion from OpenAI: {e}")

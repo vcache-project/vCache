@@ -20,6 +20,10 @@ def convert_to_dataframe_from_benchmark(benchmark: "Benchmark") -> tuple:
         "fn_list": benchmark.fn_list,
         "latency_direct_list": benchmark.latency_direct_list,
         "latency_vectorq_list": benchmark.latency_vcache_list,
+        "input_tokens_list": getattr(benchmark, 'input_tokens_list', [0] * len(benchmark.cache_hit_list)),
+        "output_tokens_list": getattr(benchmark, 'output_tokens_list', [0] * len(benchmark.cache_hit_list)),
+        "direct_input_tokens_list": getattr(benchmark, 'direct_input_tokens_list', [0] * len(benchmark.cache_hit_list)),
+        "direct_output_tokens_list": getattr(benchmark, 'direct_output_tokens_list', [0] * len(benchmark.cache_hit_list)),
     }
     df = pd.DataFrame(data)
 
@@ -55,6 +59,10 @@ def convert_to_dataframe_from_json_file(
     fn_list = json_data["fn_list"]
     latency_direct_list = json_data["latency_direct_list"]
     latency_vcache_list = json_data["latency_vectorq_list"]
+    input_tokens_list = json_data.get("input_tokens_list", [0] * len(cache_hit_list))
+    output_tokens_list = json_data.get("output_tokens_list", [0] * len(cache_hit_list))
+    direct_input_tokens_list = json_data.get("direct_input_tokens_list", [0] * len(cache_hit_list))
+    direct_output_tokens_list = json_data.get("direct_output_tokens_list", [0] * len(cache_hit_list))
 
     chopped_index = 0
     if keep_split > 0 and keep_split < 100:
@@ -67,6 +75,10 @@ def convert_to_dataframe_from_json_file(
         fn_list = fn_list[chopped_index:]
         latency_direct_list = latency_direct_list[chopped_index:]
         latency_vcache_list = latency_vcache_list[chopped_index:]
+        input_tokens_list = input_tokens_list[chopped_index:]
+        output_tokens_list = output_tokens_list[chopped_index:]
+        direct_input_tokens_list = direct_input_tokens_list[chopped_index:]
+        direct_output_tokens_list = direct_output_tokens_list[chopped_index:]
 
     data = {
         "cache_hit_list": cache_hit_list,
@@ -77,6 +89,10 @@ def convert_to_dataframe_from_json_file(
         "fn_list": fn_list,
         "latency_direct_list": latency_direct_list,
         "latency_vectorq_list": latency_vcache_list,
+        "input_tokens_list": input_tokens_list,
+        "output_tokens_list": output_tokens_list,
+        "direct_input_tokens_list": direct_input_tokens_list,
+        "direct_output_tokens_list": direct_output_tokens_list,
     }
     df = pd.DataFrame(data)
 
@@ -367,3 +383,37 @@ def compute_avg_latency_score(latency_list: pd.DataFrame) -> float:
         avg_latency: float - Average Latency 0.xx
     """
     return latency_list.mean()
+
+
+def compute_avg_input_tokens_score(input_tokens_list: pd.DataFrame) -> float:
+    """
+    Compute the average input tokens per request.
+    Args:
+        input_tokens_list: pd.DataFrame - Input tokens [45, 52, 38, ...]
+    Returns:
+        avg_input_tokens: float - Average input tokens per request
+    """
+    return input_tokens_list.mean()
+
+
+def compute_avg_output_tokens_score(output_tokens_list: pd.DataFrame) -> float:
+    """
+    Compute the average output tokens per request.
+    Args:
+        output_tokens_list: pd.DataFrame - Output tokens [120, 95, 200, ...]
+    Returns:
+        avg_output_tokens: float - Average output tokens per request
+    """
+    return output_tokens_list.mean()
+
+
+def compute_total_tokens_score(input_tokens_list: pd.DataFrame, output_tokens_list: pd.DataFrame) -> float:
+    """
+    Compute the average total tokens (input + output) per request.
+    Args:
+        input_tokens_list: pd.DataFrame - Input tokens [45, 52, 38, ...]
+        output_tokens_list: pd.DataFrame - Output tokens [120, 95, 200, ...]
+    Returns:
+        avg_total_tokens: float - Average total tokens per request
+    """
+    return input_tokens_list.mean() + output_tokens_list.mean()
