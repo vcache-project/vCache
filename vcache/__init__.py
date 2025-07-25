@@ -70,6 +70,8 @@ from .vcache_policy import (
     BenchmarkVerifiedGlobalDecisionPolicy,
     BenchmarkVerifiedIIDDecisionPolicy,
     NoCachePolicy,
+    SigmoidOnlyDecisionPolicy,
+    SigmoidProbabilityDecisionPolicy,
     VCachePolicy,
     VerifiedDecisionPolicy,
 )
@@ -92,6 +94,8 @@ __all__ = [
     # Concrete vCache Policies
     "VerifiedDecisionPolicy",
     "NoCachePolicy",
+    "SigmoidProbabilityDecisionPolicy",
+    "SigmoidOnlyDecisionPolicy",
     "BenchmarkStaticDecisionPolicy",
     "BenchmarkVerifiedGlobalDecisionPolicy",
     "BenchmarkVerifiedIIDDecisionPolicy",
