@@ -23,7 +23,7 @@ Reliable and Efficient Semantic Prompt Caching
 
 
 
-Semantic caching reduces LLM latency and cost by returning cached model responses for semantically similar prompts (not just exact matches). **vCache** is the first verified semantic cache that **guarantees user-defined error rate bounds**. vCache replaces static thresholds with **online-learned, embedding-specific decision boundaries**—no manual fine-tuning required. This enables reliable cached response reuse across any embedding model or workload.
+vCache is the first semantic prompt cache that guarantees user-defined error rate bounds. Semantic caching reduces LLM latency and cost by returning cached model responses for semantically similar prompts (not just exact matches). vCache replaces static thresholds with **online-learned, embedding-specific decision boundaries**—no manual fine-tuning required. This enables reliable cached response reuse across any embedding model or workload.
 
 > 💳
 > **Cost & Latency Optimization** <br> 
