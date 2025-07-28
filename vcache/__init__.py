@@ -12,6 +12,7 @@ from .inference_engine import (
     InferenceEngine,
     LangChainInferenceEngine,
     OpenAIInferenceEngine,
+    VLLMInferenceEngine,
 )
 from .main import VCache
 from .vcache_core import (
@@ -102,6 +103,7 @@ __all__ = [
     # Concrete Inference engines
     "OpenAIInferenceEngine",
     "LangChainInferenceEngine",
+    "VLLMInferenceEngine",
     "BenchmarkInferenceEngine",
     # Concrete Embedding engines
     "OpenAIEmbeddingEngine",
