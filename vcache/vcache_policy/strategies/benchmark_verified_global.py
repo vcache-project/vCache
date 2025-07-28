@@ -106,7 +106,10 @@ class BenchmarkVerifiedGlobalDecisionPolicy(VCachePolicy):
                     prompt=prompt, system_prompt=system_prompt
                 )
                 should_have_exploited = self.similarity_evaluator.answers_similar(
-                    a=response, b=metadata.response
+                    a=response,
+                    b=metadata.response,
+                    id_set_a=id_set,
+                    id_set_b=metadata.id_set,
                 )
                 self.bayesian.update_metadata(
                     similarity_score=similarity_score,

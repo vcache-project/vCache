@@ -530,6 +530,7 @@ class _Algorithm:
         metadata.t_hat = t_hat
         metadata.var_t = -1  # not computed
 
+        # if similarity_score <= t_hat: # This is used for ablation study
         if similarity_score <= t_prime:
             return _Action.EXPLORE
         else:
