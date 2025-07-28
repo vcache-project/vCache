@@ -91,9 +91,6 @@ from vcache.vcache_core.cache.embedding_store.vector_db import (
 from vcache.vcache_core.cache.eviction_policy.eviction_policy import EvictionPolicy
 from vcache.vcache_core.cache.eviction_policy.strategies.scu import SCUEvictionPolicy
 from vcache.vcache_core.similarity_evaluator import SimilarityEvaluator
-from vcache.vcache_core.similarity_evaluator.strategies.benchmark_comparison import (
-    BenchmarkComparisonSimilarityEvaluator,
-)
 from vcache.vcache_core.similarity_evaluator.strategies.string_comparison import (
     StringComparisonSimilarityEvaluator,
 )
@@ -167,6 +164,12 @@ class LargeLanguageModel(Enum):
 
     LLAMA_3_8B = ("response_llama_3_8b", "Llama_3_8B_Instruct", "float16", None)
     LLAMA_3_70B = ("response_llama_3_70b", "Llama_3_70B_Instruct", "float16", None)
+    LLAMA_3_70B_VLLM = (
+        "response_llama_3_70b_vllm",
+        "Llama_3_70B_Instruct_VLLM",
+        "float16",
+        None,
+    )
     GPT_4O_MINI = ("response_gpt-4o-mini", "GPT-4o-mini", "float16", None)
     GPT_4O_NANO = ("response_gpt-4.1-nano", "GPT-4.1-nano", "float16", None)
     GPT_4_1 = ("response_gpt-4.1", "gpt-4.1-2025-04-14", "float16", None)
@@ -194,6 +197,7 @@ class Baseline(Enum):
     IID = "iid"
     SigmoidProbability = "SigmoidProbability"
     SigmoidOnly = "SigmoidOnly"
+    NoCache = "NoCache"
 
 
 class Dataset(Enum):
@@ -243,37 +247,18 @@ RUN_COMBINATIONS: List[
     ]
 ] = [
     (
-        EmbeddingModel.E5_LARGE_V2,
-        LargeLanguageModel.GPT_4O_MINI,
-        Dataset.SEM_BENCHMARK_ARENA,
-        GeneratePlotsOnly.YES,
-        BenchmarkComparisonSimilarityEvaluator(),
+        EmbeddingModel.GTE,
+        LargeLanguageModel.LLAMA_3_70B_VLLM,
+        Dataset.SEM_BENCHMARK_CLASSIFICATION,
+        GeneratePlotsOnly.NO,
+        StringComparisonSimilarityEvaluator(),
         SCUEvictionPolicy(max_size=100000, watermark=0.99, eviction_percentage=0.1),
         60000,
-    ),
-    (
-        EmbeddingModel.GTE,
-        LargeLanguageModel.LLAMA_3_8B,
-        Dataset.SEM_BENCHMARK_CLASSIFICATION,
-        GeneratePlotsOnly.YES,
-        StringComparisonSimilarityEvaluator(),
-        SCUEvictionPolicy(max_size=100000, watermark=0.99, eviction_percentage=0.1),
-        45000,
-    ),
-    (
-        EmbeddingModel.GTE,
-        LargeLanguageModel.LLAMA_3_8B,
-        Dataset.SEM_BENCHMARK_SEARCH_QUERIES,
-        GeneratePlotsOnly.YES,
-        StringComparisonSimilarityEvaluator(),
-        SCUEvictionPolicy(max_size=100000, watermark=0.99, eviction_percentage=0.1),
-        150000,
-    ),
+    )
 ]
 
 BASELINES_TO_RUN: List[Baseline] = [
-    Baseline.SigmoidProbability,
-    Baseline.SigmoidOnly,
+    Baseline.VCacheLocal,
 ]
 
 STATIC_THRESHOLDS: List[float] = [0.80, 0.83, 0.86, 0.89, 0.92, 0.95, 0.97, 0.98, 0.99]
