@@ -7,7 +7,8 @@ from enum import Enum
 from typing import Optional
 
 import numpy as np
-from scipy.stats import norm
+import statsmodels.api as sm
+from sklearn.linear_model import LogisticRegression
 from typing_extensions import override
 
 from vcache.config import VCacheConfig
@@ -27,7 +28,6 @@ from vcache.vcache_policy.vcache_policy import VCachePolicy
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
 
 
-# TODO(aditya) pull out CallbackQueue out of strategy and use uniformly across vCache baselines
 class CallbackQueue(queue.Queue):
     """
     A queue that processes items with a callback function in a worker thread.
@@ -79,9 +79,12 @@ class CallbackQueue(queue.Queue):
             self.worker_thread.join()
 
 
-class BenchmarkVerifiedIIDDecisionPolicy(VCachePolicy):
+class SigmoidOnlyDecisionPolicy(VCachePolicy):
     """
     Dynamic local threshold policy that computes optimal thresholds for each embedding.
+
+    Computes the cross-entropy-loss-based optimal threshold per embedding. Does not take
+    the user-defined accuracy target into account.
     """
 
     def __init__(self, delta: float = 0.01):
@@ -419,7 +422,9 @@ class _Algorithm:
         self.delta: float = delta
         self.P_c: float = 1.0 - self.delta
         self.epsilon_grid: np.ndarray = np.linspace(1e-6, 1 - 1e-6, 50)
-        self.thold_grid: np.ndarray = np.linspace(0, 1, 100)
+        self.logistic_regression: LogisticRegression = LogisticRegression(
+            penalty=None, solver="lbfgs", tol=1e-8, max_iter=1000, fit_intercept=False
+        )
 
     def add_observation_to_metadata(
         self, similarity_score: float, is_correct: bool, metadata: EmbeddingMetadataObj
@@ -433,39 +438,9 @@ class _Algorithm:
             metadata: EmbeddingMetadataObj - The metadata of the embedding
         """
         if is_correct:
-            metadata.observations.append((round(similarity_score, 3).item(), 1))
+            metadata.observations.append((round(similarity_score, 3), 1))
         else:
-            metadata.observations.append((round(similarity_score, 3).item(), 0))
-
-    def wilson_proportion_ci(self, cdf_estimates, n, confidence):
-        """
-        Vectorized Wilson score confidence interval for binomial proportions.
-
-        Parameters:
-        - k : array_like, number of successes (1,tholds,1)
-        - n : array_like, number of trials (1)
-        - confidence_level : float, confidence level for the interval (1,1,epsilons)
-
-        Returns:
-        - ci_low, ci_upp : np.ndarray, lower and upper bounds of the confidence interval
-        """
-        k = np.asarray((cdf_estimates * n).astype(int))  # (1, tholds,1)
-        n = np.asarray(n)  # 1
-
-        assert np.all((0 <= k) & (k <= n)), "k must be between 0 and n"
-        assert np.all(n > 0), "n must be > 0"
-
-        p_hat = k / n  # (1, tholds,1)
-        z = norm.ppf(confidence)  # this is single sided # (1,1,epsilons)
-
-        denom = 1 + z**2 / n
-        center = (p_hat + z**2 / (2 * n)) / denom
-        margin = (z * np.sqrt((p_hat * (1 - p_hat) + z**2 / (4 * n)) / n)) / denom
-
-        ci_low = center - margin
-        ci_upp = center + margin
-
-        return ci_low, ci_upp  # (1,tholds,epsilons)
+            metadata.observations.append((round(similarity_score, 3), 0))
 
     def select_action(
         self, similarity_score: float, metadata: EmbeddingMetadataObj
@@ -485,53 +460,44 @@ class _Algorithm:
 
         if len(similarities) < 6 or len(labels) < 6:
             return _Action.EXPLORE
-        num_positive_samples = np.sum(labels == 1)
-        num_negative_samples = np.sum(labels == 0)
 
-        # ( for vectorization , [samples, tholds, epsilon])
-        negative_samples = similarities[labels == 0].reshape(-1, 1, 1)
-        labels = labels.reshape(-1, 1, 1)
-        tholds = self.thold_grid.reshape(1, -1, 1)
-        deltap = (
-            self.delta * (num_negative_samples + num_positive_samples)
-        ) / num_negative_samples
+        t_hat: float = self._estimate_parameters(
+            similarities=similarities, labels=labels
+        )
 
-        epsilon = self.epsilon_grid[self.epsilon_grid < deltap].reshape(1, 1, -1)
-
-        cdf_estimate = (
-            np.sum(negative_samples < tholds, axis=0, keepdims=True)
-            / num_negative_samples
-        )  # (1, tholds, 1)
-        cdf_ci_lower, cdf_ci_upper = self.wilson_proportion_ci(
-            cdf_estimate, num_negative_samples, confidence=1 - epsilon
-        )  # (1, tholds, epsilon)
-
-        # adjust for positive samples (1,1,epsilon)
-        pc_adjusted = 1 - (deltap - epsilon) / (1 - epsilon)
-
-        t_hats = (
-            np.sum(cdf_estimate > pc_adjusted, axis=1, keepdims=True) == 0
-        ) * 1.0 + (
-            1 - (np.sum(cdf_estimate > pc_adjusted, axis=1, keepdims=True) == 0)
-        ) * self.thold_grid[
-            np.argmax(cdf_estimate > pc_adjusted, axis=1, keepdims=True)
-        ]
-        t_primes = (
-            np.sum(cdf_ci_lower > pc_adjusted, axis=1, keepdims=True) == 0
-        ) * 1.0 + (
-            1 - (np.sum(cdf_ci_lower > pc_adjusted, axis=1, keepdims=True) == 0)
-        ) * self.thold_grid[
-            np.argmax(cdf_ci_lower > pc_adjusted, axis=1, keepdims=True)
-        ]
-
-        t_hat = np.min(t_hats)
-        t_prime = np.min(t_primes)
-        metadata.t_prime = t_prime
-        metadata.t_hat = t_hat
-        metadata.var_t = -1  # not computed
-
-        # if similarity_score <= t_hat: # This is used for ablation study
-        if similarity_score <= t_prime:
-            return _Action.EXPLORE
-        else:
+        if similarity_score >= t_hat:
             return _Action.EXPLOIT
+        else:
+            return _Action.EXPLORE
+
+    def _estimate_parameters(
+        self, similarities: np.ndarray, labels: np.ndarray
+    ) -> _Action:
+        """
+        Optimize parameters with logistic regression
+
+        Args
+            labels: np.ndarray - The labels of the embeddings
+            metadata: EmbeddingMetadataObj - The metadata of the embedding
+
+        Returns
+            t_hat: float - The estimated threshold
+        """
+
+        similarities = sm.add_constant(similarities)
+
+        try:
+            if len(similarities) != len(labels):
+                print(f"len does not match: {len(similarities)} != {len(labels)}")
+            self.logistic_regression.fit(similarities, labels)
+            intercept, gamma = self.logistic_regression.coef_[0]
+
+            gamma = max(gamma, 1e-6)
+            t_hat = -intercept / gamma
+            t_hat = float(np.clip(t_hat, 0.0, 1.0))
+
+            return t_hat
+
+        except Exception as e:
+            print(f"Logistic regression failed: {e}")
+            return -1.0, -1.0, -1.0

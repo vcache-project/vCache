@@ -12,6 +12,7 @@ from .inference_engine import (
     InferenceEngine,
     LangChainInferenceEngine,
     OpenAIInferenceEngine,
+    VLLMInferenceEngine,
 )
 from .main import VCache
 from .vcache_core import (
@@ -70,6 +71,8 @@ from .vcache_policy import (
     BenchmarkVerifiedGlobalDecisionPolicy,
     BenchmarkVerifiedIIDDecisionPolicy,
     NoCachePolicy,
+    SigmoidOnlyDecisionPolicy,
+    SigmoidProbabilityDecisionPolicy,
     VCachePolicy,
     VerifiedDecisionPolicy,
 )
@@ -92,12 +95,15 @@ __all__ = [
     # Concrete vCache Policies
     "VerifiedDecisionPolicy",
     "NoCachePolicy",
+    "SigmoidProbabilityDecisionPolicy",
+    "SigmoidOnlyDecisionPolicy",
     "BenchmarkStaticDecisionPolicy",
     "BenchmarkVerifiedGlobalDecisionPolicy",
     "BenchmarkVerifiedIIDDecisionPolicy",
     # Concrete Inference engines
     "OpenAIInferenceEngine",
     "LangChainInferenceEngine",
+    "VLLMInferenceEngine",
     "BenchmarkInferenceEngine",
     # Concrete Embedding engines
     "OpenAIEmbeddingEngine",
