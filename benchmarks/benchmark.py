@@ -91,6 +91,12 @@ from vcache.vcache_core.cache.embedding_store.vector_db import (
 from vcache.vcache_core.cache.eviction_policy.eviction_policy import EvictionPolicy
 from vcache.vcache_core.cache.eviction_policy.strategies.scu import SCUEvictionPolicy
 from vcache.vcache_core.similarity_evaluator import SimilarityEvaluator
+from vcache.vcache_core.similarity_evaluator.strategies.benchmark_comparison import (
+    BenchmarkComparisonSimilarityEvaluator,
+)
+from vcache.vcache_core.similarity_evaluator.strategies.llm_comparison import (
+    LLMComparisonSimilarityEvaluator,
+)
 from vcache.vcache_core.similarity_evaluator.strategies.string_comparison import (
     StringComparisonSimilarityEvaluator,
 )
@@ -247,18 +253,55 @@ RUN_COMBINATIONS: List[
     ]
 ] = [
     (
+        EmbeddingModel.E5_LARGE_V2,
+        LargeLanguageModel.GPT_4O_MINI,
+        Dataset.SEM_BENCHMARK_ARENA,
+        GeneratePlotsOnly.NO,
+        BenchmarkComparisonSimilarityEvaluator(),
+        SCUEvictionPolicy(max_size=100000, watermark=0.99, eviction_percentage=0.1),
+        60000,
+    ),
+    (
         EmbeddingModel.GTE,
-        LargeLanguageModel.LLAMA_3_70B_VLLM,
-        Dataset.SEM_BENCHMARK_CLASSIFICATION,
+        LargeLanguageModel.LLAMA_3_8B,
+        Dataset.SEM_BENCHMARK_ARENA,
         GeneratePlotsOnly.NO,
         StringComparisonSimilarityEvaluator(),
         SCUEvictionPolicy(max_size=100000, watermark=0.99, eviction_percentage=0.1),
-        60000,
-    )
+        45000,
+    ),
+    (
+        EmbeddingModel.GTE,
+        LargeLanguageModel.LLAMA_3_8B,
+        Dataset.SEM_BENCHMARK_SEARCH_QUERIES,
+        GeneratePlotsOnly.NO,
+        BenchmarkComparisonSimilarityEvaluator(),
+        SCUEvictionPolicy(max_size=160000, watermark=0.99, eviction_percentage=0.1),
+        150000,
+    ),
+    (
+        EmbeddingModel.OPENAI_TEXT_EMBEDDING_SMALL,
+        LargeLanguageModel.GPT_4_1,
+        Dataset.CUSTOM_EXAMPLE,
+        GeneratePlotsOnly.NO,
+        LLMComparisonSimilarityEvaluator(
+            inference_engine=OpenAIInferenceEngine(
+                model_name="gpt-4.1-nano-2025-04-14", temperature=0.0
+            )
+        ),
+        SCUEvictionPolicy(max_size=2000, watermark=0.99, eviction_percentage=0.1),
+        50,
+    ),
 ]
 
 BASELINES_TO_RUN: List[Baseline] = [
     Baseline.VCacheLocal,
+    Baseline.IID,
+    Baseline.GPTCache,
+    Baseline.BerkeleyEmbedding,
+    Baseline.SigmoidProbability,
+    Baseline.SigmoidOnly,
+    Baseline.VCacheBerkeleyEmbedding,
 ]
 
 STATIC_THRESHOLDS: List[float] = [0.80, 0.83, 0.86, 0.89, 0.92, 0.95, 0.97, 0.98, 0.99]
