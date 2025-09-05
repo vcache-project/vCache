@@ -262,7 +262,7 @@ RUN_COMBINATIONS: List[
         Dataset.SEM_BENCHMARK_ARENA,
         GeneratePlotsOnly.NO,
         BenchmarkComparisonSimilarityEvaluator(),
-        MRUEvictionPolicy(max_size=1000, watermark=0.99, eviction_percentage=0.1),
+        MRUEvictionPolicy(max_size=100000, watermark=0.99, eviction_percentage=0.1),
         60000,
     ),
     # vCache Paper: Figure 4 and 5 (bottom row)
