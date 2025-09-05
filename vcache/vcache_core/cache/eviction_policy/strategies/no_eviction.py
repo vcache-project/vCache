@@ -10,16 +10,14 @@ if TYPE_CHECKING:
 
 
 class NoEvictionPolicy(EvictionPolicy):
-    """
-    A policy that represents the absence of an eviction strategy.
-
-    This policy never flags the cache as ready for eviction and never selects
-    any items to be removed. It is suitable for caches that are not size-limited
-    or for testing purposes.
-    """
-
     def __init__(self):
-        """Initializes the NoEvictionPolicy."""
+        """
+        A policy that represents the absence of an eviction strategy.
+
+        This policy never flags the cache as ready for eviction and never selects
+        any items to be removed. It is suitable for caches that are not size-limited
+        or for testing purposes.
+        """
         # Intentionally override the parent __init__ to ignore sizing parameters.
         pass
 
