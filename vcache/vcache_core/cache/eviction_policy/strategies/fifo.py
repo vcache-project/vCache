@@ -8,11 +8,33 @@ from vcache.vcache_core.cache.eviction_policy.eviction_policy import EvictionPol
 
 
 class FIFOEvictionPolicy(EvictionPolicy):
-    """
-    Implements a First-In, First-Out (FIFO) eviction policy.
+    def __init__(
+        self, max_size: int, watermark: float = 0.95, eviction_percentage: float = 0.1
+    ):
+        """
+        Implements a First-In, First-Out (FIFO) eviction policy.
 
-    This policy evicts items in the order they were added to the cache.
-    """
+        This policy evicts items in the order they were added to the cache.
+        The eviction process is triggered when the number of items in the cache
+        exceeds a "high-watermark" threshold, which is a percentage of the
+        absolute `max_size`. Once triggered, the policy will evict a number
+        of items equivalent to `eviction_percentage` of the `max_size`.
+
+        Example:
+            With `max_size=1000`, `watermark=0.9`, and `eviction_percentage=0.2`,
+            eviction starts when the cache size grows beyond 900 items. The
+            policy will then remove 200 items (0.2 * 1000).
+
+        Args:
+            max_size: The absolute maximum number of items the cache can hold.
+            watermark: The percentage of `max_size` that triggers eviction.
+            eviction_percentage: The percentage of `max_size` to evict.
+        """
+        super().__init__(
+            max_size=max_size,
+            watermark=watermark,
+            eviction_percentage=eviction_percentage,
+        )
 
     def update_eviction_metadata(self, metadata: EmbeddingMetadataObj) -> None:
         """This method is not used in the FIFO policy."""

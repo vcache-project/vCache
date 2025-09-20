@@ -89,7 +89,7 @@ from vcache.vcache_core.cache.embedding_store.vector_db import (
     SimilarityMetricType,
 )
 from vcache.vcache_core.cache.eviction_policy.eviction_policy import EvictionPolicy
-from vcache.vcache_core.cache.eviction_policy.strategies.scu import SCUEvictionPolicy
+from vcache.vcache_core.cache.eviction_policy.strategies.mru import MRUEvictionPolicy
 from vcache.vcache_core.similarity_evaluator import SimilarityEvaluator
 from vcache.vcache_core.similarity_evaluator.strategies.benchmark_comparison import (
     BenchmarkComparisonSimilarityEvaluator,
@@ -186,7 +186,7 @@ class Baseline(Enum):
 
     Each baseline represents a different caching strategy:
     - GPTCache: Static threshold-based caching
-    - VCacheLocal: vCache with local threshold adaptation
+    - VCacheLocal: vCache with local threshold adaptation (original vCache version)
     - VCacheGlobal: vCache with global threshold adaptation
     - BerkeleyEmbedding: Fine-tuned embeddings with static threshold
     - VCacheBerkeleyEmbedding: vCache with fine-tuned embeddings
@@ -213,8 +213,11 @@ class Dataset(Enum):
     (with relative paths from benchmarks/your_datasets/).
     """
 
+    # HuggingFace: https://huggingface.co/datasets/vCache/SemBenchmarkClassification
     SEM_BENCHMARK_CLASSIFICATION = "vCache/SemBenchmarkClassification"
+    # HuggingFace: https://huggingface.co/datasets/vCache/SemBenchmarkLmArena
     SEM_BENCHMARK_ARENA = "vCache/SemBenchmarkLmArena"
+    # HuggingFace: https://huggingface.co/datasets/vCache/SemBenchmarkSearchQueries
     SEM_BENCHMARK_SEARCH_QUERIES = "vCache/SemBenchmarkSearchQueries"
     # Example for custom dataset. The path is relative to 'benchmarks/your_datasets/'
     CUSTOM_EXAMPLE = "your_datasets/your_custom_dataset.parquet"
@@ -235,7 +238,7 @@ class GeneratePlotsOnly(Enum):
 ### Benchmark Config ###################################################################################################
 ########################################################################################################################
 
-CONFIDENCE_INTERVALS_ITERATIONS: int = 1
+CONFIDENCE_INTERVALS_ITERATIONS: int = 3
 DISABLE_PROGRESS_BAR: bool = False
 KEEP_SPLIT: int = 100
 MAX_VECTOR_DB_CAPACITY: int = 150000
@@ -252,33 +255,37 @@ RUN_COMBINATIONS: List[
         int,
     ]
 ] = [
+    # vCache Paper: Figure 4 and 5 (top row)
     (
         EmbeddingModel.E5_LARGE_V2,
         LargeLanguageModel.GPT_4O_MINI,
         Dataset.SEM_BENCHMARK_ARENA,
         GeneratePlotsOnly.NO,
         BenchmarkComparisonSimilarityEvaluator(),
-        SCUEvictionPolicy(max_size=100000, watermark=0.99, eviction_percentage=0.1),
+        MRUEvictionPolicy(max_size=100000, watermark=0.99, eviction_percentage=0.1),
         60000,
     ),
+    # vCache Paper: Figure 4 and 5 (bottom row)
     (
         EmbeddingModel.GTE,
         LargeLanguageModel.LLAMA_3_8B,
-        Dataset.SEM_BENCHMARK_ARENA,
+        Dataset.SEM_BENCHMARK_CLASSIFICATION,
         GeneratePlotsOnly.NO,
         StringComparisonSimilarityEvaluator(),
-        SCUEvictionPolicy(max_size=100000, watermark=0.99, eviction_percentage=0.1),
+        MRUEvictionPolicy(max_size=100000, watermark=0.99, eviction_percentage=0.1),
         45000,
     ),
+    # vCache Paper: Figure 6 and 7
     (
         EmbeddingModel.GTE,
         LargeLanguageModel.LLAMA_3_8B,
         Dataset.SEM_BENCHMARK_SEARCH_QUERIES,
         GeneratePlotsOnly.NO,
         BenchmarkComparisonSimilarityEvaluator(),
-        SCUEvictionPolicy(max_size=160000, watermark=0.99, eviction_percentage=0.1),
+        MRUEvictionPolicy(max_size=160000, watermark=0.99, eviction_percentage=0.1),
         150000,
     ),
+    # Custom Dataset
     (
         EmbeddingModel.OPENAI_TEXT_EMBEDDING_SMALL,
         LargeLanguageModel.GPT_4_1,
@@ -289,7 +296,7 @@ RUN_COMBINATIONS: List[
                 model_name="gpt-4.1-nano-2025-04-14", temperature=0.0
             )
         ),
-        SCUEvictionPolicy(max_size=2000, watermark=0.99, eviction_percentage=0.1),
+        MRUEvictionPolicy(max_size=2000, watermark=0.99, eviction_percentage=0.1),
         50,
     ),
 ]
