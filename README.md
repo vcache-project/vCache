@@ -75,8 +75,6 @@ This lets it return cached model responses for semantically similar prompts—no
   <img src="docs/VCacheVisualizer.gif" alt="vCache Visualization" width="60%">
 </p>
 
-Please refer to the [vCache paper](https://arxiv.org/abs/2502.03771) for further details.
-
 
 ### System Integration
 
@@ -180,16 +178,3 @@ We provide three open benchmarks:
 - **SemCacheSearchQueries** (real-world search logs) - [Dataset  ↗](https://huggingface.co/datasets/vCache/SemBenchmarkSearchQueries)
 
 See the [Benchmarking Documentation](benchmarks/ReadMe.md) for instructions.
-
-## 📄 Citation
-
-If you use vCache for your research, please cite our [paper](https://arxiv.org/abs/2502.03771).
-
-```bibtex
-@article{schroeder2025adaptive,
-  title={vCache: Verified Semantic Prompt Caching},
-  author={Schroeder, Luis Gaspar and Desai, Aditya and Cuadron, Alejandro and Chu, Kyle and Liu, Shu and Zhao, Mark and Krusche, Stephan and Kemper, Alfons and Zaharia, Matei and Gonzalez, Joseph E},
-  journal={arXiv preprint arXiv:2502.03771},
-  year={2025}
-}
-```
