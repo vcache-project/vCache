@@ -3,6 +3,9 @@ import os
 import queue
 import random
 import threading
+import pandas as pd
+import time
+import datetime
 from concurrent.futures import ThreadPoolExecutor
 from enum import Enum
 from typing import Dict, List, Optional, Tuple
@@ -471,6 +474,7 @@ class _Algorithm:
             47: 0.02109,
             48: 0.01531,
         }
+        self.tau_latencies: List[float] = []
 
     def add_observation_to_metadata(
         self, similarity_score: float, is_correct: bool, metadata: EmbeddingMetadataObj
@@ -517,9 +521,19 @@ class _Algorithm:
         metadata.t_hat = t_hat
         metadata.var_t = var_t
 
+        start_time = time.time()
         tau: float = self._get_tau(
             var_t=var_t, s=similarity_score, t_hat=t_hat, metadata=metadata
         )
+        latency = time.time() - start_time
+        
+        self.tau_latencies.append(latency)
+        # Uncomment this to save the tau latencies to a CSV file
+        #if len(self.tau_latencies) % 10000 == 0:
+        #    df = pd.DataFrame(self.tau_latencies, columns=['latency'])
+        #    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        #    print(f"Saving tau latencies to CSV: tau_latencies_{timestamp}.csv (First value: {self.tau_latencies[0]:.5f}s)")
+        #    df.to_csv(f'tau_latencies_{timestamp}.csv', index=False)
 
         u: float = random.uniform(0, 1)
         if u <= tau:
