@@ -527,8 +527,8 @@ class _Algorithm:
         )
         latency = time.time() - start_time
         
-        self.tau_latencies.append(latency)
         # Uncomment this to save the tau latencies to a CSV file
+        #self.tau_latencies.append(latency)
         #if len(self.tau_latencies) % 10000 == 0:
         #    df = pd.DataFrame(self.tau_latencies, columns=['latency'])
         #    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
