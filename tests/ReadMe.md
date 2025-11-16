@@ -14,7 +14,7 @@ Reliable and Efficient Semantic Prompt Caching
 </h3>
 <br>
 
-## 🧪 Tests
+## Tests
 
 vCache includes both **unit tests** and **integration tests** to ensure correctness and reliability across its modular components.
 
