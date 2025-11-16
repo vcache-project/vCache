@@ -151,7 +151,7 @@ class EmbeddingModel(Enum):
     E5_LARGE_V2 = ("emb_e5_large_v2", "E5_Large_v2", "float16", 512)
     E5_LARGE_V2_FT = ("emb_e5_large_v2_ft", "E5_Large_v2", "float16", 512)
     OPENAI_TEXT_EMBEDDING_SMALL = (
-        "emb_openai_text_embedding_small",
+        "emb_text-embedding-3-small",
         "text-embedding-3-small",
         "float16",
         1536,
@@ -177,7 +177,7 @@ class LargeLanguageModel(Enum):
         None,
     )
     GPT_4O_MINI = ("response_gpt-4o-mini", "GPT-4o-mini", "float16", None)
-    GPT_4O_NANO = ("response_gpt-4.1-nano", "GPT-4.1-nano", "float16", None)
+    GPT_4_1_NANO = ("response_gpt-4.1-nano", "GPT-4.1-nano", "float16", None)
     GPT_4_1 = ("response_gpt-4.1", "gpt-4.1-2025-04-14", "float16", None)
 
 
@@ -219,6 +219,8 @@ class Dataset(Enum):
     SEM_BENCHMARK_ARENA = "vCache/SemBenchmarkLmArena"
     # HuggingFace: https://huggingface.co/datasets/vCache/SemBenchmarkSearchQueries
     SEM_BENCHMARK_SEARCH_QUERIES = "vCache/SemBenchmarkSearchQueries"
+    # HuggingFace: https://huggingface.co/datasets/vCache/SemBenchmarkCombo
+    SEM_BENCHMARK_COMBO = "vCache/SemBenchmarkCombo"
     # Example for custom dataset. The path is relative to 'benchmarks/your_datasets/'
     CUSTOM_EXAMPLE = "your_datasets/your_custom_dataset.parquet"
 
@@ -238,7 +240,7 @@ class GeneratePlotsOnly(Enum):
 ### Benchmark Config ###################################################################################################
 ########################################################################################################################
 
-CONFIDENCE_INTERVALS_ITERATIONS: int = 3
+CONFIDENCE_INTERVALS_ITERATIONS: int = 1
 DISABLE_PROGRESS_BAR: bool = False
 KEEP_SPLIT: int = 100
 MAX_VECTOR_DB_CAPACITY: int = 150000
@@ -298,6 +300,26 @@ RUN_COMBINATIONS: List[
         ),
         MRUEvictionPolicy(max_size=2000, watermark=0.99, eviction_percentage=0.1),
         50,
+    ),
+    # vCache Paper: Figure X (Third embedding model ablation)
+    (
+        EmbeddingModel.OPENAI_TEXT_EMBEDDING_SMALL,
+        LargeLanguageModel.GPT_4_1_NANO,
+        Dataset.SEM_BENCHMARK_ARENA,
+        GeneratePlotsOnly.NO,
+        BenchmarkComparisonSimilarityEvaluator(),
+        MRUEvictionPolicy(max_size=100000, watermark=0.99, eviction_percentage=0.1),
+        60000,
+    ),
+    # vCache Paper: Figure X (SemBenchmarkCombo)
+    (
+        EmbeddingModel.GTE,
+        LargeLanguageModel.LLAMA_3_8B,
+        Dataset.SEM_BENCHMARK_COMBO,
+        GeneratePlotsOnly.NO,
+        BenchmarkComparisonSimilarityEvaluator(),
+        MRUEvictionPolicy(max_size=100000, watermark=0.99, eviction_percentage=0.1),
+        27500,
     ),
 ]
 
