@@ -3,9 +3,7 @@ import os
 import queue
 import random
 import threading
-import pandas as pd
 import time
-import datetime
 from concurrent.futures import ThreadPoolExecutor
 from enum import Enum
 from typing import Dict, List, Optional, Tuple
@@ -529,7 +527,7 @@ class _Algorithm:
 
         # Uncomment this to save the tau latencies to a CSV file
         self.tau_latencies.append(latency)
-        #if len(self.tau_latencies) % 10000 == 0:
+        # if len(self.tau_latencies) % 10000 == 0:
         #    df = pd.DataFrame(self.tau_latencies, columns=['latency'])
         #    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         #    print(f"Saving tau latencies to CSV: tau_latencies_{timestamp}.csv (First value: {self.tau_latencies[0]:.5f}s)")
