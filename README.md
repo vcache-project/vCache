@@ -38,7 +38,7 @@ vCache is the first semantic prompt cache that guarantees user-defined error rat
 > vCache uses OpenAI by default for both LLM inference and embedding generation, but you can configure any other inference setup.
 
 
-## 🚀 Quick Install
+## Quick Install
 
 Install vCache in editable mode:
 
@@ -66,10 +66,10 @@ print(response)
 ```
 
 
-## 🎬 How vCache Works
+## How vCache Works
 
 vCache intelligently detects when a new prompt is semantically equivalent to a cached one, and adapts its decision boundaries based on your accuracy requirements.
-This lets it return cached model responses for semantically similar prompts—not just exact matches—reducing both inference latency and cost without sacrificing correctness.
+This lets it return cached model responses for semantically similar prompts (not just exact matches) reducing both inference latency and cost without sacrificing correctness.
 
 <p align="left">
   <img src="docs/VCacheVisualizer.gif" alt="vCache Visualization" width="60%">
@@ -95,7 +95,7 @@ Applications can range from agentic systems and RAG pipelines to database system
 
 
 
-## ⚙️ Advanced Configuration
+## Advanced Configuration
 
 > [NOTE]
 > vCache is currently in active development. Features and APIs may change as we continue to improve the system.
@@ -160,13 +160,13 @@ vCache supports FIFO, LRU, MRU, and a custom SCU eviction policy. See the [Evict
 
 
 
-## 🛠 Developer Guide
+## Developer Guide
 
 For development setup and contribution guidelines, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 
 
-## 📊 Benchmarking vCache
+## Benchmarking vCache
 
 vCache includes a benchmarking framework to evaluate:
 - **Cache hit rate**
@@ -174,14 +174,15 @@ vCache includes a benchmarking framework to evaluate:
 - **Latency improvement**
 - **...**
 
-We provide three open benchmarks:
+We provide four open benchmarks:
 - **SemCacheLmArena** (chat-style prompts) - [Dataset  ↗](https://huggingface.co/datasets/vCache/SemBenchmarkLmArena)
 - **SemCacheClassification** (classification queries) - [Dataset  ↗](https://huggingface.co/datasets/vCache/SemBenchmarkClassification)
 - **SemCacheSearchQueries** (real-world search logs) - [Dataset  ↗](https://huggingface.co/datasets/vCache/SemBenchmarkSearchQueries)
+- **vCache/SemBenchmarkCombo** (combines SemBenchmarkLmArena with SemBenchmarkSearchQueries with no-cache-hit scenarios) - [Dataset ↗](https://huggingface.co/datasets/vCache/SemBenchmarkCombo)
 
 See the [Benchmarking Documentation](benchmarks/ReadMe.md) for instructions.
 
-## 📄 Citation
+## Citation
 
 If you use vCache for your research, please cite our [paper](https://arxiv.org/abs/2502.03771).
 

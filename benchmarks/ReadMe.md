@@ -20,7 +20,7 @@ This directory provides the official benchmarking tools for evaluating the perfo
 
 
 
-## ⚙️ Installation
+## Installation
 
 To enable benchmarking capabilities, install vCache with the `benchmarks` extras from the project root:
 
@@ -29,7 +29,7 @@ pip install -e .[benchmarks]
 ```
 
 
-## 🚀 Running Benchmarks
+## Running Benchmarks
 
 Run the main benchmarking script from the project root:
 
@@ -40,7 +40,7 @@ python benchmarks/benchmark.py
 The script will automatically download the required datasets from Hugging Face based on the configurations in `RUN_COMBINATIONS`.
 
 
-## ⚙️ Custom Configuration
+## Custom Configuration
 
 The primary configuration is done by modifying the global variables in the `benchmarks/benchmark.py` script. This script is designed to benchmark the performance of vCache against several baselines by evaluating cache hit rates, accuracy, latency, and other metrics.
 
@@ -64,7 +64,7 @@ Refer to the docstring in `benchmarks/benchmark.py` for more details on other co
 
 
 
-## 📁 Datasets
+## Datasets
 
 ### vCache Datasets
 
@@ -73,6 +73,7 @@ The official benchmark datasets are hosted on Hugging Face and will be downloade
 - **`vCache/SemBenchmarkLmArena`** (chat-style prompts): [Dataset ↗](https://huggingface.co/datasets/vCache/SemBenchmarkLmArena)
 - **`vCache/SemBenchmarkClassification`** (structured queries): [Dataset ↗](https://huggingface.co/datasets/vCache/SemBenchmarkClassification)
 - **`vCache/SemBenchmarkSearchQueries`** (real-world browser searches): [Dataset ↗](https://huggingface.co/datasets/vCache/SemBenchmarkSearchQueries)
+- **`vCache/SemBenchmarkCombo`** (combines SemBenchmarkLmArena with SemBenchmarkSearchQueries with no-cache-hit scenarios): [Dataset ↗](https://huggingface.co/datasets/vCache/SemBenchmarkCombo)
 
 
 ### Custom Datasets
@@ -120,7 +121,7 @@ You can benchmark vCache on your own datasets. The script supports `.csv` and `.
     ```
 
 
-## 📦 Output
+## Output
 
 Benchmark results are saved to the `benchmarks/results/` directory, organized by dataset, embedding model, and LLM. For each run, the output includes:
 - **JSON files** containing raw data on cache hits, misses, latency, accuracy metrics, and internal vCache statistics.
