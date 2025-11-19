@@ -215,6 +215,8 @@ class Dataset(Enum):
 
     # HuggingFace: https://huggingface.co/datasets/vCache/SemBenchmarkClassification
     SEM_BENCHMARK_CLASSIFICATION = "vCache/SemBenchmarkClassification"
+    # HuggingFace: https://huggingface.co/datasets/vCache/SemBenchmarkClassificationSorted
+    SEM_BENCHMARK_CLASSIFICATION_SORTED = "vCache/SemBenchmarkClassificationSorted"
     # HuggingFace: https://huggingface.co/datasets/vCache/SemBenchmarkLmArena
     SEM_BENCHMARK_ARENA = "vCache/SemBenchmarkLmArena"
     # HuggingFace: https://huggingface.co/datasets/vCache/SemBenchmarkSearchQueries
@@ -320,6 +322,16 @@ RUN_COMBINATIONS: List[
         BenchmarkComparisonSimilarityEvaluator(),
         MRUEvictionPolicy(max_size=100000, watermark=0.99, eviction_percentage=0.1),
         27500,
+    ),
+    # vCache Paper: Figure X (SemBenchmarkClassificationSorted)
+    (
+        EmbeddingModel.GTE,
+        LargeLanguageModel.LLAMA_3_8B,
+        Dataset.SEM_BENCHMARK_CLASSIFICATION_SORTED,
+        GeneratePlotsOnly.NO,
+        StringComparisonSimilarityEvaluator(),
+        MRUEvictionPolicy(max_size=100000, watermark=0.99, eviction_percentage=0.1),
+        45000,
     ),
 ]
 
