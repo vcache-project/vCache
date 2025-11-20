@@ -53,12 +53,13 @@ import unittest
 from datetime import datetime
 from enum import Enum
 from typing import Dict, List, Tuple
-
+import random
 import numpy as np
 import pandas as pd
 import torch
-from datasets import load_dataset
+from datasets import load_dataset, concatenate_datasets
 from tqdm import tqdm
+import pyarrow as pa
 
 from benchmarks._plotter_combined import generate_combined_plots
 from benchmarks._plotter_individual import generate_individual_plots
@@ -258,15 +259,15 @@ RUN_COMBINATIONS: List[
     ]
 ] = [
     # vCache Paper: Figure 4 and 5 (top row)
-    (
-        EmbeddingModel.E5_LARGE_V2,
-        LargeLanguageModel.GPT_4O_MINI,
-        Dataset.SEM_BENCHMARK_ARENA,
-        GeneratePlotsOnly.NO,
-        BenchmarkComparisonSimilarityEvaluator(),
-        MRUEvictionPolicy(max_size=100000, watermark=0.99, eviction_percentage=0.1),
-        60000,
-    ),
+    # (
+    #     EmbeddingModel.E5_LARGE_V2,
+    #     LargeLanguageModel.GPT_4O_MINI,
+    #     Dataset.SEM_BENCHMARK_ARENA,
+    #     GeneratePlotsOnly.NO,
+    #     BenchmarkComparisonSimilarityEvaluator(),
+    #     MRUEvictionPolicy(max_size=100000, watermark=0.99, eviction_percentage=0.1),
+    #     60000,
+    # ),
     # vCache Paper: Figure 4 and 5 (bottom row)
     (
         EmbeddingModel.GTE,
@@ -277,50 +278,50 @@ RUN_COMBINATIONS: List[
         MRUEvictionPolicy(max_size=100000, watermark=0.99, eviction_percentage=0.1),
         45000,
     ),
-    # vCache Paper: Figure 6 and 7
-    (
-        EmbeddingModel.GTE,
-        LargeLanguageModel.LLAMA_3_8B,
-        Dataset.SEM_BENCHMARK_SEARCH_QUERIES,
-        GeneratePlotsOnly.NO,
-        BenchmarkComparisonSimilarityEvaluator(),
-        MRUEvictionPolicy(max_size=160000, watermark=0.99, eviction_percentage=0.1),
-        150000,
-    ),
-    # Custom Dataset
-    (
-        EmbeddingModel.OPENAI_TEXT_EMBEDDING_SMALL,
-        LargeLanguageModel.GPT_4_1,
-        Dataset.CUSTOM_EXAMPLE,
-        GeneratePlotsOnly.NO,
-        LLMComparisonSimilarityEvaluator(
-            inference_engine=OpenAIInferenceEngine(
-                model_name="gpt-4.1-nano-2025-04-14", temperature=0.0
-            )
-        ),
-        MRUEvictionPolicy(max_size=2000, watermark=0.99, eviction_percentage=0.1),
-        50,
-    ),
-    # vCache Paper: Figure X (Third embedding model ablation)
-    (
-        EmbeddingModel.OPENAI_TEXT_EMBEDDING_SMALL,
-        LargeLanguageModel.GPT_4_1_NANO,
-        Dataset.SEM_BENCHMARK_ARENA,
-        GeneratePlotsOnly.NO,
-        BenchmarkComparisonSimilarityEvaluator(),
-        MRUEvictionPolicy(max_size=100000, watermark=0.99, eviction_percentage=0.1),
-        60000,
-    ),
-    # vCache Paper: Figure X (SemBenchmarkCombo)
-    (
-        EmbeddingModel.GTE,
-        LargeLanguageModel.LLAMA_3_8B,
-        Dataset.SEM_BENCHMARK_COMBO,
-        GeneratePlotsOnly.NO,
-        BenchmarkComparisonSimilarityEvaluator(),
-        MRUEvictionPolicy(max_size=100000, watermark=0.99, eviction_percentage=0.1),
-        27500,
-    ),
+    # # vCache Paper: Figure 6 and 7
+    # (
+    #     EmbeddingModel.GTE,
+    #     LargeLanguageModel.LLAMA_3_8B,
+    #     Dataset.SEM_BENCHMARK_SEARCH_QUERIES,
+    #     GeneratePlotsOnly.NO,
+    #     BenchmarkComparisonSimilarityEvaluator(),
+    #     MRUEvictionPolicy(max_size=160000, watermark=0.99, eviction_percentage=0.1),
+    #     150000,
+    # ),
+    # # Custom Dataset
+    # (
+    #     EmbeddingModel.OPENAI_TEXT_EMBEDDING_SMALL,
+    #     LargeLanguageModel.GPT_4_1,
+    #     Dataset.CUSTOM_EXAMPLE,
+    #     GeneratePlotsOnly.NO,
+    #     LLMComparisonSimilarityEvaluator(
+    #         inference_engine=OpenAIInferenceEngine(
+    #             model_name="gpt-4.1-nano-2025-04-14", temperature=0.0
+    #         )
+    #     ),
+    #     MRUEvictionPolicy(max_size=2000, watermark=0.99, eviction_percentage=0.1),
+    #     50,
+    # ),
+    # # vCache Paper: Figure X (Third embedding model ablation)
+    # (
+    #     EmbeddingModel.OPENAI_TEXT_EMBEDDING_SMALL,
+    #     LargeLanguageModel.GPT_4_1_NANO,
+    #     Dataset.SEM_BENCHMARK_ARENA,
+    #     GeneratePlotsOnly.NO,
+    #     BenchmarkComparisonSimilarityEvaluator(),
+    #     MRUEvictionPolicy(max_size=100000, watermark=0.99, eviction_percentage=0.1),
+    #     60000,
+    # ),
+    # # vCache Paper: Figure X (SemBenchmarkCombo)
+    # (
+    #     EmbeddingModel.GTE,
+    #     LargeLanguageModel.LLAMA_3_8B,
+    #     Dataset.SEM_BENCHMARK_COMBO,
+    #     GeneratePlotsOnly.NO,
+    #     BenchmarkComparisonSimilarityEvaluator(),
+    #     MRUEvictionPolicy(max_size=100000, watermark=0.99, eviction_percentage=0.1),
+    #     27500,
+    # ),
 ]
 
 BASELINES_TO_RUN: List[Baseline] = [
@@ -379,6 +380,71 @@ class Benchmark(unittest.TestCase):
         self.is_static_threshold: bool = None
         self.eviction_policy: EvictionPolicy = None
         self.is_custom_dataset: bool = False
+
+    def induce_artifical_drift(self, data_entries, label_column: str, drift_strength: float, drift_phases: int ):
+        # step 1 extract labels from the data_entries
+
+        total_samples = len(data_entries)
+        labels = list(set(data_entries[label_column]))
+
+        label_to_phase_id = np.arange(len(labels)) % drift_phases
+
+        phase_id_to_labels = {}
+        for i in range(len(labels)):
+            phase_id = label_to_phase_id[i]
+            if phase_id not in phase_id_to_labels:
+                phase_id_to_labels[phase_id] = []
+            phase_id_to_labels[phase_id].append(labels[i])
+        # Filter datasets for each phase using HuggingFace datasets API
+        phase_id_datasets = {}
+        for phase_id in range(drift_phases):
+            phase_labels = phase_id_to_labels[phase_id]
+            phase_id_datasets[phase_id] = data_entries.filter(
+                lambda example: example[label_column] in phase_labels
+            )
+
+        # Calculate vanilla probability for each phase
+        phase_id_vanilla_probability = np.zeros(drift_phases)
+        for phase_id in range(drift_phases):
+            phase_id_vanilla_probability[phase_id] = len(phase_id_datasets[phase_id]) / total_samples
+
+        # Create dataset list with adjusted probabilities
+        dataset_list = []
+        phase_id_offsets = {phase_id: 0 for phase_id in range(drift_phases)}
+        
+        # phase_total_samples for each phase should match phase dataset sizes
+        # This ensures complete coverage even with high drift_strength (e.g., 1.0)
+        # Each phase represents a sequential chunk/time-period in the final dataset
+        # Since phase_dataset_sizes sum to total_samples (each sample has exactly one label),
+        # this allocation naturally covers the entire dataset
+        phase_total_samples = np.array([len(phase_id_datasets[i]) for i in range(drift_phases)])
+
+
+
+
+        for phase_id in range(drift_phases):
+            this_phase_probability = phase_id_vanilla_probability.copy()
+            this_phase_probability[phase_id] = min(1.0, this_phase_probability[phase_id] + drift_strength)
+            for other_phase_id in range(drift_phases):
+                if other_phase_id != phase_id:
+                    this_phase_probability[other_phase_id] = max(0.0, this_phase_probability[other_phase_id] - drift_strength)
+            this_phase_probability = this_phase_probability / np.sum(this_phase_probability)
+            for phase_id_itr in range(drift_phases):
+                num_samples = int(phase_total_samples[phase_id] * this_phase_probability[phase_id_itr])
+                start_idx = phase_id_offsets[phase_id_itr]
+                end_idx = min(start_idx + num_samples, len(phase_id_datasets[phase_id_itr]))
+                
+                if start_idx < len(phase_id_datasets[phase_id_itr]):
+                    dataset_list.append(
+                        phase_id_datasets[phase_id_itr].select(range(start_idx, end_idx))
+                    )
+                    phase_id_offsets[phase_id_itr] = end_idx
+        
+        final_dataset = concatenate_datasets(dataset_list)
+        import pdb; pdb.set_trace()
+        return final_dataset
+            
+        
 
     def stats_set_up(self):
         """Initialize statistics tracking lists and create output directory.
@@ -499,6 +565,8 @@ class Benchmark(unittest.TestCase):
             disable=DISABLE_PROGRESS_BAR,
         )
         logging.info(f"data_entries: {data_entries}")
+        
+        data_entries = self.induce_artifical_drift(data_entries, "response_llama_3_70b", 1.0, 41)
 
         for idx, data_entry in enumerate(data_entries):
             if idx >= max_samples:
