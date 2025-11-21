@@ -326,17 +326,17 @@ RUN_COMBINATIONS: List[
 
 BASELINES_TO_RUN: List[Baseline] = [
     Baseline.VCacheLocal,
-    Baseline.IID,
-    Baseline.GPTCache,
-    Baseline.BerkeleyEmbedding,
-    Baseline.SigmoidProbability,
-    Baseline.SigmoidOnly,
-    Baseline.VCacheBerkeleyEmbedding,
+    # Baseline.IID,
+    # Baseline.GPTCache,
+    # Baseline.BerkeleyEmbedding,
+    # Baseline.SigmoidProbability,
+    # Baseline.SigmoidOnly,
+    # Baseline.VCacheBerkeleyEmbedding,
 ]
 
 STATIC_THRESHOLDS: List[float] = [0.80, 0.83, 0.86, 0.89, 0.92, 0.95, 0.97, 0.98, 0.99]
 
-DELTAS: List[float] = [0.01, 0.015, 0.02, 0.025, 0.03, 0.035, 0.04, 0.05, 0.06, 0.07]
+DELTAS: List[float] = [0.015]
 
 
 ########################################################################################################################
@@ -383,9 +383,28 @@ class Benchmark(unittest.TestCase):
 
     def induce_artifical_drift(self, data_entries, label_column: str, drift_strength: float, drift_phases: int ):
         # step 1 extract labels from the data_entries
-
         total_samples = len(data_entries)
-        labels = list(set(data_entries[label_column]))
+        
+        # Count frequency of each label
+        label_counts = {}
+        for label in data_entries[label_column]:
+            label_counts[label] = label_counts.get(label, 0) + 1
+        
+        # Sort labels by their frequency in descending order
+        labels = sorted(label_counts.keys(), key=lambda x: label_counts[x], reverse=True)
+
+        # shuffle the lables
+        random.shuffle(labels)
+        
+        if len(labels) < drift_phases:
+            drift_phases = len(labels)
+            print(f"Drift phases adjusted to {drift_phases} because there are only {len(labels)} labels")
+            print(flush=True)
+
+        # print labels and their frequencies
+        for label in labels:
+            print(f"{label}: {label_counts[label]}")
+        print(flush=True)
 
         label_to_phase_id = np.arange(len(labels)) % drift_phases
 
@@ -441,7 +460,6 @@ class Benchmark(unittest.TestCase):
                     phase_id_offsets[phase_id_itr] = end_idx
         
         final_dataset = concatenate_datasets(dataset_list)
-        import pdb; pdb.set_trace()
         return final_dataset
             
         
@@ -566,7 +584,7 @@ class Benchmark(unittest.TestCase):
         )
         logging.info(f"data_entries: {data_entries}")
         
-        data_entries = self.induce_artifical_drift(data_entries, "response_llama_3_70b", 1.0, 41)
+        data_entries = self.induce_artifical_drift(data_entries, "response_llama_3_8b", 1.0, 50)
 
         for idx, data_entry in enumerate(data_entries):
             if idx >= max_samples:
