@@ -14,4 +14,6 @@ __all__ = [
     "NoEvictionPolicy",
     "EvictionPolicy",
     "SCUEvictionPolicy",
+    "LFUEvictionPolicy",
 ]
+from vcache.vcache_core.cache.eviction_policy.lfu_eviction_policy import LFUEvictionPolicy
