@@ -1,6 +1,6 @@
 import unittest
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from unittest.mock import MagicMock, patch
+from unittest.mock import ANY, MagicMock, patch
 
 from vcache.config import VCacheConfig
 from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage.embedding_metadata_obj import (
@@ -23,7 +23,7 @@ class TestVerifiedDecisionPolicy(unittest.TestCase):
         self.mock_metadata_store = {}
         self.next_embedding_id = 0
 
-        def add_to_cache(prompt, response, id_set=None):
+        def add_to_cache(prompt, response, id_set=None, cost=None):
             self.next_embedding_id += 1
             # Simulate adding metadata
             mock_meta = MagicMock(spec=EmbeddingMetadataObj)
@@ -75,7 +75,7 @@ class TestVerifiedDecisionPolicy(unittest.TestCase):
         self.assertFalse(is_hit)
         self.assertEqual(response, "new response")
         self.mock_cache.add.assert_called_once_with(
-            prompt="prompt", response="new response", id_set=1
+            prompt="prompt", response="new response", id_set=1, cost=ANY
         )
 
     @patch("vcache.vcache_policy.strategies.verified._Algorithm.select_action")
@@ -208,7 +208,7 @@ class TestVerifiedDecisionPolicy(unittest.TestCase):
         self.assertEqual(response, "fallback response")
         # It should have been treated as a cache miss, so add is called
         self.mock_cache.add.assert_called_once_with(
-            prompt="prompt", response="fallback response", id_set=1
+            prompt="prompt", response="fallback response", id_set=1, cost=ANY
         )
 
     def test_race_condition_update_vs_eviction(self):

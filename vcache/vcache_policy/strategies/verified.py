@@ -199,10 +199,12 @@ class VerifiedDecisionPolicy(VCachePolicy):
 
         knn = self.cache.get_knn(prompt=prompt, k=1)
         if not knn:
+            start_time = time.time()
             response = self.inference_engine.create(
                 prompt=prompt, system_prompt=system_prompt
             )
-            self.cache.add(prompt=prompt, response=response, id_set=id_set)
+            cost = time.time() - start_time
+            self.cache.add(prompt=prompt, response=response, id_set=id_set, cost=cost)
             return False, response, EmbeddingMetadataObj(embedding_id=-1, response="")
 
         similarity_score, embedding_id = knn[0]
@@ -213,10 +215,14 @@ class VerifiedDecisionPolicy(VCachePolicy):
             )
         except Exception:
             # Cache eviction fallback
+            start_time = time.time()
             new_response: str = self.inference_engine.create(
                 prompt=prompt, system_prompt=system_prompt
             )
-            self.cache.add(prompt=prompt, response=new_response, id_set=id_set)
+            cost = time.time() - start_time
+            self.cache.add(
+                prompt=prompt, response=new_response, id_set=id_set, cost=cost
+            )
             return (
                 False,
                 new_response,
@@ -231,9 +237,11 @@ class VerifiedDecisionPolicy(VCachePolicy):
             case _Action.EXPLOIT:
                 return True, nn_metadata.response, nn_metadata
             case _Action.EXPLORE:
+                start_time = time.time()
                 response = self.inference_engine.create(
                     prompt=prompt, system_prompt=system_prompt
                 )
+                cost = time.time() - start_time
 
                 self.__update_cache(
                     response=response,
@@ -242,6 +250,7 @@ class VerifiedDecisionPolicy(VCachePolicy):
                     embedding_id=embedding_id,
                     prompt=prompt,
                     label_id_set=id_set,
+                    cost=cost,
                 )
 
                 return False, response, nn_metadata
@@ -254,6 +263,7 @@ class VerifiedDecisionPolicy(VCachePolicy):
         embedding_id: int,
         prompt: str,
         label_id_set: int,
+        cost: float = None,
     ) -> None:
         """
         Asynchronously validates the correctness of the cached response and updates the cache.
@@ -274,6 +284,8 @@ class VerifiedDecisionPolicy(VCachePolicy):
             label_id_set: The set identifier for the embedding. This is used in the
                 benchmark to identify if the nearest neighbor is from the same set
                 (if the cached response is correct or incorrect).
+            cost: The cost (e.g. LLM inference latency in seconds) incurred to
+                generate the response.
         """
         if self.executor is None:
             raise ValueError("Executor not initialized. Call setup() first.")
@@ -287,6 +299,7 @@ class VerifiedDecisionPolicy(VCachePolicy):
             nn_metadata.response,
             label_id_set,
             nn_metadata.id_set,
+            cost,
         )
 
     def __submit_for_background_update(
@@ -298,6 +311,7 @@ class VerifiedDecisionPolicy(VCachePolicy):
         cached_response: str,
         label_id_set: int,
         nn_id_set: int,
+        cost: float = None,
     ):
         """
         Submits a task to check answer similarity and queue a cache update.
@@ -314,6 +328,8 @@ class VerifiedDecisionPolicy(VCachePolicy):
             cached_response: The response from the cached nearest neighbor.
             label_id_set: The id_set of the label.
             nn_id_set: The id_set of the nearest neighbor.
+            cost: The cost (e.g. LLM inference latency in seconds) incurred to
+                generate the new response.
         """
         should_have_exploited = self.similarity_evaluator.answers_similar(
             a=new_response, b=cached_response, id_set_a=label_id_set, id_set_b=nn_id_set
@@ -326,6 +342,7 @@ class VerifiedDecisionPolicy(VCachePolicy):
                 embedding_id,
                 prompt,
                 label_id_set,
+                cost,
             )
         )
 
@@ -351,6 +368,8 @@ class VerifiedDecisionPolicy(VCachePolicy):
                          - id_set (int): The set identifier for the embedding. This is used in the
                             benchmark to identify if the nearest neighbor is from the same set
                             (if the cached response is correct or incorrect).
+                         - cost (float): The cost (e.g. LLM inference latency in
+                           seconds) incurred to generate the new response.
         """
         (
             should_have_exploited,
@@ -359,6 +378,7 @@ class VerifiedDecisionPolicy(VCachePolicy):
             embedding_id,
             prompt,
             id_set,
+            cost,
         ) = update_args
 
         try:
@@ -386,7 +406,9 @@ class VerifiedDecisionPolicy(VCachePolicy):
             return
 
         if not should_have_exploited:
-            self.cache.add(prompt=prompt, response=new_response, id_set=id_set)
+            self.cache.add(
+                prompt=prompt, response=new_response, id_set=id_set, cost=cost
+            )
 
         try:
             self.cache.update_metadata(

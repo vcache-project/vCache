@@ -32,7 +32,13 @@ class EmbeddingStore:
         self._add_lock = threading.Lock()
         self._remove_lock = threading.Lock()
 
-    def add_embedding(self, embedding: List[float], response: str, id_set: int) -> int:
+    def add_embedding(
+        self,
+        embedding: List[float],
+        response: str,
+        id_set: int,
+        cost: float = None,
+    ) -> int:
         """Adds an embedding and its metadata to the store.
 
         This operation is thread-safe.
@@ -43,6 +49,8 @@ class EmbeddingStore:
             id_set (int): The set identifier for the embedding. This is used in the
                 benchmark to identify if the nearest neighbor is from the same set
                 (if the cached response is correct or incorrect).
+            cost (float): The cost (e.g. LLM inference latency in seconds) incurred
+                to generate the response. Used by cost-aware eviction policies.
 
         Returns:
             int: The ID of the added embedding.
@@ -53,6 +61,7 @@ class EmbeddingStore:
                 embedding_id=embedding_id,
                 response=response,
                 id_set=id_set,
+                cost=cost,
             )
             self.embedding_metadata_storage.add_metadata(
                 embedding_id=embedding_id, metadata=metadata
