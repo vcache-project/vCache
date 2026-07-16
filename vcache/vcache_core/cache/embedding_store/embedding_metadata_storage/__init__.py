@@ -7,9 +7,13 @@ from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage.strateg
 from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage.strategies.langchain import (
     LangchainMetadataStorage,
 )
+from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage.strategies.sqlite import (
+    SQLiteEmbeddingMetadataStorage,
+)
 
 __all__ = [
     "EmbeddingMetadataStorage",
     "InMemoryEmbeddingMetadataStorage",
     "LangchainMetadataStorage",
+    "SQLiteEmbeddingMetadataStorage",
 ]
