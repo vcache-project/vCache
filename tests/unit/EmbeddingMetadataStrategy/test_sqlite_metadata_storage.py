@@ -78,7 +78,9 @@ class TestSQLiteEmbeddingMetadataStorage(unittest.TestCase):
         first_instance = SQLiteEmbeddingMetadataStorage(self.db_path)
         first_instance.add_metadata(
             embedding_id=7,
-            metadata=EmbeddingMetadataObj(embedding_id=7, response="persisted", id_set=3),
+            metadata=EmbeddingMetadataObj(
+                embedding_id=7, response="persisted", id_set=3
+            ),
         )
         del first_instance
 
