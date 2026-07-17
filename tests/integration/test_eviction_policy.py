@@ -165,10 +165,17 @@ class TestEvictionPolicy(unittest.TestCase):
             time.sleep(1)
             return original_evict_victims(*args, **kwargs)
 
-        with patch.object(
-            self.vcache.vcache_config.eviction_policy,
-            "_evict_victims",
-            side_effect=slow_evict_victims,
+        with (
+            patch.object(
+                self.vcache.vcache_config.eviction_policy,
+                "_evict_victims",
+                side_effect=slow_evict_victims,
+            ),
+            patch.object(
+                self.vcache.vcache_policy.inference_engine,
+                "create",
+                return_value="mock response",
+            ),
         ):
             # Fill the cache up to just before the watermark limit
             for i in range(self.watermark_limit - 1):
