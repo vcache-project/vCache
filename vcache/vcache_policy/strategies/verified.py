@@ -199,11 +199,11 @@ class VerifiedDecisionPolicy(VCachePolicy):
 
         knn = self.cache.get_knn(prompt=prompt, k=1)
         if not knn:
-            start_time = time.time()
+            start_time = time.perf_counter()
             response = self.inference_engine.create(
                 prompt=prompt, system_prompt=system_prompt
             )
-            cost = time.time() - start_time
+            cost = time.perf_counter() - start_time
             self.cache.add(prompt=prompt, response=response, id_set=id_set, cost=cost)
             return False, response, EmbeddingMetadataObj(embedding_id=-1, response="")
 
@@ -215,11 +215,11 @@ class VerifiedDecisionPolicy(VCachePolicy):
             )
         except Exception:
             # Cache eviction fallback
-            start_time = time.time()
+            start_time = time.perf_counter()
             new_response: str = self.inference_engine.create(
                 prompt=prompt, system_prompt=system_prompt
             )
-            cost = time.time() - start_time
+            cost = time.perf_counter() - start_time
             self.cache.add(
                 prompt=prompt, response=new_response, id_set=id_set, cost=cost
             )
@@ -237,11 +237,11 @@ class VerifiedDecisionPolicy(VCachePolicy):
             case _Action.EXPLOIT:
                 return True, nn_metadata.response, nn_metadata
             case _Action.EXPLORE:
-                start_time = time.time()
+                start_time = time.perf_counter()
                 response = self.inference_engine.create(
                     prompt=prompt, system_prompt=system_prompt
                 )
-                cost = time.time() - start_time
+                cost = time.perf_counter() - start_time
 
                 self.__update_cache(
                     response=response,

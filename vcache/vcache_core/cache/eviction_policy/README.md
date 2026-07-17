@@ -29,7 +29,7 @@ Each item added to the cache can carry a `cost` (e.g. the LLM inference latency,
 
 ### Eviction Priority
 
-For every item $i$, the policy computes a normalized staleness (time since `last_accessed`, relative to the most stale item in the cache) and a normalized cost (relative to the most expensive item in the cache). The eviction priority is:
+For every item $i$, the policy computes a min-max normalized staleness (time since `last_accessed`, scaled so the freshest item in the cache maps to 0 and the most stale maps to 1) and a min-max normalized cost (scaled so the cheapest item maps to 0 and the most expensive maps to 1). The eviction priority is:
 
 $P_i = (1 - w) \cdot \text{staleness}'_i + w \cdot (1 - \text{cost}'_i)$
 

@@ -81,38 +81,80 @@ class CostAwareEvictionPolicy(EvictionPolicy):
             return []
 
         now: datetime = datetime.now(timezone.utc)
-        staleness: List[float] = [
-            (
-                now
-                - (
-                    meta.last_accessed
-                    if meta.last_accessed is not None
-                    else self._MIN_DATETIME
-                )
-            ).total_seconds()
-            for meta in all_metadata
-        ]
+        staleness: List[float] = [self._staleness_seconds(meta, now) for meta in all_metadata]
         costs: List[float] = [
             meta.cost if meta.cost is not None else 0.0 for meta in all_metadata
         ]
 
-        max_staleness: float = max(staleness) or 1.0
-        max_cost: float = max(costs) or 1.0
+        normalized_staleness: List[float] = self._min_max_normalize(staleness)
+        normalized_cost: List[float] = self._min_max_normalize(costs)
 
-        priorities: List[Tuple[int, float]] = []
-        for meta, stale, cost in zip(all_metadata, staleness, costs):
-            normalized_staleness: float = stale / max_staleness
-            normalized_cost: float = cost / max_cost
-            priority: float = (
-                1 - self.cost_weight
-            ) * normalized_staleness + self.cost_weight * (1 - normalized_cost)
-            priorities.append((meta.embedding_id, priority))
+        priorities: List[Tuple[int, float]] = [
+            (
+                meta.embedding_id,
+                self._compute_priority(stale, cost),
+            )
+            for meta, stale, cost in zip(all_metadata, normalized_staleness, normalized_cost)
+        ]
 
         priorities.sort(key=lambda x: x[1], reverse=True)
         victims: List[int] = [
             embedding_id for embedding_id, _ in priorities[:num_to_evict]
         ]
         return victims
+
+    def _staleness_seconds(self, metadata: EmbeddingMetadataObj, now: datetime) -> float:
+        """Computes how long ago an item was last accessed, in seconds.
+
+        Args:
+            metadata (EmbeddingMetadataObj): The metadata object to inspect.
+            now (datetime): The current time to measure staleness against.
+
+        Returns:
+            float: Seconds since `last_accessed`. Items that were never
+            accessed are treated as maximally stale.
+        """
+        last_accessed = (
+            metadata.last_accessed
+            if metadata.last_accessed is not None
+            else self._MIN_DATETIME
+        )
+        return (now - last_accessed).total_seconds()
+
+    @staticmethod
+    def _min_max_normalize(values: List[float]) -> List[float]:
+        """Min-max normalizes a list of values to the [0, 1] range.
+
+        Args:
+            values (List[float]): The values to normalize.
+
+        Returns:
+            List[float]: The normalized values, in the same order. If all
+            values are equal (zero range), every value normalizes to 0.0,
+            since there is no variation to distinguish them by.
+        """
+        min_value: float = min(values)
+        max_value: float = max(values)
+        value_range: float = max_value - min_value
+        if value_range == 0:
+            return [0.0 for _ in values]
+        return [(value - min_value) / value_range for value in values]
+
+    def _compute_priority(
+        self, normalized_staleness: float, normalized_cost: float
+    ) -> float:
+        """Computes an item's eviction priority from its normalized metrics.
+
+        Args:
+            normalized_staleness (float): The item's staleness, normalized to [0, 1].
+            normalized_cost (float): The item's generation cost, normalized to [0, 1].
+
+        Returns:
+            float: The eviction priority. Higher values are evicted first.
+        """
+        return (1 - self.cost_weight) * normalized_staleness + self.cost_weight * (
+            1 - normalized_cost
+        )
 
     def __str__(self) -> str:
         """Returns a string representation of the CostAwareEvictionPolicy.
