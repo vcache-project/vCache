@@ -81,7 +81,9 @@ class CostAwareEvictionPolicy(EvictionPolicy):
             return []
 
         now: datetime = datetime.now(timezone.utc)
-        staleness: List[float] = [self._staleness_seconds(meta, now) for meta in all_metadata]
+        staleness: List[float] = [
+            self._staleness_seconds(meta, now) for meta in all_metadata
+        ]
         costs: List[float] = [
             meta.cost if meta.cost is not None else 0.0 for meta in all_metadata
         ]
@@ -94,7 +96,9 @@ class CostAwareEvictionPolicy(EvictionPolicy):
                 meta.embedding_id,
                 self._compute_priority(stale, cost),
             )
-            for meta, stale, cost in zip(all_metadata, normalized_staleness, normalized_cost)
+            for meta, stale, cost in zip(
+                all_metadata, normalized_staleness, normalized_cost
+            )
         ]
 
         priorities.sort(key=lambda x: x[1], reverse=True)
@@ -103,7 +107,9 @@ class CostAwareEvictionPolicy(EvictionPolicy):
         ]
         return victims
 
-    def _staleness_seconds(self, metadata: EmbeddingMetadataObj, now: datetime) -> float:
+    def _staleness_seconds(
+        self, metadata: EmbeddingMetadataObj, now: datetime
+    ) -> float:
         """Computes how long ago an item was last accessed, in seconds.
 
         Args:

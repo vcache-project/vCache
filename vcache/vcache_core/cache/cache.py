@@ -30,9 +30,7 @@ class Cache:
         self.embedding_engine: EmbeddingEngine = embedding_engine
         self.eviction_policy: EvictionPolicy = eviction_policy
 
-    def add(
-        self, prompt: str, response: str, id_set: int, cost: float = None
-    ) -> int:
+    def add(self, prompt: str, response: str, id_set: int, cost: float = None) -> int:
         """Computes and adds an embedding to the vector database and metadata store.
 
         Note:
