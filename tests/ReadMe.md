@@ -43,7 +43,7 @@ python -m pytest tests/unit
 ### Integration Tests
 
 Integration tests validate the **end-to-end behavior** of vCache by checking how components interact (e.g., LLM inference + vector database + thresholding policy).  
-They may involve real API calls and require a valid OpenAI key.
+Tests that make real API calls require a valid OpenAI key. Pytest skips those tests when `OPENAI_API_KEY` is not set and still runs integration tests that do not require the API.
 
 #### Running Integration Tests
 
