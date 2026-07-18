@@ -3,6 +3,9 @@ import unittest
 from datetime import datetime, timezone
 from unittest.mock import MagicMock
 
+from vcache.vcache_core.cache.eviction_policy.strategies.cost_aware import (
+    CostAwareEvictionPolicy,
+)
 from vcache.vcache_core.cache.eviction_policy.strategies.fifo import (
     FIFOEvictionPolicy,
 )
@@ -33,6 +36,7 @@ class TestEvictionPolicyStrategies(unittest.TestCase):
             mock_meta.embedding_id = i
             mock_meta.created_at = datetime.now(timezone.utc)
             mock_meta.last_accessed = mock_meta.created_at
+            mock_meta.cost = None
             self.metadata.append(mock_meta)
             time.sleep(0.01)  # Ensure timestamps are distinct
 
@@ -137,6 +141,46 @@ class TestEvictionPolicyStrategies(unittest.TestCase):
         # Fallback should use LRU, evicting the least recently used items
         self.assertEqual(len(victims), self.num_to_evict)
         self.assertEqual(sorted(victims), [2, 3])
+
+    def test_cost_aware_matches_lru_with_no_cost_data(self):
+        """With no cost data, CostAwareEvictionPolicy should behave like LRU."""
+        policy = CostAwareEvictionPolicy(self.max_size, 0.9, self.eviction_percentage)
+
+        # Simulate access to items 0 and 1, making them the most recently used
+        policy.update_eviction_metadata(self.metadata[0])
+        time.sleep(0.01)
+        policy.update_eviction_metadata(self.metadata[1])
+
+        victims = policy.select_victims(self.metadata)
+
+        # Same result as plain LRU: items 2 and 3 are the least recently used
+        self.assertEqual(len(victims), self.num_to_evict)
+        self.assertEqual(sorted(victims), [2, 3])
+
+    def test_cost_aware_protects_expensive_items(self):
+        """CostAwareEvictionPolicy should protect stale but expensive items."""
+        policy = CostAwareEvictionPolicy(
+            self.max_size, 0.9, self.eviction_percentage, cost_weight=0.9
+        )
+
+        # Simulate access to items 0 and 1, making them the most recently used.
+        # This leaves items 2, 3, and 4 as the stalest, in that order (item 2
+        # is the most stale, matching the plain-LRU test which evicts [2, 3]).
+        policy.update_eviction_metadata(self.metadata[0])
+        time.sleep(0.01)
+        policy.update_eviction_metadata(self.metadata[1])
+
+        for meta in self.metadata:
+            meta.cost = 0.0
+        # Item 2 was very expensive to generate, so it should be protected
+        # from eviction in favor of the next stalest (cheap) item, item 4.
+        self.metadata[2].cost = 100.0
+
+        victims = policy.select_victims(self.metadata)
+
+        self.assertEqual(len(victims), self.num_to_evict)
+        self.assertNotIn(2, victims)
+        self.assertEqual(sorted(victims), [3, 4])
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 # Cache Eviction Strategies
 
-A cache eviction policy is a crucial component of `vCache` that determines which items to remove when the cache reaches its capacity. The choice of policy significantly impacts cache performance, as it dictates how the system prioritizes the stored information. `vCache` supports both traditional heuristics (FIFO, LRU, MRU) and a novel, statistically-driven strategy (SCU).
+A cache eviction policy is a crucial component of `vCache` that determines which items to remove when the cache reaches its capacity. The choice of policy significantly impacts cache performance, as it dictates how the system prioritizes the stored information. `vCache` supports traditional heuristics (FIFO, LRU, MRU), a cost-aware heuristic (Cost-Aware), and a novel, statistically-driven strategy (SCU).
 
 
 ## First-In, First-Out (FIFO)
@@ -20,6 +20,26 @@ The LRU policy operates on the assumption that items that have not been used rec
 Conversely, the MRU policy evicts the items that have been accessed most recently. This seemingly counterintuitive approach is highly effective for workloads involving iterative scans over large datasets that do not fit in the cache. In such cases, once an item is accessed, it is often not needed again for a long time, making the most recently used item the best candidate for eviction.
 
 
+
+## Cost-Aware Eviction
+
+Traditional recency-based policies like LRU treat every cached item as equally expensive to regenerate. In practice, the cost of a cache miss can vary a lot: some responses come from a cheap, fast model call, while others come from an expensive, slow one. The `CostAwareEvictionPolicy` accounts for this by combining an item's staleness with the cost that was incurred to generate its cached response, so that expensive items are protected from eviction even if they are accessed less frequently.
+
+Each item added to the cache can carry a `cost` (e.g. the LLM inference latency, in seconds, that was measured when the response was generated). This is threaded through `Cache.add()` / `EmbeddingStore.add_embedding()` into the item's `EmbeddingMetadataObj`. If the cost is unknown, it is treated as free.
+
+### Eviction Priority
+
+For every item $i$, the policy computes a min-max normalized staleness (time since `last_accessed`, scaled so the freshest item in the cache maps to 0 and the most stale maps to 1) and a min-max normalized cost (scaled so the cheapest item maps to 0 and the most expensive maps to 1). The eviction priority is:
+
+$P_i = (1 - w) \cdot \text{staleness}'_i + w \cdot (1 - \text{cost}'_i)$
+
+where $w$ is the configurable `cost_weight` in $[0, 1]$. Items with the highest priority are evicted first.
+
+- With `cost_weight = 0`, this reduces exactly to LRU.
+- With `cost_weight = 1`, only cost matters and the cheapest items are evicted first, regardless of recency.
+- The default `cost_weight = 0.5` balances both signals.
+
+Because unknown costs default to `0.0`, a cache with no cost data behaves identically to LRU without any special-cased fallback logic.
 
 ## Sky Confident Utility (SCU)
 
