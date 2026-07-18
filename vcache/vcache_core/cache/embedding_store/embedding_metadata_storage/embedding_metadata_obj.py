@@ -13,6 +13,7 @@ class EmbeddingMetadataObj:
         response: str,
         last_accessed: Optional[datetime] = None,
         id_set: int = -1,
+        cost: Optional[float] = None,
     ):
         """Initializes the embedding metadata object.
 
@@ -25,6 +26,11 @@ class EmbeddingMetadataObj:
             id_set (int): The set identifier for the embedding. This is used in the
                 benchmark to identify if the nearest neighbor is from the same set
                 (if the cached response is correct or incorrect).
+            cost (Optional[float]): The cost (e.g. LLM inference latency in
+                seconds) that was incurred to generate the cached response. Used
+                by cost-aware eviction policies to avoid evicting expensive-to
+                -regenerate responses. If unknown, treated as free by such
+                policies.
         """
 
         #### Core metadata ###################################################
@@ -49,6 +55,7 @@ class EmbeddingMetadataObj:
         )
         self.created_at: datetime = datetime.now(timezone.utc)
         self.usage_count: int = 0
+        self.cost: Optional[float] = cost
 
     def __eq__(self, other: object) -> bool:
         """Checks for equality with another EmbeddingMetadataObj.

@@ -1,6 +1,7 @@
 import unittest
 from unittest.mock import MagicMock
 
+import pytest
 from dotenv import load_dotenv
 
 from vcache import (
@@ -11,6 +12,8 @@ from vcache import (
 )
 
 load_dotenv()
+
+pytestmark = pytest.mark.requires_openai
 
 
 def create_default_config_and_policy():
