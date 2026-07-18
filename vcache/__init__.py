@@ -37,6 +37,7 @@ from .vcache_core.cache.embedding_engine import (
 from .vcache_core.cache.embedding_store.embedding_metadata_storage import (
     InMemoryEmbeddingMetadataStorage,
     LangchainMetadataStorage,
+    SQLiteEmbeddingMetadataStorage,
 )
 
 # Concrete Vector databases
@@ -44,6 +45,7 @@ from .vcache_core.cache.embedding_store.vector_db import (
     ChromaVectorDB,
     FAISSVectorDB,
     HNSWLibVectorDB,
+    PersistentHNSWLibVectorDB,
     SimilarityMetricType,
     VectorDB,
 )
@@ -113,6 +115,7 @@ __all__ = [
     # Concrete Vector databases
     "FAISSVectorDB",
     "HNSWLibVectorDB",
+    "PersistentHNSWLibVectorDB",
     "ChromaVectorDB",
     "SimilarityMetricType",
     # Concrete Similarity evaluators
@@ -130,5 +133,6 @@ __all__ = [
     # Concrete Embedding metadata storage
     "InMemoryEmbeddingMetadataStorage",
     "LangchainMetadataStorage",
+    "SQLiteEmbeddingMetadataStorage",
     "EmbeddingMetadataObj",
 ]
