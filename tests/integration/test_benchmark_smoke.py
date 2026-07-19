@@ -5,7 +5,6 @@ import unittest
 
 import pandas as pd
 
-from benchmarks.benchmark import Benchmark
 from vcache import VCache, VCacheConfig, VerifiedDecisionPolicy
 from vcache.inference_engine.strategies.benchmark import BenchmarkInferenceEngine
 from vcache.vcache_core.cache.embedding_engine.strategies.benchmark import (
@@ -67,6 +66,13 @@ class TestBenchmarkSmoke(unittest.TestCase):
     """
 
     def setUp(self):
+        # Imported locally (not at module level) because `Benchmark` itself
+        # subclasses unittest.TestCase (an existing quirk of benchmark.py).
+        # A module-level import here would make pytest collect and try to
+        # run `Benchmark` as its own bare test case, which fails since it
+        # requires a `vcache` constructor argument pytest can't supply.
+        from benchmarks.benchmark import Benchmark
+
         self.output_dir = tempfile.mkdtemp()
 
         eviction_policy = MRUEvictionPolicy(
