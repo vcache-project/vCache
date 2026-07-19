@@ -66,6 +66,11 @@ from benchmarks.common.comparison import (
     answers_have_same_meaning_llm,
     answers_have_same_meaning_static,
 )
+from benchmarks.common.resource_metrics import (
+    ResourceSampler,
+    count_tokens,
+    gpu_utilization_percent,
+)
 from vcache.config import VCacheConfig
 from vcache.inference_engine.strategies.benchmark import (
     BenchmarkInferenceEngine,
@@ -399,6 +404,13 @@ class Benchmark(unittest.TestCase):
         self.fn_list: List[int] = []
         self.latency_direct_list: List[float] = []
         self.latency_vcache_list: List[float] = []
+        self.cpu_percent_list: List[float] = []
+        self.memory_mb_list: List[float] = []
+        self.gpu_util_list: List[float] = []
+        self._resource_sampler: ResourceSampler = ResourceSampler()
+        self._total_tokens: int = 0
+        self._loop_start_time: float = None
+        self.elapsed_time_sec: float = None
         self.observations_dict: Dict[str, Dict[str, float]] = {}
         self.gammas_dict: Dict[str, float] = {}
         self.t_hats_dict: Dict[str, float] = {}
@@ -431,6 +443,7 @@ class Benchmark(unittest.TestCase):
             desc="Processing entries",
             disable=DISABLE_PROGRESS_BAR,
         )
+        self._loop_start_time = time.time()
 
         for idx, data_entry in enumerate(data_entries):
             if idx >= max_samples:
@@ -467,11 +480,14 @@ class Benchmark(unittest.TestCase):
                 nn_metadata=nn_metadata,
                 latency_direct=latency_direct,
                 latency_vcache=latency_vcache,
+                prompt=prompt,
+                response_text=cache_response or label_response,
             )
 
             pbar.update(1)
 
         pbar.close()
+        self.elapsed_time_sec = time.time() - self._loop_start_time
 
     def run_benchmark_loop(self, data_entries: List[Dict], max_samples: int):
         """Run benchmark loop for pre-computed datasets from HuggingFace.
@@ -499,6 +515,7 @@ class Benchmark(unittest.TestCase):
             disable=DISABLE_PROGRESS_BAR,
         )
         logging.info(f"data_entries: {data_entries}")
+        self._loop_start_time = time.time()
 
         for idx, data_entry in enumerate(data_entries):
             if idx >= max_samples:
@@ -557,11 +574,14 @@ class Benchmark(unittest.TestCase):
                 nn_metadata=nn_metadata,
                 latency_direct=latency_direct,
                 latency_vcache=latency_vcache,
+                prompt=prompt,
+                response_text=cache_response or label_response,
             )
 
             pbar.update(1)
 
         pbar.close()
+        self.elapsed_time_sec = time.time() - self._loop_start_time
 
     def test_run_benchmark(self, max_samples):
         """Main benchmark execution method that loads data and runs evaluation.
@@ -616,6 +636,7 @@ class Benchmark(unittest.TestCase):
             return
 
         self.dump_results_to_json()
+        self.dump_results_to_csv()
         generate_individual_plots(
             self,
             font_size=PLOT_FONT_SIZE,
@@ -636,6 +657,8 @@ class Benchmark(unittest.TestCase):
         nn_metadata: EmbeddingMetadataObj,
         latency_direct: float,
         latency_vcache: float,
+        prompt: str = "",
+        response_text: str = "",
     ):
         """Update benchmark statistics with results from a single inference.
 
@@ -653,6 +676,8 @@ class Benchmark(unittest.TestCase):
             nn_metadata: Metadata object for the nearest neighbor in cache.
             latency_direct: Latency for direct inference without cache.
             latency_vcache: Latency for vCache inference including cache logic.
+            prompt: The input prompt, used to estimate token throughput.
+            response_text: The response text, used to estimate token throughput.
 
         Note:
             The method uses different correctness evaluation strategies based on
@@ -710,6 +735,11 @@ class Benchmark(unittest.TestCase):
 
         self.latency_direct_list.append(latency_direct)
         self.latency_vcache_list.append(latency_vcache)
+
+        self.cpu_percent_list.append(self._resource_sampler.cpu_percent())
+        self.memory_mb_list.append(self._resource_sampler.memory_mb())
+        self.gpu_util_list.append(gpu_utilization_percent())
+        self._total_tokens += count_tokens(prompt) + count_tokens(response_text)
 
     def get_vcache_answer(
         self,
@@ -916,6 +946,21 @@ class Benchmark(unittest.TestCase):
             "fn_list": self.fn_list,
             "latency_direct_list": self.latency_direct_list,
             "latency_vectorq_list": self.latency_vcache_list,
+            "cpu_percent_list": self.cpu_percent_list,
+            "memory_mb_list": self.memory_mb_list,
+            "peak_memory_mb": max(self.memory_mb_list) if self.memory_mb_list else None,
+            "gpu_util_list": self.gpu_util_list,
+            "elapsed_time_sec": self.elapsed_time_sec,
+            "throughput_qps": (
+                len(self.cache_hit_list) / self.elapsed_time_sec
+                if self.elapsed_time_sec
+                else None
+            ),
+            "throughput_tps": (
+                self._total_tokens / self.elapsed_time_sec
+                if self.elapsed_time_sec
+                else None
+            ),
             "observations_dict": self.observations_dict,
             "gammas_dict": self.gammas_dict,
             "t_hats_dict": self.t_hats_dict,
@@ -931,6 +976,35 @@ class Benchmark(unittest.TestCase):
         filepath = self.output_folder_path + f"/results_{self.timestamp}.json"
         with open(filepath, "w") as json_file:
             json.dump(data, json_file, indent=4)
+        logging.info(f"Results successfully dumped to {filepath}")
+
+    def dump_results_to_csv(self):
+        """Serialize per-query benchmark results to a CSV file.
+
+        Writes one row per processed query, covering cache hit/miss outcome,
+        classification labels, latency, and the resource/throughput metrics
+        (CPU, memory, GPU utilization) sampled for that query. This is a
+        row-aligned companion to `dump_results_to_json`, useful for quick
+        spreadsheet-style inspection or downstream analysis with pandas.
+        """
+        df = pd.DataFrame(
+            {
+                "cache_hit": self.cache_hit_list,
+                "cache_miss": self.cache_miss_list,
+                "tp": self.tp_list,
+                "fp": self.fp_list,
+                "tn": self.tn_list,
+                "fn": self.fn_list,
+                "latency_direct": self.latency_direct_list,
+                "latency_vcache": self.latency_vcache_list,
+                "cpu_percent": self.cpu_percent_list,
+                "memory_mb": self.memory_mb_list,
+                "gpu_util_percent": self.gpu_util_list,
+            }
+        )
+
+        filepath = self.output_folder_path + f"/results_{self.timestamp}.csv"
+        df.to_csv(filepath, index=False)
         logging.info(f"Results successfully dumped to {filepath}")
 
 
