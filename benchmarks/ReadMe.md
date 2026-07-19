@@ -125,6 +125,30 @@ You can benchmark vCache on your own datasets. The script supports `.csv` and `.
 
 Benchmark results are saved to the `benchmarks/results/` directory, organized by dataset, embedding model, and LLM. For each run, the output includes:
 - **JSON files** containing raw data on cache hits, misses, latency, accuracy metrics, and internal vCache statistics.
+- **CSV files** with the same per-query metrics in a flat, row-per-query table (`cache_hit`, `latency_direct`, `latency_vcache`, `cpu_percent`, `memory_mb`, `gpu_util_percent`, ...), convenient for spreadsheets or `pandas`.
 - **Plot images (`.png`, `.pdf`)** visualizing key trade-offs, such as cache hit rate vs. accuracy and latency savings.
 
 These metrics help assess the trade-offs between reliability, efficiency, and reuse across different semantic caching strategies.
+
+A sample run's output is committed at [`benchmarks/results/sample/`](results/sample/) so you can see the file format without running anything.
+
+
+### Resource & Throughput Metrics
+
+Alongside cache hit rate, accuracy, and latency, every run also records, per query:
+- `cpu_percent_list` / `memory_mb_list`: the benchmark process's CPU usage (%) and resident memory (MB), sampled via [`psutil`](https://pypi.org/project/psutil/) right after each query completes. `peak_memory_mb` is the run's maximum.
+- `gpu_util_list`: GPU utilization (%) of device 0, sampled via [`pynvml`](https://pypi.org/project/pynvml/). This is **best-effort**: it's `None` for every query unless you `pip install pynvml` and have a working NVIDIA driver — no error is raised either way.
+
+And for the run as a whole:
+- `elapsed_time_sec`: total wall-clock time for the benchmark loop.
+- `throughput_qps`: queries processed per second (`num_queries / elapsed_time_sec`).
+- `throughput_tps`: tokens processed per second, summing prompt + response tokens (counted with [`tiktoken`](https://pypi.org/project/tiktoken/)'s `cl100k_base` encoding when available, falling back to a whitespace word count otherwise).
+
+These are implemented in `benchmarks/common/resource_metrics.py` and wired into `Benchmark.update_stats` / `dump_results_to_json` / `dump_results_to_csv` in `benchmarks/benchmark.py`.
+
+
+## Continuous Integration
+
+Running the full benchmark suite on every commit isn't practical — it downloads large Hugging Face datasets and, for custom/live datasets, makes real LLM API calls. Instead, `tests/integration/test_benchmark_smoke.py` and `tests/unit/Benchmark/test_resource_metrics.py` exercise the exact same metrics pipeline (`Benchmark.run_benchmark_loop`, `update_stats`, `dump_results_to_json`/`dump_results_to_csv`, and the resource-sampling helpers) against a small synthetic, fully offline dataset using `BenchmarkInferenceEngine`/`BenchmarkEmbeddingEngine` (pre-set responses/embeddings, no network or API key required). These tests run automatically in the `test` job of `.github/workflows/ci.yml` on every commit, so regressions in the benchmarking instrumentation are caught immediately, without the cost or flakiness of a full-scale run.
+
+If you want to track real performance trends over time, periodically run `python benchmarks/benchmark.py` with a small `RUN_COMBINATIONS` entry and commit or archive the resulting JSON/CSV — see `benchmarks/results/sample/` for the expected format.
