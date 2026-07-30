@@ -170,6 +170,39 @@ class VerifiedDecisionPolicy(VCachePolicy):
         if self.callback_queue:
             self.callback_queue.stop()
 
+    def _generate_and_measure_cost(
+        self, prompt: str, system_prompt: Optional[str]
+    ) -> Tuple[str, float]:
+        """
+        Generates a response and determines its generation cost.
+
+        Cost is normally measured as the wall-clock duration of the
+        `create()` call, which reflects real latency for a live inference
+        engine. Test doubles that return canned responses instantly (e.g.
+        `BenchmarkInferenceEngine`) would otherwise always report a
+        near-zero cost regardless of the latency they are simulating, so if
+        the engine exposes a `next_cost` attribute, that value is used
+        instead.
+
+        Args:
+            prompt: The prompt to generate a response for.
+            system_prompt: The optional system prompt to use for the response.
+
+        Returns:
+            Tuple containing [response, cost_in_seconds].
+        """
+        start_time = time.perf_counter()
+        response = self.inference_engine.create(
+            prompt=prompt, system_prompt=system_prompt
+        )
+        injected_cost = getattr(self.inference_engine, "next_cost", None)
+        cost = (
+            injected_cost
+            if injected_cost is not None
+            else time.perf_counter() - start_time
+        )
+        return response, cost
+
     @override
     def process_request(
         self, prompt: str, system_prompt: Optional[str], id_set: int
@@ -199,11 +232,7 @@ class VerifiedDecisionPolicy(VCachePolicy):
 
         knn = self.cache.get_knn(prompt=prompt, k=1)
         if not knn:
-            start_time = time.perf_counter()
-            response = self.inference_engine.create(
-                prompt=prompt, system_prompt=system_prompt
-            )
-            cost = time.perf_counter() - start_time
+            response, cost = self._generate_and_measure_cost(prompt, system_prompt)
             self.cache.add(prompt=prompt, response=response, id_set=id_set, cost=cost)
             return False, response, EmbeddingMetadataObj(embedding_id=-1, response="")
 
@@ -215,11 +244,7 @@ class VerifiedDecisionPolicy(VCachePolicy):
             )
         except Exception:
             # Cache eviction fallback
-            start_time = time.perf_counter()
-            new_response: str = self.inference_engine.create(
-                prompt=prompt, system_prompt=system_prompt
-            )
-            cost = time.perf_counter() - start_time
+            new_response, cost = self._generate_and_measure_cost(prompt, system_prompt)
             self.cache.add(
                 prompt=prompt, response=new_response, id_set=id_set, cost=cost
             )
@@ -237,11 +262,7 @@ class VerifiedDecisionPolicy(VCachePolicy):
             case _Action.EXPLOIT:
                 return True, nn_metadata.response, nn_metadata
             case _Action.EXPLORE:
-                start_time = time.perf_counter()
-                response = self.inference_engine.create(
-                    prompt=prompt, system_prompt=system_prompt
-                )
-                cost = time.perf_counter() - start_time
+                response, cost = self._generate_and_measure_cost(prompt, system_prompt)
 
                 self.__update_cache(
                     response=response,

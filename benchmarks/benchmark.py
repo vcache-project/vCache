@@ -66,6 +66,11 @@ from benchmarks.common.comparison import (
     answers_have_same_meaning_llm,
     answers_have_same_meaning_static,
 )
+from benchmarks.common.resource_metrics import (
+    ResourceSampler,
+    count_tokens,
+    gpu_utilization_percent,
+)
 from vcache.config import VCacheConfig
 from vcache.inference_engine.strategies.benchmark import (
     BenchmarkInferenceEngine,
@@ -89,7 +94,13 @@ from vcache.vcache_core.cache.embedding_store.vector_db import (
     SimilarityMetricType,
 )
 from vcache.vcache_core.cache.eviction_policy.eviction_policy import EvictionPolicy
+from vcache.vcache_core.cache.eviction_policy.strategies.cost_aware import (
+    CostAwareEvictionPolicy,
+)
+from vcache.vcache_core.cache.eviction_policy.strategies.fifo import FIFOEvictionPolicy
+from vcache.vcache_core.cache.eviction_policy.strategies.lru import LRUEvictionPolicy
 from vcache.vcache_core.cache.eviction_policy.strategies.mru import MRUEvictionPolicy
+from vcache.vcache_core.cache.eviction_policy.strategies.scu import SCUEvictionPolicy
 from vcache.vcache_core.similarity_evaluator import SimilarityEvaluator
 from vcache.vcache_core.similarity_evaluator.strategies.benchmark_comparison import (
     BenchmarkComparisonSimilarityEvaluator,
@@ -321,6 +332,63 @@ RUN_COMBINATIONS: List[
         MRUEvictionPolicy(max_size=100000, watermark=0.99, eviction_percentage=0.1),
         27500,
     ),
+    # Eviction policy comparison: CostAwareEvictionPolicy against every other
+    # eviction strategy in the codebase (LRU, MRU, FIFO, SCU). Same
+    # dataset/model/sample count across all five entries, differing only in
+    # eviction policy, so any metric delta is attributable to that one
+    # variable. `max_size` is set well below `max_samples` (unlike the
+    # combinations above, where the cache never fills up) so eviction
+    # actually triggers repeatedly during the run. LRU is the most important
+    # of these baselines: per CostAwareEvictionPolicy's own docs, it reduces
+    # to plain LRU at cost_weight=0, so that comparison isolates exactly what
+    # the cost-weighting term adds.
+    (
+        EmbeddingModel.E5_LARGE_V2,
+        LargeLanguageModel.GPT_4O_MINI,
+        Dataset.SEM_BENCHMARK_ARENA,
+        GeneratePlotsOnly.NO,
+        BenchmarkComparisonSimilarityEvaluator(),
+        CostAwareEvictionPolicy(
+            max_size=300, watermark=0.9, eviction_percentage=0.1, cost_weight=0.5
+        ),
+        3000,
+    ),
+    (
+        EmbeddingModel.E5_LARGE_V2,
+        LargeLanguageModel.GPT_4O_MINI,
+        Dataset.SEM_BENCHMARK_ARENA,
+        GeneratePlotsOnly.NO,
+        BenchmarkComparisonSimilarityEvaluator(),
+        LRUEvictionPolicy(max_size=300, watermark=0.9, eviction_percentage=0.1),
+        3000,
+    ),
+    (
+        EmbeddingModel.E5_LARGE_V2,
+        LargeLanguageModel.GPT_4O_MINI,
+        Dataset.SEM_BENCHMARK_ARENA,
+        GeneratePlotsOnly.NO,
+        BenchmarkComparisonSimilarityEvaluator(),
+        MRUEvictionPolicy(max_size=300, watermark=0.9, eviction_percentage=0.1),
+        3000,
+    ),
+    (
+        EmbeddingModel.E5_LARGE_V2,
+        LargeLanguageModel.GPT_4O_MINI,
+        Dataset.SEM_BENCHMARK_ARENA,
+        GeneratePlotsOnly.NO,
+        BenchmarkComparisonSimilarityEvaluator(),
+        FIFOEvictionPolicy(max_size=300, watermark=0.9, eviction_percentage=0.1),
+        3000,
+    ),
+    (
+        EmbeddingModel.E5_LARGE_V2,
+        LargeLanguageModel.GPT_4O_MINI,
+        Dataset.SEM_BENCHMARK_ARENA,
+        GeneratePlotsOnly.NO,
+        BenchmarkComparisonSimilarityEvaluator(),
+        SCUEvictionPolicy(max_size=300, watermark=0.9, eviction_percentage=0.1),
+        3000,
+    ),
 ]
 
 BASELINES_TO_RUN: List[Baseline] = [
@@ -399,6 +467,13 @@ class Benchmark(unittest.TestCase):
         self.fn_list: List[int] = []
         self.latency_direct_list: List[float] = []
         self.latency_vcache_list: List[float] = []
+        self.cpu_percent_list: List[float] = []
+        self.memory_mb_list: List[float] = []
+        self.gpu_util_list: List[float] = []
+        self._resource_sampler: ResourceSampler = ResourceSampler()
+        self._total_tokens: int = 0
+        self._loop_start_time: float = None
+        self.elapsed_time_sec: float = None
         self.observations_dict: Dict[str, Dict[str, float]] = {}
         self.gammas_dict: Dict[str, float] = {}
         self.t_hats_dict: Dict[str, float] = {}
@@ -431,6 +506,7 @@ class Benchmark(unittest.TestCase):
             desc="Processing entries",
             disable=DISABLE_PROGRESS_BAR,
         )
+        self._loop_start_time = time.time()
 
         for idx, data_entry in enumerate(data_entries):
             if idx >= max_samples:
@@ -467,11 +543,14 @@ class Benchmark(unittest.TestCase):
                 nn_metadata=nn_metadata,
                 latency_direct=latency_direct,
                 latency_vcache=latency_vcache,
+                prompt=prompt,
+                response_text=cache_response or label_response,
             )
 
             pbar.update(1)
 
         pbar.close()
+        self.elapsed_time_sec = time.time() - self._loop_start_time
 
     def run_benchmark_loop(self, data_entries: List[Dict], max_samples: int):
         """Run benchmark loop for pre-computed datasets from HuggingFace.
@@ -499,6 +578,7 @@ class Benchmark(unittest.TestCase):
             disable=DISABLE_PROGRESS_BAR,
         )
         logging.info(f"data_entries: {data_entries}")
+        self._loop_start_time = time.time()
 
         for idx, data_entry in enumerate(data_entries):
             if idx >= max_samples:
@@ -539,6 +619,7 @@ class Benchmark(unittest.TestCase):
                 label_response=label_response,
                 system_prompt=system_prompt,
                 id_set=label_id_set,
+                cost=llm_generation_latency,
             )
             latency_vcache: float = latency_vcache_logic + emb_generation_latency
             if not is_cache_hit:
@@ -557,11 +638,14 @@ class Benchmark(unittest.TestCase):
                 nn_metadata=nn_metadata,
                 latency_direct=latency_direct,
                 latency_vcache=latency_vcache,
+                prompt=prompt,
+                response_text=cache_response or label_response,
             )
 
             pbar.update(1)
 
         pbar.close()
+        self.elapsed_time_sec = time.time() - self._loop_start_time
 
     def test_run_benchmark(self, max_samples):
         """Main benchmark execution method that loads data and runs evaluation.
@@ -616,6 +700,7 @@ class Benchmark(unittest.TestCase):
             return
 
         self.dump_results_to_json()
+        self.dump_results_to_csv()
         generate_individual_plots(
             self,
             font_size=PLOT_FONT_SIZE,
@@ -636,6 +721,8 @@ class Benchmark(unittest.TestCase):
         nn_metadata: EmbeddingMetadataObj,
         latency_direct: float,
         latency_vcache: float,
+        prompt: str = "",
+        response_text: str = "",
     ):
         """Update benchmark statistics with results from a single inference.
 
@@ -653,6 +740,8 @@ class Benchmark(unittest.TestCase):
             nn_metadata: Metadata object for the nearest neighbor in cache.
             latency_direct: Latency for direct inference without cache.
             latency_vcache: Latency for vCache inference including cache logic.
+            prompt: The input prompt, used to estimate token throughput.
+            response_text: The response text, used to estimate token throughput.
 
         Note:
             The method uses different correctness evaluation strategies based on
@@ -711,6 +800,11 @@ class Benchmark(unittest.TestCase):
         self.latency_direct_list.append(latency_direct)
         self.latency_vcache_list.append(latency_vcache)
 
+        self.cpu_percent_list.append(self._resource_sampler.cpu_percent())
+        self.memory_mb_list.append(self._resource_sampler.memory_mb())
+        self.gpu_util_list.append(gpu_utilization_percent())
+        self._total_tokens += count_tokens(prompt) + count_tokens(response_text)
+
     def get_vcache_answer(
         self,
         prompt: str,
@@ -718,6 +812,7 @@ class Benchmark(unittest.TestCase):
         label_response: str,
         system_prompt: str,
         id_set: int,
+        cost: float = None,
     ) -> Tuple[bool, str, EmbeddingMetadataObj, EmbeddingMetadataObj, float]:
         """Get vCache response for pre-computed datasets with embedding injection.
 
@@ -731,6 +826,12 @@ class Benchmark(unittest.TestCase):
             label_response: Ground truth response to inject into inference engine.
             system_prompt: System prompt for structured outputs.
             id_set: ID set for the prompt (used for correctness evaluation).
+            cost: The dataset's recorded LLM generation latency for this
+                prompt, in seconds. `BenchmarkInferenceEngine.create()`
+                returns the pre-set response instantly, so on a cache miss
+                a wall-clock cost measurement would be near-zero regardless
+                of this value; passing it through lets cost-aware eviction
+                policies see the real, dataset-recorded generation cost.
 
         Returns:
             Tuple containing:
@@ -767,7 +868,9 @@ class Benchmark(unittest.TestCase):
         self.vcache.vcache_config.embedding_engine.set_next_embedding(
             candidate_embedding
         )
-        self.vcache.vcache_config.inference_engine.set_next_response(label_response)
+        self.vcache.vcache_config.inference_engine.set_next_response(
+            label_response, cost=cost
+        )
 
         latency_vcache_logic: float = time.time()
         try:
@@ -841,6 +944,25 @@ class Benchmark(unittest.TestCase):
             latency_vcache_logic,
         )
 
+    @staticmethod
+    def _latency_stats(latencies: List[float]) -> Dict[str, float]:
+        """Computes mean/p95/p99 for a list of per-query latencies.
+
+        Args:
+            latencies: Per-query latency measurements, in seconds.
+
+        Returns:
+            Dict with "mean", "p95", and "p99" keys. All values are None if
+            `latencies` is empty.
+        """
+        if not latencies:
+            return {"mean": None, "p95": None, "p99": None}
+        return {
+            "mean": float(np.mean(latencies)),
+            "p95": float(np.percentile(latencies, 95)),
+            "p99": float(np.percentile(latencies, 99)),
+        }
+
     def dump_results_to_json(self):
         """Serialize benchmark results to JSON file.
 
@@ -885,6 +1007,13 @@ class Benchmark(unittest.TestCase):
         self.t_primes_dict = t_primes_dict
         self.var_ts_dict = var_ts_dict
 
+        simulated_time_sec = (
+            sum(self.latency_vcache_list) if self.latency_vcache_list else None
+        )
+
+        latency_vcache_stats = self._latency_stats(self.latency_vcache_list)
+        latency_direct_stats = self._latency_stats(self.latency_direct_list)
+
         try:
             global_observations_dict = self.vcache.vcache_policy.global_observations
             global_gamma = self.vcache.vcache_policy.bayesian.global_gamma
@@ -910,12 +1039,37 @@ class Benchmark(unittest.TestCase):
             },
             "cache_hit_list": self.cache_hit_list,
             "cache_miss_list": self.cache_miss_list,
+            "hit_rate": (
+                sum(self.cache_hit_list) / len(self.cache_hit_list)
+                if self.cache_hit_list
+                else None
+            ),
             "tp_list": self.tp_list,
             "fp_list": self.fp_list,
             "tn_list": self.tn_list,
             "fn_list": self.fn_list,
             "latency_direct_list": self.latency_direct_list,
             "latency_vectorq_list": self.latency_vcache_list,
+            "latency_vcache_mean_sec": latency_vcache_stats["mean"],
+            "latency_vcache_p95_sec": latency_vcache_stats["p95"],
+            "latency_vcache_p99_sec": latency_vcache_stats["p99"],
+            "latency_direct_mean_sec": latency_direct_stats["mean"],
+            "latency_direct_p95_sec": latency_direct_stats["p95"],
+            "latency_direct_p99_sec": latency_direct_stats["p99"],
+            "cpu_percent_list": self.cpu_percent_list,
+            "memory_mb_list": self.memory_mb_list,
+            "peak_memory_mb": max(self.memory_mb_list) if self.memory_mb_list else None,
+            "gpu_util_list": self.gpu_util_list,
+            "elapsed_time_sec": self.elapsed_time_sec,
+            "simulated_time_sec": simulated_time_sec,
+            "throughput_qps": (
+                len(self.cache_hit_list) / simulated_time_sec
+                if simulated_time_sec
+                else None
+            ),
+            "throughput_tps": (
+                self._total_tokens / simulated_time_sec if simulated_time_sec else None
+            ),
             "observations_dict": self.observations_dict,
             "gammas_dict": self.gammas_dict,
             "t_hats_dict": self.t_hats_dict,
@@ -931,6 +1085,35 @@ class Benchmark(unittest.TestCase):
         filepath = self.output_folder_path + f"/results_{self.timestamp}.json"
         with open(filepath, "w") as json_file:
             json.dump(data, json_file, indent=4)
+        logging.info(f"Results successfully dumped to {filepath}")
+
+    def dump_results_to_csv(self):
+        """Serialize per-query benchmark results to a CSV file.
+
+        Writes one row per processed query, covering cache hit/miss outcome,
+        classification labels, latency, and the resource/throughput metrics
+        (CPU, memory, GPU utilization) sampled for that query. This is a
+        row-aligned companion to `dump_results_to_json`, useful for quick
+        spreadsheet-style inspection or downstream analysis with pandas.
+        """
+        df = pd.DataFrame(
+            {
+                "cache_hit": self.cache_hit_list,
+                "cache_miss": self.cache_miss_list,
+                "tp": self.tp_list,
+                "fp": self.fp_list,
+                "tn": self.tn_list,
+                "fn": self.fn_list,
+                "latency_direct": self.latency_direct_list,
+                "latency_vcache": self.latency_vcache_list,
+                "cpu_percent": self.cpu_percent_list,
+                "memory_mb": self.memory_mb_list,
+                "gpu_util_percent": self.gpu_util_list,
+            }
+        )
+
+        filepath = self.output_folder_path + f"/results_{self.timestamp}.csv"
+        df.to_csv(filepath, index=False)
         logging.info(f"Results successfully dumped to {filepath}")
 
 

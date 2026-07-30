@@ -182,6 +182,105 @@ class TestEvictionPolicyStrategies(unittest.TestCase):
         self.assertNotIn(2, victims)
         self.assertEqual(sorted(victims), [3, 4])
 
+    def test_cost_aware_cost_weight_zero_equals_lru(self):
+        """At cost_weight=0.0, CostAwareEvictionPolicy must reduce to plain
+        LRU, ignoring cost entirely -- even when cost data would otherwise
+        protect the stalest item."""
+        policy = CostAwareEvictionPolicy(
+            self.max_size, 0.9, self.eviction_percentage, cost_weight=0.0
+        )
+
+        policy.update_eviction_metadata(self.metadata[0])
+        time.sleep(0.01)
+        policy.update_eviction_metadata(self.metadata[1])
+
+        # Item 2 is the stalest and would normally be evicted first under
+        # LRU. Give it a huge cost -- at cost_weight=0.0 this must have no
+        # effect on the outcome.
+        for meta in self.metadata:
+            meta.cost = 0.0
+        self.metadata[2].cost = 1000.0
+
+        victims = policy.select_victims(self.metadata)
+
+        self.assertEqual(len(victims), self.num_to_evict)
+        self.assertEqual(sorted(victims), [2, 3])
+
+    def test_cost_aware_cost_weight_one_ignores_staleness(self):
+        """At cost_weight=1.0, eviction should be driven purely by cost,
+        even when that means evicting the freshest (least stale) items."""
+        policy = CostAwareEvictionPolicy(
+            self.max_size, 0.9, self.eviction_percentage, cost_weight=1.0
+        )
+
+        # Items are in creation order 0 (oldest) .. 4 (newest), so plain
+        # LRU would evict 0 and 1. Make the newest items (3, 4) the
+        # cheapest -- at cost_weight=1.0 they must be evicted first despite
+        # being the freshest.
+        self.metadata[0].cost = 1000.0
+        self.metadata[1].cost = 1000.0
+        self.metadata[2].cost = 50.0
+        self.metadata[3].cost = 0.1
+        self.metadata[4].cost = 0.0
+
+        victims = policy.select_victims(self.metadata)
+
+        self.assertEqual(len(victims), self.num_to_evict)
+        self.assertEqual(sorted(victims), [3, 4])
+
+    def test_cost_aware_invalid_cost_weight_defaults_to_half(self):
+        """An out-of-range cost_weight should be clamped to the documented
+        default of 0.5 rather than silently producing an invalid policy."""
+        policy_too_low = CostAwareEvictionPolicy(
+            self.max_size, 0.9, self.eviction_percentage, cost_weight=-0.5
+        )
+        policy_too_high = CostAwareEvictionPolicy(
+            self.max_size, 0.9, self.eviction_percentage, cost_weight=1.5
+        )
+
+        self.assertEqual(policy_too_low.cost_weight, 0.5)
+        self.assertEqual(policy_too_high.cost_weight, 0.5)
+
+    def test_cost_aware_min_max_normalize(self):
+        """_min_max_normalize should scale values to [0, 1], mapping the
+        minimum to 0.0 and the maximum to 1.0, and collapse to all-zero
+        when every value is equal (no variation to distinguish them by)."""
+        normalized = CostAwareEvictionPolicy._min_max_normalize([10.0, 20.0, 30.0])
+        self.assertEqual(normalized, [0.0, 0.5, 1.0])
+
+        normalized_equal = CostAwareEvictionPolicy._min_max_normalize([5.0, 5.0, 5.0])
+        self.assertEqual(normalized_equal, [0.0, 0.0, 0.0])
+
+    def test_cost_aware_compute_priority(self):
+        """_compute_priority should blend normalized staleness and
+        (inverted) normalized cost by cost_weight, exactly per the
+        documented formula."""
+        policy = CostAwareEvictionPolicy(
+            self.max_size, 0.9, self.eviction_percentage, cost_weight=0.25
+        )
+        # priority = (1 - 0.25) * staleness + 0.25 * (1 - cost)
+        priority = policy._compute_priority(
+            normalized_staleness=0.8, normalized_cost=0.4
+        )
+        self.assertAlmostEqual(priority, 0.75 * 0.8 + 0.25 * (1 - 0.4))
+
+    def test_cost_aware_handles_negative_and_zero_cost(self):
+        """Negative or zero costs (e.g. from a bad cost measurement) should
+        not crash normalization or eviction -- they're unusual but valid
+        inputs."""
+        policy = CostAwareEvictionPolicy(
+            self.max_size, 0.9, self.eviction_percentage, cost_weight=0.9
+        )
+        self.metadata[0].cost = -5.0
+        self.metadata[1].cost = 0.0
+        self.metadata[2].cost = 0.0
+        self.metadata[3].cost = 0.0
+        self.metadata[4].cost = 0.0
+
+        victims = policy.select_victims(self.metadata)
+
+        self.assertEqual(len(victims), self.num_to_evict)
+
 
 if __name__ == "__main__":
     unittest.main()

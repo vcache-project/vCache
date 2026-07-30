@@ -9,14 +9,21 @@ class BenchmarkInferenceEngine(InferenceEngine):
     It is used for benchmarking purposes.
     """
 
-    def set_next_response(self, response: str):
+    def set_next_response(self, response: str, cost: float = None):
         """
         Set the next response to be returned by create.
 
         Args:
             response: The response to return on next call.
+            cost: The known generation cost (e.g. LLM latency in seconds)
+                for this response, if any. Callers that measure cost via
+                wall-clock time around `create()` (e.g.
+                `VerifiedDecisionPolicy`) prefer this value when set, since
+                `create()` itself returns instantly and its wall-clock
+                duration does not reflect the real generation cost.
         """
         self.next_response = response
+        self.next_cost = cost
 
     @override
     def create(self, prompt: str, system_prompt: str = None) -> str:

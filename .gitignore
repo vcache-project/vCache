@@ -16,3 +16,8 @@ bin/*
 .venv/
 .env
 *.DS_Store
+
+# Sample benchmark output committed as the benchmarking "how to" deliverable
+!benchmarks/results/sample/
+!benchmarks/results/sample/*.json
+!benchmarks/results/sample/*.csv
