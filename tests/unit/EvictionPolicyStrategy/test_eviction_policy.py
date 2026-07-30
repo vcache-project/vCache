@@ -9,6 +9,9 @@ from vcache.vcache_core.cache.eviction_policy.strategies.cost_aware import (
 from vcache.vcache_core.cache.eviction_policy.strategies.fifo import (
     FIFOEvictionPolicy,
 )
+from vcache.vcache_core.cache.eviction_policy.strategies.gpca import (
+    GPCAEvictionPolicy,
+)
 from vcache.vcache_core.cache.eviction_policy.strategies.lru import (
     LRUEvictionPolicy,
 )
@@ -181,6 +184,93 @@ class TestEvictionPolicyStrategies(unittest.TestCase):
         self.assertEqual(len(victims), self.num_to_evict)
         self.assertNotIn(2, victims)
         self.assertEqual(sorted(victims), [3, 4])
+
+    def test_gpca_cold_start_protects_expensive_items(self):
+        """During the cold-start grace period (no t_prime yet), GPCA should
+        protect an expensive item even though it has no other distinguishing
+        signal, instead of treating it as equally evictable as cheap items."""
+        policy = GPCAEvictionPolicy(self.max_size, 0.9, self.eviction_percentage)
+
+        for meta in self.metadata:
+            meta.t_prime = None
+            meta.observations = [0] * 2
+            meta.cost = 0.0
+        # Item 2 was expensive to generate, so it should be protected even
+        # though it has never been evaluated by the decision policy yet.
+        self.metadata[2].cost = 100.0
+
+        victims = policy.select_victims(self.metadata)
+
+        self.assertEqual(len(victims), self.num_to_evict)
+        self.assertNotIn(2, victims)
+        self.assertEqual(sorted(victims), [0, 1])
+
+    def test_gpca_cold_start_protects_frequently_accessed_items(self):
+        """During the cold-start grace period, an item with more accumulated
+        observations (higher frequency so far) should be protected relative
+        to equally cheap, less-frequently-seen items."""
+        policy = GPCAEvictionPolicy(self.max_size, 0.9, self.eviction_percentage)
+
+        for meta in self.metadata:
+            meta.t_prime = None
+            meta.cost = None
+            meta.observations = [0] * 2
+        # Item 3 has been observed far more than the others.
+        self.metadata[3].observations = [0] * 8
+
+        victims = policy.select_victims(self.metadata)
+
+        self.assertEqual(len(victims), self.num_to_evict)
+        self.assertNotIn(3, victims)
+        self.assertEqual(sorted(victims), [0, 1])
+
+    def test_gpca_confirmed_items_blend_confidence_and_frequency(self):
+        """Once t_prime is confirmed, protection should favor low t_prime
+        (high confidence) and high observation count (high frequency),
+        similar in spirit to SCU but blended rather than all-or-nothing."""
+        policy = GPCAEvictionPolicy(self.max_size, 0.9, self.eviction_percentage)
+
+        for meta in self.metadata:
+            meta.cost = 0.0
+        self.metadata[0].t_prime, self.metadata[0].observations = 0.9, [0] * 2
+        self.metadata[1].t_prime, self.metadata[1].observations = 0.9, [0] * 2
+        self.metadata[2].t_prime, self.metadata[2].observations = 0.1, [0] * 10
+        self.metadata[3].t_prime, self.metadata[3].observations = 0.9, [0] * 10
+        self.metadata[4].t_prime, self.metadata[4].observations = 0.5, [0] * 2
+
+        victims = policy.select_victims(self.metadata)
+
+        # Item 2 (most confident and most frequently observed) must survive;
+        # items 0 and 1 (least confident, least frequently observed) are the
+        # weakest and are evicted first.
+        self.assertEqual(len(victims), self.num_to_evict)
+        self.assertNotIn(2, victims)
+        self.assertEqual(sorted(victims), [0, 1])
+
+    def test_gpca_does_not_penalize_unconfirmed_expensive_item_like_scu(self):
+        """The specific bug GPCA fixes: SCUEvictionPolicy always evicts a
+        t_prime=None item first (infinite distance), regardless of its cost.
+        GPCA should protect an unconfirmed item instead if it is expensive,
+        rather than treating "not yet evaluated" as "worst in the cache"."""
+        policy = GPCAEvictionPolicy(self.max_size, 0.9, self.eviction_percentage)
+
+        for meta in self.metadata:
+            meta.cost = 0.0
+        self.metadata[0].t_prime, self.metadata[0].observations = 0.9, [0] * 10
+        self.metadata[1].t_prime, self.metadata[1].observations = 0.9, [0] * 2
+        self.metadata[2].t_prime, self.metadata[2].observations = 0.1, [0] * 10
+        self.metadata[3].t_prime, self.metadata[3].observations = 0.1, [0] * 2
+        # Item 4 has never been evaluated (t_prime is None, like in
+        # test_scu_eviction, where this made it a guaranteed victim) but is
+        # expensive to regenerate.
+        self.metadata[4].t_prime, self.metadata[4].observations = None, [0] * 2
+        self.metadata[4].cost = 100.0
+
+        victims = policy.select_victims(self.metadata)
+
+        self.assertEqual(len(victims), self.num_to_evict)
+        self.assertNotIn(4, victims)
+        self.assertEqual(sorted(victims), [0, 1])
 
 
 if __name__ == "__main__":

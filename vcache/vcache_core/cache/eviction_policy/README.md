@@ -95,3 +95,31 @@ This distance-based utility model provides a robust, data-driven foundation for 
     -   **Suspected Losers** (high $t'_{prime}$, low $n_{obs}$), which are treated with less prejudice, allowing them an opportunity to accumulate more data.
 
 By aligning the eviction criteria with the statistical outputs of the caching policy, the `SkyEvictionPolicy` ensures that the most valuable and reliable information is preserved.
+
+## Grace-Period Confidence-Cost Aware (GPCA)
+
+SCU's ideal-point distance treats any item without a confirmed $t'_{prime}$ (fewer than 6 observations, the minimum `VerifiedDecisionPolicy` needs before trusting a logistic-regression threshold estimate) as an infinite, worst-case distance — indistinguishable from a proven bad match. This punishes expensive, infrequently-accessed items the hardest, since they are the least likely to accumulate 6 observations before eviction pressure reaches them.
+
+`GPCAEvictionPolicy` replaces that blind spot with a grace period: while an item is unconfirmed, it is protected in proportion to its generation cost and access frequency so far, instead of being maximally evictable. Once confirmed, protection is driven by SCU-style confidence blended with frequency.
+
+### Protection Score
+
+For every item $i$, define protection $\text{prot}_i$ (higher = more protected, evicted last):
+
+**Cold-start** ($t'_{prime,i}$ is unset):
+
+$\text{prot}_i = \max(0.2,\ \text{cost}'_i,\ 0.6 \cdot \text{freq}'_i)$
+
+**Confirmed** ($t'_{prime,i}$ is set):
+
+$\text{prot}_i = \text{clip}\left(0.3 + 0.7 \cdot (1 - t'_{prime,i}) + 0.3 \cdot \text{freq}'_i,\ 0,\ 1\right)$
+
+where $\text{freq}'_i$ is the item's observation count, min-max normalized across the current cache contents, and $\text{cost}'_i$ is *log-scaled* generation cost, min-max normalized. Log-scaling matters here: real generation costs are typically heavy-tailed (a handful of extreme outliers next to many ordinary items), and normalizing raw cost directly would squash nearly every ordinary item's $\text{cost}'_i$ toward 0 next to a rare outlier, making the cost term meaningless for most items.
+
+Eviction priority is $1 - \text{prot}_i$; items with the highest priority are evicted first.
+
+With no cost data and no confidence signal at all, protection floors to 0.2 for every item — eviction degenerates toward frequency-based behavior rather than silently becoming LRU, since GPCA has no staleness term at all by design.
+
+### Empirical Results
+
+Benchmarked against LRU, FIFO, SCU, and CostAware on real conversational data (LmArena): GPCA shows a substantial hit-rate and hit-precision improvement under tight-to-medium cache pressure on workloads with genuine repeated queries (up to ~6x higher hit rate than the next-best policy at 20-40MB cache budgets). This advantage is specific to that regime, not universal — it disappears once the cache is generous relative to the working set, and GPCA shows a reproducible weakness protecting infrequently-reused expensive items across long reuse gaps compared to LRU, FIFO, and CostAware. It is a targeted improvement for repeated-query-heavy, memory-constrained workloads, not a drop-in replacement for every scenario.

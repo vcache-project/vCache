@@ -2,6 +2,7 @@ from vcache.vcache_core.cache.eviction_policy.strategies.cost_aware import (
     CostAwareEvictionPolicy,
 )
 from vcache.vcache_core.cache.eviction_policy.strategies.fifo import FIFOEvictionPolicy
+from vcache.vcache_core.cache.eviction_policy.strategies.gpca import GPCAEvictionPolicy
 from vcache.vcache_core.cache.eviction_policy.strategies.lru import LRUEvictionPolicy
 from vcache.vcache_core.cache.eviction_policy.strategies.mru import MRUEvictionPolicy
 from vcache.vcache_core.cache.eviction_policy.strategies.no_eviction import (
@@ -16,4 +17,5 @@ __all__ = [
     "NoEvictionPolicy",
     "SCUEvictionPolicy",
     "CostAwareEvictionPolicy",
+    "GPCAEvictionPolicy",
 ]
